@@ -1432,34 +1432,39 @@ export default function Kick3() {
   const soloCardRef = useRef(null);
   const h2hCardRef = useRef(null);
 
-  // Share state — used to show "Sharing..." and "Copied!" feedback
+  // Share state — shows feedback in the buttons.
+  // Two independent flows: share (native share sheet) and save (download to photos).
   const [shareState, setShareState] = useState('idle'); // 'idle' | 'working' | 'shared' | 'copied' | 'error'
+  const [saveState, setSaveState] = useState('idle');   // 'idle' | 'working' | 'saved' | 'error'
 
-  // Turn a card element into a PNG and either share or copy it.
+  // Render the verdict card to a JPEG blob.
+  // 1.5x scale + 90% JPEG quality keeps file size ~250-350KB instead of ~1MB,
+  // with no visible quality loss on phone screens.
+  const renderCardToBlob = async (cardRef) => {
+    if (!cardRef.current || !window.html2canvas) return null;
+    const canvas = await window.html2canvas(cardRef.current, {
+      backgroundColor: '#0a0a14',
+      scale: 1.5,
+      useCORS: true,
+      logging: false
+    });
+    return new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.9));
+  };
+
+  // SHARE — opens native share sheet on phone, copies on desktop, downloads as last resort.
   const shareCard = async (cardRef, mode) => {
-    if (!cardRef.current || !window.html2canvas) {
-      setShareState('error');
-      setTimeout(() => setShareState('idle'), 2000);
-      return;
-    }
     setShareState('working');
     try {
-      // Render the card to a canvas at 2x for retina-quality PNG
-      const canvas = await window.html2canvas(cardRef.current, {
-        backgroundColor: '#0a0a14',
-        scale: 2,
-        useCORS: true,
-        logging: false
-      });
-      const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
-      if (!blob) throw new Error('No blob');
+      const blob = await renderCardToBlob(cardRef);
+      if (!blob) throw new Error('Render failed');
 
-      const file = new File([blob], `kick3-day${TODAYS_QUESTION.number}.png`, { type: 'image/png' });
+      const filename = `kick3-day${TODAYS_QUESTION.number}.jpg`;
+      const file = new File([blob], filename, { type: 'image/jpeg' });
       const shareText = mode === 'h2h'
         ? `Kick 3 — Day ${TODAYS_QUESTION.number} — kick3.vercel.app`
         : `My Kick 3 score today: ${verdict?.score || ''}/10 — kick3.vercel.app`;
 
-      // Try the native Web Share API first (best mobile experience)
+      // Best mobile experience: native share sheet
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
@@ -1468,17 +1473,17 @@ export default function Kick3() {
         });
         setShareState('shared');
       } else if (navigator.clipboard && window.ClipboardItem) {
-        // Desktop / older browsers: copy image to clipboard
+        // Desktop fallback: copy image to clipboard
         await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob })
+          new ClipboardItem({ 'image/jpeg': blob })
         ]);
         setShareState('copied');
       } else {
-        // Last resort: download the image
+        // Last resort: trigger a download
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = file.name;
+        a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
         setShareState('shared');
@@ -1496,6 +1501,32 @@ export default function Kick3() {
     }
   };
 
+  // SAVE — downloads the image so it lands in the user's camera roll / Downloads.
+  // The Snapchat workaround: save → open Snapchat → pick from camera roll.
+  const saveCard = async (cardRef) => {
+    setSaveState('working');
+    try {
+      const blob = await renderCardToBlob(cardRef);
+      if (!blob) throw new Error('Render failed');
+
+      const filename = `kick3-day${TODAYS_QUESTION.number}.jpg`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setSaveState('saved');
+    } catch (err) {
+      console.error('Save failed:', err);
+      setSaveState('error');
+    } finally {
+      setTimeout(() => setSaveState('idle'), 2500);
+    }
+  };
+
   const shareLabel = {
     idle: 'SHARE VERDICT',
     working: 'GENERATING…',
@@ -1503,6 +1534,13 @@ export default function Kick3() {
     copied: 'COPIED ✓',
     error: 'TRY AGAIN'
   }[shareState];
+
+  const saveLabel = {
+    idle: 'SAVE TO PHOTOS',
+    working: 'SAVING…',
+    saved: 'SAVED ✓',
+    error: 'TRY AGAIN'
+  }[saveState];
 
   const startGame = () => {
     setMode('solo');
@@ -2313,6 +2351,40 @@ Deliver your verdict as JSON.`;
               {shareLabel}
             </button>
 
+            {/* SAVE TO PHOTOS — secondary action (Snapchat workaround) */}
+            <button
+              onClick={() => saveCard(soloCardRef)}
+              disabled={saveState === 'working'}
+              style={{
+                width: '100%',
+                marginTop: '8px',
+                padding: '13px',
+                background: 'transparent',
+                color: saveState === 'saved' ? '#27AE60' : colours.gold,
+                border: `1px solid ${saveState === 'saved' ? '#27AE60' : colours.gold}`,
+                borderRadius: '2px',
+                ...displayFont,
+                fontSize: '14px',
+                fontWeight: 500,
+                letterSpacing: '0.2em',
+                cursor: saveState === 'working' ? 'wait' : 'pointer',
+                transition: 'all 0.2s',
+                opacity: saveState === 'working' ? 0.7 : 1
+              }}
+            >
+              {saveLabel}
+            </button>
+
+            {/* Snapchat hint — only relevant when sharing */}
+            <p style={{
+              textAlign: 'center', ...condFont,
+              color: colours.muted, fontSize: '11px',
+              marginTop: '8px', marginBottom: 0,
+              fontStyle: 'italic', letterSpacing: '0.05em'
+            }}>
+              For Snapchat: save the image, then post from your camera roll.
+            </p>
+
             {/* Actions */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
               <button onClick={() => setScreen('home')} style={{
@@ -2964,6 +3036,39 @@ Deliver your verdict as JSON.`;
             >
               {shareLabel}
             </button>
+
+            {/* SAVE TO PHOTOS — secondary action (Snapchat workaround) */}
+            <button
+              onClick={() => saveCard(h2hCardRef)}
+              disabled={saveState === 'working'}
+              style={{
+                width: '100%',
+                marginTop: '8px',
+                padding: '13px',
+                background: 'transparent',
+                color: saveState === 'saved' ? '#27AE60' : colours.gold,
+                border: `1px solid ${saveState === 'saved' ? '#27AE60' : colours.gold}`,
+                borderRadius: '2px',
+                ...displayFont,
+                fontSize: '14px',
+                fontWeight: 500,
+                letterSpacing: '0.2em',
+                cursor: saveState === 'working' ? 'wait' : 'pointer',
+                transition: 'all 0.2s',
+                opacity: saveState === 'working' ? 0.7 : 1
+              }}
+            >
+              {saveLabel}
+            </button>
+
+            <p style={{
+              textAlign: 'center', ...condFont,
+              color: colours.muted, fontSize: '11px',
+              marginTop: '8px', marginBottom: 0,
+              fontStyle: 'italic', letterSpacing: '0.05em'
+            }}>
+              For Snapchat: save the image, then post from your camera roll.
+            </p>
 
             {/* Actions */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
