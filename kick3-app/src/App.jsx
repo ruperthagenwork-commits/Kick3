@@ -1432,10 +1432,8 @@ export default function Kick3() {
   const soloCardRef = useRef(null);
   const h2hCardRef = useRef(null);
 
-  // Share state — shows feedback in the buttons.
-  // Two independent flows: share (native share sheet) and save (download to photos).
+  // Share state — shows feedback in the share button.
   const [shareState, setShareState] = useState('idle'); // 'idle' | 'working' | 'shared' | 'copied' | 'error'
-  const [saveState, setSaveState] = useState('idle');   // 'idle' | 'working' | 'saved' | 'error'
 
   // Render the verdict card to a JPEG blob.
   // 1.5x scale + 90% JPEG quality keeps file size ~250-350KB instead of ~1MB,
@@ -1501,32 +1499,6 @@ export default function Kick3() {
     }
   };
 
-  // SAVE — downloads the image so it lands in the user's camera roll / Downloads.
-  // The Snapchat workaround: save → open Snapchat → pick from camera roll.
-  const saveCard = async (cardRef) => {
-    setSaveState('working');
-    try {
-      const blob = await renderCardToBlob(cardRef);
-      if (!blob) throw new Error('Render failed');
-
-      const filename = `kick3-day${TODAYS_QUESTION.number}.jpg`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setSaveState('saved');
-    } catch (err) {
-      console.error('Save failed:', err);
-      setSaveState('error');
-    } finally {
-      setTimeout(() => setSaveState('idle'), 2500);
-    }
-  };
-
   const shareLabel = {
     idle: 'SHARE VERDICT',
     working: 'GENERATING…',
@@ -1534,13 +1506,6 @@ export default function Kick3() {
     copied: 'COPIED ✓',
     error: 'TRY AGAIN'
   }[shareState];
-
-  const saveLabel = {
-    idle: 'SAVE TO PHOTOS',
-    working: 'SAVING…',
-    saved: 'SAVED ✓',
-    error: 'TRY AGAIN'
-  }[saveState];
 
   const startGame = () => {
     setMode('solo');
@@ -2351,40 +2316,6 @@ Deliver your verdict as JSON.`;
               {shareLabel}
             </button>
 
-            {/* SAVE TO PHOTOS — secondary action (Snapchat workaround) */}
-            <button
-              onClick={() => saveCard(soloCardRef)}
-              disabled={saveState === 'working'}
-              style={{
-                width: '100%',
-                marginTop: '8px',
-                padding: '13px',
-                background: 'transparent',
-                color: saveState === 'saved' ? '#27AE60' : colours.gold,
-                border: `1px solid ${saveState === 'saved' ? '#27AE60' : colours.gold}`,
-                borderRadius: '2px',
-                ...displayFont,
-                fontSize: '14px',
-                fontWeight: 500,
-                letterSpacing: '0.2em',
-                cursor: saveState === 'working' ? 'wait' : 'pointer',
-                transition: 'all 0.2s',
-                opacity: saveState === 'working' ? 0.7 : 1
-              }}
-            >
-              {saveLabel}
-            </button>
-
-            {/* Snapchat hint — only relevant when sharing */}
-            <p style={{
-              textAlign: 'center', ...condFont,
-              color: colours.muted, fontSize: '11px',
-              marginTop: '8px', marginBottom: 0,
-              fontStyle: 'italic', letterSpacing: '0.05em'
-            }}>
-              For Snapchat: save the image, then post from your camera roll.
-            </p>
-
             {/* Actions */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
               <button onClick={() => setScreen('home')} style={{
@@ -3036,39 +2967,6 @@ Deliver your verdict as JSON.`;
             >
               {shareLabel}
             </button>
-
-            {/* SAVE TO PHOTOS — secondary action (Snapchat workaround) */}
-            <button
-              onClick={() => saveCard(h2hCardRef)}
-              disabled={saveState === 'working'}
-              style={{
-                width: '100%',
-                marginTop: '8px',
-                padding: '13px',
-                background: 'transparent',
-                color: saveState === 'saved' ? '#27AE60' : colours.gold,
-                border: `1px solid ${saveState === 'saved' ? '#27AE60' : colours.gold}`,
-                borderRadius: '2px',
-                ...displayFont,
-                fontSize: '14px',
-                fontWeight: 500,
-                letterSpacing: '0.2em',
-                cursor: saveState === 'working' ? 'wait' : 'pointer',
-                transition: 'all 0.2s',
-                opacity: saveState === 'working' ? 0.7 : 1
-              }}
-            >
-              {saveLabel}
-            </button>
-
-            <p style={{
-              textAlign: 'center', ...condFont,
-              color: colours.muted, fontSize: '11px',
-              marginTop: '8px', marginBottom: 0,
-              fontStyle: 'italic', letterSpacing: '0.05em'
-            }}>
-              For Snapchat: save the image, then post from your camera roll.
-            </p>
 
             {/* Actions */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
