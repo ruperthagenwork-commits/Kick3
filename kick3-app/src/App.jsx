@@ -1459,8 +1459,8 @@ export default function Kick3() {
       const filename = `kick3-day${TODAYS_QUESTION.number}.jpg`;
       const file = new File([blob], filename, { type: 'image/jpeg' });
       const shareText = mode === 'h2h'
-        ? `Kick 3 — Day ${TODAYS_QUESTION.number} — kick3.vercel.app`
-        : `My Kick 3 score today: ${verdict?.score || ''}/10 — kick3.vercel.app`;
+        ? `Kick 3 — Day ${TODAYS_QUESTION.number} — kick3.app`
+        : `My Kick 3 score today: ${verdict?.score || ''}/10 — kick3.app`;
 
       // Best mobile experience: native share sheet
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -2288,7 +2288,7 @@ Deliver your verdict as JSON.`;
                 color: colours.gold,
                 fontStyle: 'italic'
               }}>
-                kick3.vercel.app
+                kick3.app
               </div>
             </div>
 
@@ -2940,7 +2940,7 @@ Deliver your verdict as JSON.`;
                 color: colours.gold,
                 fontStyle: 'italic'
               }}>
-                kick3.vercel.app
+                kick3.app
               </div>
             </div>
 
