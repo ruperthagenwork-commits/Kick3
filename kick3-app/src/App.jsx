@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 
 // --- 10 starter daily questions, each with a curated 24-player pool ---
 // Each pool has exactly 6 Legends, 6 Stars, 6 Cult heroes, 6 Wildcards
@@ -1880,6 +1881,7 @@ Deliver your verdict as JSON.`;
             </button>
           </div>
         </div>
+        <Analytics />
       </>
     );
   }
@@ -2008,6 +2010,7 @@ Deliver your verdict as JSON.`;
             </div>
           </div>
         </div>
+        <Analytics />
       </>
     );
   }
@@ -2108,6 +2111,7 @@ Deliver your verdict as JSON.`;
             </button>
           </div>
         </div>
+        <Analytics />
       </>
     );
   }
@@ -2363,6 +2367,7 @@ Deliver your verdict as JSON.`;
             </div>
           </div>
         </div>
+        <Analytics />
       </>
     );
   }
@@ -2467,6 +2472,7 @@ Deliver your verdict as JSON.`;
             </button>
           </div>
         </div>
+        <Analytics />
       </>
     );
   }
@@ -2543,6 +2549,7 @@ Deliver your verdict as JSON.`;
             </button>
           </div>
         </div>
+        <Analytics />
       </>
     );
   }
@@ -2622,6 +2629,7 @@ Deliver your verdict as JSON.`;
             </button>
           </div>
         </div>
+        <Analytics />
       </>
     );
   }
@@ -2764,6 +2772,7 @@ Deliver your verdict as JSON.`;
             </button>
           </div>
         </div>
+        <Analytics />
       </>
     );
   }
@@ -3015,6 +3024,7 @@ Deliver your verdict as JSON.`;
             </div>
           </div>
         </div>
+        <Analytics />
       </>
     );
   }
@@ -3179,6 +3189,7 @@ Deliver your verdict as JSON.`;
             </p>
           </div>
         </div>
+        <Analytics />
       </>
     );
   }
