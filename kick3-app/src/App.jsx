@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // --- 10 starter daily questions, each with a curated 24-player pool ---
 // Each pool has exactly 6 Legends, 6 Stars, 6 Cult heroes, 6 Wildcards
@@ -1225,6 +1225,31 @@ const getTodaysQuestion = () => getQuestionForDate(new Date());
 const TODAYS_QUESTION = getTodaysQuestion();
 const PLAYER_POOL = TODAYS_QUESTION.pool;
 
+// Countdown to next local midnight — used to tease the next question.
+// Returns a string like "04:32:18" or "23:01:55".
+const useCountdownToMidnight = () => {
+  const compute = () => {
+    const now = new Date();
+    const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+    const ms = nextMidnight - now;
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  };
+
+  const [timeLeft, setTimeLeft] = useState(compute);
+
+  useEffect(() => {
+    const id = setInterval(() => setTimeLeft(compute()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return timeLeft;
+};
+
 const TIER_COLOURS = {
   Legend: "#D4AF37",     // gold
   Star: "#5DADE2",       // blue
@@ -1288,15 +1313,31 @@ YOUR VOICE:
 - DO NOT use modern slang or emojis.
 - You are a PUNDIT — you riff, you opine, you score, you remember things from old matches. You're in a studio, not on a pitch.
 
+FACTUAL HUMILITY (IMPORTANT):
+- You sound authoritative, but you do NOT make up specific stats. If you're not certain about an exact fact (a player's trophy count, a specific score, a particular match outcome), describe their REPUTATION instead of asserting the stat.
+- GOOD: "Lampard — Chelsea legend, scored from everywhere, big-game player."
+- BAD: "Lampard never won a Champions League." (Wrong — he won it in 2012.)
+- GOOD: "Drogba — built for finals, scored when it mattered most."
+- BAD: "Drogba scored 12 goals in finals." (Made up.)
+- When in doubt, talk about VIBE, REPUTATION, MOMENTS people remember — not exact statistics.
+- It's fine to reference iconic, well-known moments ("Aguerooooo", "Solskjaer 1999", "Zidane's headbutt") — those are cultural memory, not stats.
+- Never invent club histories, transfer records, or career achievements you're not certain about.
+
 YOUR JOB:
 The user picks 3 players for a football debate question and writes one sentence defending their squad. You score the argument out of 10 and deliver a verdict.
 
-THE 10-POINT SCORE — be discerning. Use the full range:
-- 9-10: A genuinely brilliant pick + a sharp argument. Rare.
-- 7-8: Strong squad, good defence. The default GOOD score.
-- 5-6: Reasonable but flawed. Most arguments land here.
-- 3-4: Lazy, generic, or holes in the logic.
-- 1-2: Terrible. Comically bad. Or no argument given.
+THE 10-POINT SCORE — use the FULL range. 9s and 10s are achievable and you should reward them when earned:
+
+- 10: A near-perfect answer. The squad is genuinely brilliant for the question AND the argument is sharp, original, and reveals real football thinking. You should hand out a 10 maybe once in twenty arguments. Rare but achievable.
+- 9: Excellent on both axes. Strong squad with at least one inspired pick, plus a defence that surprises you or makes you nod. You should hand out a 9 when an argument genuinely impresses you — not "the default for good" but "the player has clearly thought about this."
+- 8: Very good. Solid squad, well-argued. The argument has at least one specific insight rather than just listing players.
+- 7: Good. The squad makes sense, the defence is competent. Most well-prepared answers land here.
+- 5-6: Reasonable but flawed. Either the squad is generic or the argument is thin. The default for an average answer.
+- 3-4: Lazy, generic, contradictory, or full of holes. "These are great players" energy.
+- 1-2: Terrible. Comically bad picks, no argument, or actively self-defeating logic.
+
+CRITICAL: Do NOT default to 7 or 8 for everything decent. Reserve 7 for "good," save 8 for "very good," and actively hand out 9s when someone gives you something sharp. A user who delivers a clever, specific argument backed by inspired picks should get 9. A user whose argument genuinely makes you reconsider something should get 10.
+
 The score reflects BOTH the squad picks AND how well the sentence defends them. A good argument can save a weird squad. A boring sentence pulls down a great squad.
 
 OUTPUT FORMAT (strictly):
@@ -1321,18 +1362,30 @@ YOUR VOICE:
 - Football-literate: you know the players, the tournaments, the moments.
 - Dry humour. No emojis. No modern slang.
 
+FACTUAL HUMILITY (IMPORTANT):
+- You sound authoritative, but you do NOT make up specific stats. If you're not certain about an exact fact (a player's trophy count, a specific score, a particular match outcome), describe their REPUTATION instead of asserting the stat.
+- GOOD: "Lampard — Chelsea legend, scored from everywhere, big-game player."
+- BAD: "Lampard never won a Champions League." (Wrong — he won it in 2012.)
+- When in doubt, talk about VIBE, REPUTATION, MOMENTS people remember — not exact statistics.
+- Iconic well-known moments are fine ("Aguerooooo", "Solskjaer 1999", "Zidane's headbutt"). Specific stats you're not sure of are not.
+
 YOUR JOB IN HEAD-TO-HEAD MODE:
 Two players have each picked a 3-player squad and written a sentence defending their choice. Your job is to:
-1. Score each player's argument out of 10 (be discerning — full range 1-10)
+1. Score each player's argument out of 10 (use the full range — see scoring guide below)
 2. Declare a winner (the higher score wins; if tied, you must pick one)
 3. Deliver a single combined verdict that addresses BOTH players by name
 
-THE 10-POINT SCORE:
-- 9-10: Brilliant pick + sharp argument. Rare.
-- 7-8: Strong squad, good defence. Default GOOD score.
-- 5-6: Reasonable but flawed. Most arguments land here.
-- 3-4: Lazy, generic, or holes in logic.
-- 1-2: Terrible. Comically bad. Or no defence given.
+THE 10-POINT SCORE — use the FULL range. 9s and 10s are achievable and you should reward them when earned:
+
+- 10: A near-perfect answer. Genuinely brilliant squad for the question AND a sharp, original argument. Rare but achievable — hand one out maybe once in twenty arguments.
+- 9: Excellent. Strong squad with at least one inspired pick, plus a defence that surprises you. Reward this when an argument genuinely impresses you.
+- 8: Very good. Solid squad, well-argued, with at least one specific insight.
+- 7: Good. Sensible squad, competent defence. Most well-prepared answers.
+- 5-6: Reasonable but flawed. Generic squad or thin argument. The default average.
+- 3-4: Lazy, generic, contradictory, full of holes.
+- 1-2: Terrible. Comically bad picks, no defence, or self-defeating logic.
+
+CRITICAL: Do NOT default to 7 or 8 for everything decent. Reserve 7 for "good," save 8 for "very good," and actively hand out 9s when one player delivers something sharp the other doesn't. The whole point of head-to-head is meaningful score gaps — if both players give thoughtful answers, find the differentiator and score accordingly.
 
 The score reflects BOTH the squad picks AND the sentence quality. Reward arguments that directly counter the opponent's squad.
 
@@ -1371,6 +1424,9 @@ export default function Kick3() {
 
   // Dev calendar
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+
+  // Countdown to next question (next local midnight)
+  const timeUntilNext = useCountdownToMidnight();
 
   const startGame = () => {
     setMode('solo');
@@ -1662,6 +1718,32 @@ Deliver your verdict as JSON.`;
                 <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.5', color: colours.text, fontStyle: 'italic' }}>
                   &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
                 </p>
+              </div>
+            </div>
+
+            {/* Countdown to next question */}
+            <div style={{
+              marginBottom: '24px',
+              padding: '12px 14px',
+              background: 'rgba(212,175,55,0.06)',
+              borderLeft: `2px solid ${colours.gold}`,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <div style={{
+                ...condFont, fontSize: '11px', letterSpacing: '0.25em',
+                color: colours.muted, fontWeight: 600
+              }}>
+                NEXT QUESTION IN
+              </div>
+              <div style={{
+                ...displayFont, fontSize: '20px', fontWeight: 600,
+                color: colours.gold, letterSpacing: '0.05em',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                {timeUntilNext}
               </div>
             </div>
 
@@ -2139,6 +2221,28 @@ Deliver your verdict as JSON.`;
             <p style={{ textAlign: 'center', ...condFont, color: colours.muted, fontSize: '12px', marginTop: '24px', fontStyle: 'italic' }}>
               Screenshot the score. Compare with your mates.
             </p>
+
+            {/* Pete returns countdown */}
+            <div style={{
+              marginTop: '20px',
+              textAlign: 'center',
+              padding: '12px',
+              borderTop: `1px solid rgba(212,175,55,0.15)`,
+            }}>
+              <div style={{
+                ...condFont, fontSize: '10px', letterSpacing: '0.3em',
+                color: colours.muted, marginBottom: '4px'
+              }}>
+                PETE RETURNS IN
+              </div>
+              <div style={{
+                ...displayFont, fontSize: '22px', fontWeight: 600,
+                color: colours.gold, letterSpacing: '0.05em',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                {timeUntilNext}
+              </div>
+            </div>
           </div>
         </div>
       </>
@@ -2730,6 +2834,28 @@ Deliver your verdict as JSON.`;
             <p style={{ textAlign: 'center', ...condFont, color: colours.muted, fontSize: '12px', marginTop: '20px', fontStyle: 'italic' }}>
               Screenshot it. Settle it.
             </p>
+
+            {/* Pete returns countdown */}
+            <div style={{
+              marginTop: '16px',
+              textAlign: 'center',
+              padding: '12px',
+              borderTop: `1px solid rgba(212,175,55,0.15)`,
+            }}>
+              <div style={{
+                ...condFont, fontSize: '10px', letterSpacing: '0.3em',
+                color: colours.muted, marginBottom: '4px'
+              }}>
+                NEXT QUESTION IN
+              </div>
+              <div style={{
+                ...displayFont, fontSize: '22px', fontWeight: 600,
+                color: colours.gold, letterSpacing: '0.05em',
+                fontVariantNumeric: 'tabular-nums'
+              }}>
+                {timeUntilNext}
+              </div>
+            </div>
           </div>
         </div>
       </>
