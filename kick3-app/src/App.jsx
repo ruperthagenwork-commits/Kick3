@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // --- 10 starter daily questions, each with a curated 24-player pool ---
 // Each pool has exactly 6 Legends, 6 Stars, 6 Cult heroes, 6 Wildcards
@@ -1428,6 +1428,82 @@ export default function Kick3() {
   // Countdown to next question (next local midnight)
   const timeUntilNext = useCountdownToMidnight();
 
+  // Refs for the verdict cards (used by the share-image generator)
+  const soloCardRef = useRef(null);
+  const h2hCardRef = useRef(null);
+
+  // Share state — used to show "Sharing..." and "Copied!" feedback
+  const [shareState, setShareState] = useState('idle'); // 'idle' | 'working' | 'shared' | 'copied' | 'error'
+
+  // Turn a card element into a PNG and either share or copy it.
+  const shareCard = async (cardRef, mode) => {
+    if (!cardRef.current || !window.html2canvas) {
+      setShareState('error');
+      setTimeout(() => setShareState('idle'), 2000);
+      return;
+    }
+    setShareState('working');
+    try {
+      // Render the card to a canvas at 2x for retina-quality PNG
+      const canvas = await window.html2canvas(cardRef.current, {
+        backgroundColor: '#0a0a14',
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+      const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+      if (!blob) throw new Error('No blob');
+
+      const file = new File([blob], `kick3-day${TODAYS_QUESTION.number}.png`, { type: 'image/png' });
+      const shareText = mode === 'h2h'
+        ? `Kick 3 — Day ${TODAYS_QUESTION.number} — kick3.vercel.app`
+        : `My Kick 3 score today: ${verdict?.score || ''}/10 — kick3.vercel.app`;
+
+      // Try the native Web Share API first (best mobile experience)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Kick 3',
+          text: shareText
+        });
+        setShareState('shared');
+      } else if (navigator.clipboard && window.ClipboardItem) {
+        // Desktop / older browsers: copy image to clipboard
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        setShareState('copied');
+      } else {
+        // Last resort: download the image
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+        setShareState('shared');
+      }
+    } catch (err) {
+      // User cancelling the share sheet on iOS throws — that's not an error
+      if (err.name === 'AbortError') {
+        setShareState('idle');
+        return;
+      }
+      console.error('Share failed:', err);
+      setShareState('error');
+    } finally {
+      setTimeout(() => setShareState('idle'), 2500);
+    }
+  };
+
+  const shareLabel = {
+    idle: 'SHARE VERDICT',
+    working: 'GENERATING…',
+    shared: 'SHARED ✓',
+    copied: 'COPIED ✓',
+    error: 'TRY AGAIN'
+  }[shareState];
+
   const startGame = () => {
     setMode('solo');
     setDraftRounds(generateDraft());
@@ -2051,7 +2127,7 @@ Deliver your verdict as JSON.`;
           <div style={pitchOverlay} />
           <div style={container}>
             {/* Verdict card (designed to be the share artifact) */}
-            <div style={{
+            <div ref={soloCardRef} style={{
               background: `linear-gradient(155deg, #1a1a2e 0%, #0a0a14 100%)`,
               border: `2px solid ${colours.gold}`,
               borderRadius: '4px',
@@ -2196,10 +2272,49 @@ Deliver your verdict as JSON.`;
                   </p>
                 </div>
               </div>
+
+              {/* Footer URL — visible inside the share image */}
+              <div style={{
+                marginTop: '24px',
+                paddingTop: '14px',
+                borderTop: `1px solid rgba(212,175,55,0.2)`,
+                textAlign: 'center',
+                ...condFont,
+                fontSize: '11px',
+                letterSpacing: '0.3em',
+                color: colours.gold,
+                fontStyle: 'italic'
+              }}>
+                kick3.vercel.app
+              </div>
             </div>
 
+            {/* SHARE button — primary action */}
+            <button
+              onClick={() => shareCard(soloCardRef, 'solo')}
+              disabled={shareState === 'working'}
+              style={{
+                width: '100%',
+                marginTop: '16px',
+                padding: '16px',
+                background: shareState === 'shared' || shareState === 'copied' ? '#27AE60' : colours.gold,
+                color: colours.bg,
+                border: 'none',
+                borderRadius: '2px',
+                ...displayFont,
+                fontSize: '18px',
+                fontWeight: 600,
+                letterSpacing: '0.15em',
+                cursor: shareState === 'working' ? 'wait' : 'pointer',
+                transition: 'background 0.2s',
+                opacity: shareState === 'working' ? 0.7 : 1
+              }}
+            >
+              {shareLabel}
+            </button>
+
             {/* Actions */}
-            <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
               <button onClick={() => setScreen('home')} style={{
                 flex: 1, padding: '14px', background: 'transparent',
                 color: colours.text, border: `1px solid ${colours.muted}`,
@@ -2209,17 +2324,17 @@ Deliver your verdict as JSON.`;
                 BACK
               </button>
               <button onClick={startGame} style={{
-                flex: 1, padding: '14px', background: colours.gold,
-                color: colours.bg, border: 'none',
+                flex: 1, padding: '14px', background: 'transparent',
+                color: colours.text, border: `1px solid ${colours.gold}`,
                 borderRadius: '2px', ...displayFont, fontSize: '16px',
-                letterSpacing: '0.1em', cursor: 'pointer', fontWeight: 600
+                letterSpacing: '0.1em', cursor: 'pointer', fontWeight: 500
               }}>
                 PLAY AGAIN
               </button>
             </div>
 
             <p style={{ textAlign: 'center', ...condFont, color: colours.muted, fontSize: '12px', marginTop: '24px', fontStyle: 'italic' }}>
-              Screenshot the score. Compare with your mates.
+              Send it to your mates. See if they can beat you.
             </p>
 
             {/* Pete returns countdown */}
@@ -2702,7 +2817,7 @@ Deliver your verdict as JSON.`;
           <div style={pitchOverlay} />
           <div style={container}>
             {/* Verdict card */}
-            <div style={{
+            <div ref={h2hCardRef} style={{
               background: `linear-gradient(155deg, #1a1a2e 0%, #0a0a14 100%)`,
               border: `2px solid ${colours.gold}`,
               borderRadius: '4px',
@@ -2809,10 +2924,49 @@ Deliver your verdict as JSON.`;
                   </p>
                 </div>
               </div>
+
+              {/* Footer URL — visible inside the share image */}
+              <div style={{
+                marginTop: '20px',
+                paddingTop: '14px',
+                borderTop: `1px solid rgba(212,175,55,0.2)`,
+                textAlign: 'center',
+                ...condFont,
+                fontSize: '11px',
+                letterSpacing: '0.3em',
+                color: colours.gold,
+                fontStyle: 'italic'
+              }}>
+                kick3.vercel.app
+              </div>
             </div>
 
+            {/* SHARE button */}
+            <button
+              onClick={() => shareCard(h2hCardRef, 'h2h')}
+              disabled={shareState === 'working'}
+              style={{
+                width: '100%',
+                marginTop: '16px',
+                padding: '16px',
+                background: shareState === 'shared' || shareState === 'copied' ? '#27AE60' : colours.gold,
+                color: colours.bg,
+                border: 'none',
+                borderRadius: '2px',
+                ...displayFont,
+                fontSize: '18px',
+                fontWeight: 600,
+                letterSpacing: '0.15em',
+                cursor: shareState === 'working' ? 'wait' : 'pointer',
+                transition: 'background 0.2s',
+                opacity: shareState === 'working' ? 0.7 : 1
+              }}
+            >
+              {shareLabel}
+            </button>
+
             {/* Actions */}
-            <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
               <button onClick={() => setScreen('home')} style={{
                 flex: 1, padding: '14px', background: 'transparent',
                 color: colours.text, border: `1px solid ${colours.muted}`,
@@ -2822,17 +2976,17 @@ Deliver your verdict as JSON.`;
                 BACK
               </button>
               <button onClick={startH2H} style={{
-                flex: 1, padding: '14px', background: colours.gold,
-                color: colours.bg, border: 'none',
+                flex: 1, padding: '14px', background: 'transparent',
+                color: colours.text, border: `1px solid ${colours.gold}`,
                 borderRadius: '2px', ...displayFont, fontSize: '16px',
-                letterSpacing: '0.1em', cursor: 'pointer', fontWeight: 600
+                letterSpacing: '0.1em', cursor: 'pointer', fontWeight: 500
               }}>
                 REMATCH
               </button>
             </div>
 
             <p style={{ textAlign: 'center', ...condFont, color: colours.muted, fontSize: '12px', marginTop: '20px', fontStyle: 'italic' }}>
-              Screenshot it. Settle it.
+              Beat Pete's verdict. Send it to your mate.
             </p>
 
             {/* Pete returns countdown */}
