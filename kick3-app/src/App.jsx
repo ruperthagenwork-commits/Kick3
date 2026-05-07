@@ -2276,10 +2276,11 @@ Deliver your verdict as JSON.`;
           @media (min-width: 900px) {
             .kick3-phone-wrap { display: none; }
             .kick3-desktop-wrap {
-              display: flex;
+              display: block;
               background: ${colours.bg};
               min-height: 100vh;
-              align-items: center;
+              width: 100%;
+              padding: 0;
             }
           }
 
@@ -2292,7 +2293,13 @@ Deliver your verdict as JSON.`;
             background: #2a1810;
             overflow: hidden;
           }
-          .kick3-desktop-stage > img.kick3-bg {
+          .kick3-desktop-stage picture {
+            position: absolute;
+            inset: 0;
+            display: block;
+          }
+          .kick3-desktop-stage > img.kick3-bg,
+          .kick3-desktop-stage picture img.kick3-bg {
             position: absolute;
             inset: 0;
             width: 100%;
