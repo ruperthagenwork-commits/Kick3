@@ -2614,10 +2614,10 @@ Deliver your verdict as JSON.`;
 
               {/* CHALKBOARD — empty slate area in centre */}
               <div className="kick3-desktop-zone" style={{ left: '44.47%', top: '37.48%', width: '34.97%', height: '34.95%' }}>
-                <div style={{ textAlign: 'center', width: '92%' }}>
+                <div style={{ textAlign: 'center', width: '78%' }}>
                   <div style={{
                     ...condFont,
-                    fontSize: 'clamp(11px, 0.95vw, 16px)',
+                    fontSize: 'clamp(11px, 0.85vw, 15px)',
                     letterSpacing: '0.3em',
                     color: colours.gold,
                     fontWeight: 600,
@@ -2626,16 +2626,16 @@ Deliver your verdict as JSON.`;
                     TODAY&apos;S QUESTION
                   </div>
                   <div style={{
-                    width: '50px',
+                    width: '40px',
                     height: '2px',
                     background: colours.gold,
-                    margin: '0 auto 18px auto',
+                    margin: '0 auto 16px auto',
                     opacity: 0.7
                   }} />
                   <p style={{
                     ...displayFont,
-                    fontSize: 'clamp(20px, 2.1vw, 36px)',
-                    lineHeight: '1.18',
+                    fontSize: 'clamp(18px, 1.7vw, 28px)',
+                    lineHeight: '1.2',
                     margin: 0,
                     fontWeight: 500,
                     color: '#f5f0e1',
@@ -2643,10 +2643,10 @@ Deliver your verdict as JSON.`;
                   }}>
                     {TODAYS_QUESTION.text}
                   </p>
-                  <div style={{ width: '60%', height: '1px', background: '#f5f0e1', opacity: 0.35, margin: '18px auto 12px auto' }} />
+                  <div style={{ width: '50%', height: '1px', background: '#f5f0e1', opacity: 0.35, margin: '14px auto 10px auto' }} />
                   <div style={{
                     ...condFont,
-                    fontSize: 'clamp(10px, 0.8vw, 14px)',
+                    fontSize: 'clamp(9px, 0.7vw, 12px)',
                     letterSpacing: '0.25em',
                     color: CATEGORY_COLOURS[TODAYS_QUESTION.category] || colours.muted,
                     fontWeight: 600
@@ -2710,12 +2710,13 @@ Deliver your verdict as JSON.`;
               <div className="kick3-desktop-zone" style={{ left: '40.98%', top: '82.94%', width: '17.99%', height: '9.95%' }}>
                 <div style={{
                   ...condFont,
-                  fontSize: 'clamp(10px, 0.9vw, 15px)',
-                  letterSpacing: '0.18em',
+                  fontSize: 'clamp(9px, 0.7vw, 13px)',
+                  letterSpacing: '0.12em',
                   color: colours.muted,
                   fontWeight: 500,
-                  width: '100%',
-                  textAlign: 'center'
+                  width: '85%',
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap'
                 }}>
                   NEXT QUESTION IN{' '}
                   <span style={{
