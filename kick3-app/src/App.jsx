@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 
-// --- 10 starter daily questions, each with a curated 24-player pool ---
-// Each pool has exactly 6 Legends, 6 Stars, 6 Cult heroes, 6 Wildcards
+// --- 31 daily questions, each with a curated 40-player pool ---
+// Each pool has exactly 10 Legends, 10 Stars, 10 Cult heroes, 10 Wildcards
 const QUESTIONS = [
   // Q1 — One-Off — World Cup penalty
   {
@@ -1781,20 +1781,46 @@ const shuffle = (arr) => {
 };
 
 // Generate 3 draft rounds, each with 2 cards from different tiers
+// Generate 3 draft rounds, each with 2 cards.
+//
+// Selection logic (chaos-driven, post-pool-expansion):
+//  - 75% of games: 1 random Legend + 5 random from the non-Legend pool (Stars + Cults + Wildcards)
+//  - 25% of games: 6 random from the non-Legend pool (no Legend)
+//  - Within the non-Legend draws: pure random — no quotas. Could be 5 Cults, could be 3 Wildcards 2 Stars, anything.
+// The 6 selected players are then randomly paired into 3 rounds of 2.
 const generateDraft = (excludeNames = []) => {
   const available = PLAYER_POOL.filter(p => !excludeNames.includes(p.name));
-  const byTier = {
-    Legend: shuffle(available.filter(p => p.tier === "Legend")),
-    Star: shuffle(available.filter(p => p.tier === "Star")),
-    Cult: shuffle(available.filter(p => p.tier === "Cult")),
-    Wildcard: shuffle(available.filter(p => p.tier === "Wildcard"))
-  };
-  const tierPairs = [
-    ["Legend", "Wildcard"],
-    ["Star", "Cult"],
-    ["Wildcard", "Star"]
+  const legends = available.filter(p => p.tier === "Legend");
+  const nonLegends = available.filter(p => p.tier !== "Legend");
+
+  // Decide whether this game gets a Legend (75% yes, 25% no).
+  // Edge case: if no Legends are available (e.g. all excluded), force 0-Legend mode.
+  const includeLegend = legends.length > 0 && Math.random() < 0.75;
+
+  let selected = [];
+  if (includeLegend) {
+    // 1 random Legend + 5 random non-Legends
+    selected.push(shuffle(legends)[0]);
+    selected = selected.concat(shuffle(nonLegends).slice(0, 5));
+  } else {
+    // 0 Legends, 6 random non-Legends
+    selected = shuffle(nonLegends).slice(0, 6);
+  }
+
+  // Safety: if we somehow got fewer than 6 (very small pool / heavy exclusions),
+  // top up from anything available so we never return malformed rounds.
+  if (selected.length < 6) {
+    const remaining = available.filter(p => !selected.includes(p));
+    selected = selected.concat(shuffle(remaining).slice(0, 6 - selected.length));
+  }
+
+  // Random pairing into 3 rounds of 2
+  const paired = shuffle(selected);
+  return [
+    [paired[0], paired[1]],
+    [paired[2], paired[3]],
+    [paired[4], paired[5]]
   ];
-  return tierPairs.map(([t1, t2]) => [byTier[t1].pop(), byTier[t2].pop()]);
 };
 
 const RON_SYSTEM_PROMPT = `You are PETE THE PUNDIT, the resident football pundit on Kick 3 — a daily football debate game. You're a former pro turned pundit, opinionated, slightly grumpy, and you've seen every Cup Final since 1966. You score arguments out of 10 with the easy authority of a man who has been right about football for forty years and is mildly irritated when people disagree.
