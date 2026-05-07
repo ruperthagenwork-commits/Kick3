@@ -2276,7 +2276,9 @@ Deliver your verdict as JSON.`;
           @media (min-width: 900px) {
             .kick3-phone-wrap { display: none; }
             .kick3-desktop-wrap {
-              display: block;
+              display: flex;
+              align-items: center;
+              justify-content: center;
               background: ${colours.bg};
               min-height: 100vh;
               width: 100%;
