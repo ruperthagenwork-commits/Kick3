@@ -2561,7 +2561,7 @@ Deliver your verdict as JSON.`;
                   <div style={{
                     position: 'absolute',
                     top: '-10px',
-                    left: '9%',
+                    left: '12%',
                     ...condFont,
                     fontSize: 'clamp(9px, 0.7vw, 12px)',
                     letterSpacing: '0.35em',
