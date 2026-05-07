@@ -2275,7 +2275,12 @@ Deliver your verdict as JSON.`;
           /* ============ DESKTOP LAYOUT (≥ 900px) ============ */
           @media (min-width: 900px) {
             .kick3-phone-wrap { display: none; }
-            .kick3-desktop-wrap { display: block; }
+            .kick3-desktop-wrap {
+              display: flex;
+              background: ${colours.bg};
+              min-height: 100vh;
+              align-items: center;
+            }
           }
 
           .kick3-desktop-stage {
@@ -2342,9 +2347,6 @@ Deliver your verdict as JSON.`;
             font-style: italic;
             z-index: 5;
           }
-
-          /* Outside-stage navy filler on tall screens (when 16:9 stage doesn't fill viewport) */
-          .kick3-desktop-wrap { background: ${colours.bg}; min-height: 100vh; display: flex; align-items: center; }
 
           /* Small-laptop adjustment — slightly tighter text */
           @media (min-width: 900px) and (max-width: 1199px) {
