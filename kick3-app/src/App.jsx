@@ -2237,143 +2237,238 @@ Deliver your verdict as JSON.`;
     return (
       <>
         <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
-        <div style={bgStyle}>
-          <div style={pitchOverlay} />
-          <div style={container}>
-            {/* Logo block */}
-            <div style={{ textAlign: 'center', paddingTop: '40px', marginBottom: '48px' }}>
-              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.4em', color: colours.gold, marginBottom: '8px', fontStyle: 'italic' }}>
-                — DAY {TODAYS_QUESTION.number} —
-              </div>
-              <h1 style={{ ...displayFont, fontSize: '88px', lineHeight: '0.85', margin: 0, fontWeight: 700, color: colours.cream, display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '8px' }}>
-                KICK<span style={{ color: colours.gold, fontSize: '88px' }}>3</span>
+        <div style={{
+          minHeight: '100vh',
+          background: colours.bg,
+          color: colours.text,
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {/* Hero illustration — Pete asleep at his desk */}
+          <div style={{
+            width: '100%',
+            position: 'relative',
+            background: '#2a1810', // warm dark fallback while image loads
+            overflow: 'hidden'
+          }}>
+            <picture>
+              <source srcSet="/pete-desk.webp" type="image/webp" />
+              <img
+                src="/pete-desk.jpg"
+                alt="Pete the Pundit asleep at his desk"
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  height: 'auto',
+                  maxHeight: '52vh',
+                  objectFit: 'cover',
+                  objectPosition: 'center top'
+                }}
+              />
+            </picture>
+            {/* DAY N badge floating top-left over the illustration */}
+            <div style={{
+              position: 'absolute',
+              top: '14px',
+              left: '14px',
+              background: 'rgba(20,20,30,0.85)',
+              padding: '6px 12px',
+              borderRadius: '2px',
+              ...condFont,
+              fontSize: '10px',
+              letterSpacing: '0.4em',
+              color: colours.gold,
+              fontWeight: 600,
+              fontStyle: 'italic'
+            }}>
+              DAY {TODAYS_QUESTION.number}
+            </div>
+          </div>
+
+          {/* Navy UI panel below the illustration */}
+          <div style={{
+            background: colours.bg,
+            padding: '28px 24px 32px 24px',
+            flex: '1 0 auto',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            {/* KICK 3 title block */}
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <h1 style={{
+                ...displayFont,
+                fontSize: '64px',
+                lineHeight: '0.85',
+                margin: 0,
+                fontWeight: 700,
+                color: colours.gold,
+                letterSpacing: '-0.01em',
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'center',
+                gap: '8px'
+              }}>
+                KICK<span style={{ color: colours.gold }}>3</span>
               </h1>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px', marginTop: '12px' }}>
-                <div style={{ height: '2px', width: '40px', background: colours.gold }} />
-                <div style={{ ...condFont, fontSize: '13px', color: colours.gold, fontWeight: 600, letterSpacing: '0.3em', fontStyle: 'italic' }}>WITH PETE THE PUNDIT</div>
-                <div style={{ height: '2px', width: '40px', background: colours.gold }} />
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px',
+                marginTop: '10px'
+              }}>
+                <div style={{ height: '1px', width: '32px', background: colours.muted }} />
+                <div style={{
+                  ...condFont,
+                  fontSize: '11px',
+                  color: colours.cream,
+                  fontWeight: 500,
+                  letterSpacing: '0.3em'
+                }}>
+                  WITH PETE THE PUNDIT
+                </div>
+                <div style={{ height: '1px', width: '32px', background: colours.muted }} />
               </div>
-              <p style={{ ...condFont, fontStyle: 'italic', color: colours.muted, marginTop: '20px', fontSize: '14px', letterSpacing: '0.05em' }}>
-                Draft three. Defend them. Let Pete decide.
-              </p>
             </div>
 
-            {/* Today's Question card */}
+            {/* Today's Question — chalkboard card */}
             <div style={{
-              background: colours.surface,
-              border: `1px solid ${colours.goldDim}`,
+              background: '#1a1a24',
+              border: `3px solid #4a3a28`,
               borderRadius: '4px',
-              padding: '24px',
-              marginBottom: '32px',
+              padding: '20px 18px 22px 18px',
+              marginBottom: '20px',
+              boxShadow: 'inset 0 0 30px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3)',
               position: 'relative'
             }}>
               <div style={{
-                position: 'absolute',
-                top: '-10px',
-                left: '20px',
-                background: colours.bg,
-                padding: '0 10px',
+                textAlign: 'center',
                 ...condFont,
-                fontSize: '11px',
+                fontSize: '12px',
                 letterSpacing: '0.3em',
-                color: colours.gold
+                color: colours.gold,
+                fontWeight: 600,
+                marginBottom: '4px'
               }}>
                 TODAY&apos;S QUESTION
               </div>
-              <p style={{ ...displayFont, fontSize: '28px', lineHeight: '1.1', margin: '8px 0 12px 0', fontWeight: 500 }}>
+              <div style={{
+                width: '40px',
+                height: '2px',
+                background: colours.gold,
+                margin: '0 auto 14px auto',
+                opacity: 0.7
+              }} />
+              <p style={{
+                ...displayFont,
+                fontSize: '24px',
+                lineHeight: '1.15',
+                margin: 0,
+                fontWeight: 500,
+                color: '#f5f0e1',
+                textAlign: 'center',
+                letterSpacing: '0.01em'
+              }}>
                 {TODAYS_QUESTION.text}
               </p>
-              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: CATEGORY_COLOURS[TODAYS_QUESTION.category] || colours.muted, fontWeight: 600 }}>
+              <div style={{
+                width: '60%',
+                height: '1px',
+                background: '#f5f0e1',
+                opacity: 0.4,
+                margin: '14px auto 0 auto'
+              }} />
+              <div style={{
+                ...condFont,
+                fontSize: '10px',
+                letterSpacing: '0.25em',
+                color: CATEGORY_COLOURS[TODAYS_QUESTION.category] || colours.muted,
+                fontWeight: 600,
+                textAlign: 'center',
+                marginTop: '10px'
+              }}>
                 ● {TODAYS_QUESTION.category.toUpperCase()}
               </div>
             </div>
 
-            {/* Ron's intro */}
-            <div style={{ display: 'flex', gap: '14px', marginBottom: '40px', alignItems: 'flex-start' }}>
-              <div style={{
-                width: '52px', height: '52px', borderRadius: '50%',
-                background: `linear-gradient(135deg, ${colours.gold} 0%, ${colours.goldDim} 100%)`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0,
-                border: `2px solid ${colours.gold}`,
-                ...displayFont,
-                fontSize: '24px',
-                fontWeight: 700,
-                color: colours.bg
-              }}>
-                P
-              </div>
-              <div>
-                <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, marginBottom: '4px' }}>
-                  PETE THE PUNDIT
-                </div>
-                <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.5', color: colours.text, fontStyle: 'italic' }}>
-                  &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
-                </p>
-              </div>
-            </div>
-
-            {/* Countdown to next question */}
-            <div style={{
-              marginBottom: '24px',
-              padding: '12px 14px',
-              background: 'rgba(212,175,55,0.06)',
-              borderLeft: `2px solid ${colours.gold}`,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: '10px'
-            }}>
-              <div style={{
-                ...condFont, fontSize: '11px', letterSpacing: '0.25em',
-                color: colours.muted, fontWeight: 600
-              }}>
-                NEXT QUESTION IN
-              </div>
-              <div style={{
-                ...displayFont, fontSize: '20px', fontWeight: 600,
-                color: colours.gold, letterSpacing: '0.05em',
-                fontVariantNumeric: 'tabular-nums'
-              }}>
-                {timeUntilNext}
-              </div>
-            </div>
-
-            {/* Play buttons */}
+            {/* PLAY TODAY — primary yellow button */}
             <button onClick={startGame} style={{
               width: '100%',
               padding: '18px',
               background: colours.gold,
               color: colours.bg,
               border: 'none',
-              borderRadius: '2px',
+              borderRadius: '4px',
               ...displayFont,
               fontSize: '22px',
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              cursor: 'pointer',
+              marginBottom: '12px',
+              boxShadow: '0 3px 0 #8a7028, 0 5px 12px rgba(0,0,0,0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px'
+            }}>
+              <span>PLAY TODAY</span>
+              <span style={{ fontSize: '24px', lineHeight: 1 }}>→</span>
+            </button>
+
+            {/* 1v1 MODE — secondary red button */}
+            <button onClick={startH2H} style={{
+              width: '100%',
+              padding: '14px',
+              background: '#a8324a',
+              color: colours.cream,
+              border: 'none',
+              borderRadius: '4px',
+              ...displayFont,
+              fontSize: '17px',
               fontWeight: 600,
               letterSpacing: '0.1em',
               cursor: 'pointer',
-              marginBottom: '12px'
+              marginBottom: '20px',
+              boxShadow: '0 3px 0 #6f1f30, 0 4px 10px rgba(0,0,0,0.25)'
             }}>
-              PLAY SOLO →
-            </button>
-            <button onClick={startH2H} style={{
-              width: '100%',
-              padding: '18px',
-              background: 'transparent',
-              color: colours.cream,
-              border: `1px solid ${colours.gold}`,
-              borderRadius: '2px',
-              ...displayFont,
-              fontSize: '20px',
-              fontWeight: 500,
-              letterSpacing: '0.1em',
-              cursor: 'pointer'
-            }}>
-              1 VS 1 →
+              1V1 MODE
             </button>
 
-            <p style={{ textAlign: 'center', ...condFont, color: colours.muted, fontSize: '12px', marginTop: '32px', letterSpacing: '0.05em' }}>
-              Solo  ·  1 vs 1  ·  Scored /10  ·  Pete decides
+            {/* Countdown to next question */}
+            <div style={{
+              textAlign: 'center',
+              ...condFont,
+              fontSize: '11px',
+              letterSpacing: '0.2em',
+              color: colours.muted,
+              fontWeight: 500
+            }}>
+              <span style={{ marginRight: '8px', opacity: 0.7 }}>◷</span>
+              NEXT QUESTION IN{' '}
+              <span style={{
+                color: colours.gold,
+                fontWeight: 700,
+                fontVariantNumeric: 'tabular-nums',
+                marginLeft: '4px'
+              }}>
+                {timeUntilNext}
+              </span>
+            </div>
+
+            {/* Pete's intro line — kept subtle, below the fold of essentials */}
+            <p style={{
+              ...condFont,
+              fontStyle: 'italic',
+              color: colours.muted,
+              textAlign: 'center',
+              fontSize: '13px',
+              marginTop: '24px',
+              marginBottom: 0,
+              padding: '0 8px',
+              lineHeight: '1.5',
+              opacity: 0.85
+            }}>
+              &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
             </p>
           </div>
         </div>
