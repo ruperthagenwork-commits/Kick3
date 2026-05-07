@@ -2707,14 +2707,14 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* COUNTDOWN — sits on the small dark card at bottom centre */}
-              <div className="kick3-desktop-zone" style={{ left: '40.98%', top: '82.94%', width: '17.99%', height: '9.95%' }}>
+              <div className="kick3-desktop-zone" style={{ left: '42.58%', top: '82.80%', width: '12.50%', height: '7.08%' }}>
                 <div style={{
                   ...condFont,
-                  fontSize: 'clamp(9px, 0.7vw, 13px)',
-                  letterSpacing: '0.12em',
+                  fontSize: 'clamp(8px, 0.62vw, 11px)',
+                  letterSpacing: '0.08em',
                   color: colours.muted,
                   fontWeight: 500,
-                  width: '85%',
+                  width: '90%',
                   textAlign: 'center',
                   whiteSpace: 'nowrap'
                 }}>
