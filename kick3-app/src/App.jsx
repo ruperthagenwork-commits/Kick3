@@ -2237,12 +2237,25 @@ Deliver your verdict as JSON.`;
     return (
       <>
         <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        {/* Outer layer — fills the full viewport on any device with the dark navy background */}
         <div style={{
           minHeight: '100vh',
+          width: '100%',
           background: colours.bg,
           color: colours.text,
           display: 'flex',
-          flexDirection: 'column'
+          justifyContent: 'center'
+        }}>
+          {/* Inner layer — constrained to phone width even on huge desktop screens */}
+          <div style={{
+          minHeight: '100vh',
+          width: '100%',
+          maxWidth: '480px',
+          background: colours.bg,
+          color: colours.text,
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 0 40px rgba(0,0,0,0.4)' // subtle edge separation on desktop
         }}>
           {/* Hero illustration — Pete asleep at his desk */}
           <div style={{
@@ -2419,7 +2432,7 @@ Deliver your verdict as JSON.`;
             <button onClick={startH2H} style={{
               width: '100%',
               padding: '14px',
-              background: '#a8324a',
+              background: '#8b2335',
               color: colours.cream,
               border: 'none',
               borderRadius: '4px',
@@ -2429,7 +2442,7 @@ Deliver your verdict as JSON.`;
               letterSpacing: '0.1em',
               cursor: 'pointer',
               marginBottom: '20px',
-              boxShadow: '0 3px 0 #6f1f30, 0 4px 10px rgba(0,0,0,0.25)'
+              boxShadow: '0 3px 0 #4a1119, 0 4px 10px rgba(0,0,0,0.25)'
             }}>
               1V1 MODE
             </button>
@@ -2471,6 +2484,7 @@ Deliver your verdict as JSON.`;
               &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
             </p>
           </div>
+        </div>
         </div>
         <Analytics />
       </>
