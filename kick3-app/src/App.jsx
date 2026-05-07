@@ -1780,7 +1780,6 @@ const shuffle = (arr) => {
   return a;
 };
 
-// Generate 3 draft rounds, each with 2 cards from different tiers
 // Generate 3 draft rounds, each with 2 cards.
 //
 // Selection logic (chaos-driven, post-pool-expansion):
@@ -2064,15 +2063,9 @@ export default function Kick3() {
     const newSquad = [...squad, player];
     setSquad(newSquad);
     if (currentRound < 2) {
-      // Exclude picked players from THIS player's pool
-      // For h2h, also exclude the other player's already-drafted squad
-      const otherSquad = mode === 'h2h' && activePlayer === 1 ? p1Squad.map(p => p.name) : [];
-      const exclude = [...newSquad.map(p => p.name), ...otherSquad];
-      const remaining = generateDraft(exclude);
-      const updated = [...draftRounds];
-      updated[currentRound + 1] = remaining[currentRound + 1];
-      if (currentRound + 2 < 3) updated[currentRound + 2] = remaining[currentRound + 2];
-      setDraftRounds(updated);
+      // Just advance to the next round. The initial draft already contains
+      // 6 valid players (with at most 1 Legend). Regenerating here would
+      // re-roll the 75/25 dice and break the per-game Legend cap.
       setCurrentRound(currentRound + 1);
     } else {
       // Done drafting
