@@ -2340,21 +2340,23 @@ Deliver your verdict as JSON.`;
             filter: brightness(1.15);
           }
 
-          /* DAY badge — shown over the image on desktop */
+          /* DAY badge — sits beside the title plaque on desktop */
           .kick3-desktop-day-badge {
             position: absolute;
-            top: 1.5%;
-            left: 1.5%;
+            top: 10.95%;
+            left: 22%;
+            transform: translate(-50%, -50%);
             background: rgba(20,20,30,0.85);
-            padding: 6px 14px;
+            padding: 8px 16px;
             border-radius: 2px;
             font-family: 'Barlow Condensed', sans-serif;
-            font-size: 12px;
+            font-size: clamp(10px, 0.85vw, 14px);
             letter-spacing: 0.4em;
             color: ${colours.gold};
             font-weight: 600;
             font-style: italic;
             z-index: 5;
+            white-space: nowrap;
           }
 
           /* Small-laptop adjustment — slightly tighter text */
@@ -2657,7 +2659,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* PLAY TODAY BUTTON — sits on the painted yellow rectangle */}
-              <div className="kick3-desktop-zone" style={{ left: '44.60%', top: '63.36%', width: '28.52%', height: '10.51%' }}>
+              <div className="kick3-desktop-zone" style={{ left: '43.50%', top: '63.36%', width: '28.52%', height: '10.51%' }}>
                 <button
                   onClick={startGame}
                   className="kick3-desktop-btn-play"
@@ -2710,11 +2712,11 @@ Deliver your verdict as JSON.`;
               <div className="kick3-desktop-zone" style={{ left: '42.58%', top: '82.80%', width: '12.50%', height: '7.08%' }}>
                 <div style={{
                   ...condFont,
-                  fontSize: 'clamp(8px, 0.62vw, 11px)',
+                  fontSize: 'clamp(10px, 0.78vw, 13px)',
                   letterSpacing: '0.08em',
                   color: colours.muted,
                   fontWeight: 500,
-                  width: '90%',
+                  width: '92%',
                   textAlign: 'center',
                   whiteSpace: 'nowrap'
                 }}>
