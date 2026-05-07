@@ -3218,7 +3218,7 @@ Deliver your verdict as JSON.`;
             </div>
 
             <p style={{ ...condFont, fontStyle: 'italic', color: colours.muted, fontSize: '14px', textAlign: 'center', marginBottom: '8px' }}>
-              One sentence. Make {myName} proud.
+              One sentence. Make Pete proud.
             </p>
 
             <textarea
@@ -3494,7 +3494,7 @@ Deliver your verdict as JSON.`;
             </div>
 
             <p style={{ textAlign: 'center', ...condFont, color: colours.muted, fontSize: '12px', marginTop: '20px', fontStyle: 'italic' }}>
-              Beat Pete's verdict. Send it to your mate.
+              Impress Pete and score well. Send it to your mate.
             </p>
 
             {/* Pete returns countdown */}
