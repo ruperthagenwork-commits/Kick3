@@ -2575,7 +2575,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* TITLE PLAQUE — sits over the empty navy banner at top centre */}
-              <div className="kick3-desktop-zone" style={{ left: '55.35%', top: '11.15%', width: '43.7%', height: '11.7%' }}>
+              <div className="kick3-desktop-zone" style={{ left: '44.99%', top: '10.95%', width: '39.97%', height: '13.94%' }}>
                 <div style={{ textAlign: 'center', width: '100%' }}>
                   <h1 style={{
                     ...displayFont,
@@ -2611,7 +2611,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* CHALKBOARD — empty slate area in centre */}
-              <div className="kick3-desktop-zone" style={{ left: '55.35%', top: '38.25%', width: '43.7%', height: '38.3%' }}>
+              <div className="kick3-desktop-zone" style={{ left: '44.47%', top: '37.48%', width: '34.97%', height: '34.95%' }}>
                 <div style={{ textAlign: 'center', width: '92%' }}>
                   <div style={{
                     ...condFont,
@@ -2655,7 +2655,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* PLAY TODAY BUTTON — sits on the painted yellow rectangle */}
-              <div className="kick3-desktop-zone" style={{ left: '50.85%', top: '64.3%', width: '34.7%', height: '9.6%' }}>
+              <div className="kick3-desktop-zone" style={{ left: '44.60%', top: '63.36%', width: '28.52%', height: '10.51%' }}>
                 <button
                   onClick={startGame}
                   className="kick3-desktop-btn-play"
@@ -2681,7 +2681,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* 1V1 MODE BUTTON — sits on the painted red rectangle */}
-              <div className="kick3-desktop-zone" style={{ left: '50.85%', top: '74.35%', width: '34.7%', height: '8.5%' }}>
+              <div className="kick3-desktop-zone" style={{ left: '42.37%', top: '72.78%', width: '23.80%', height: '8.43%' }}>
                 <button
                   onClick={startH2H}
                   className="kick3-desktop-btn-h2h"
@@ -2705,7 +2705,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* COUNTDOWN — sits on the small dark card at bottom centre */}
-              <div className="kick3-desktop-zone" style={{ left: '46.65%', top: '83.65%', width: '19.1%', height: '6.9%' }}>
+              <div className="kick3-desktop-zone" style={{ left: '40.98%', top: '82.94%', width: '17.99%', height: '9.95%' }}>
                 <div style={{
                   ...condFont,
                   fontSize: 'clamp(10px, 0.9vw, 15px)',
