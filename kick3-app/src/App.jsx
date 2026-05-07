@@ -2340,25 +2340,6 @@ Deliver your verdict as JSON.`;
             filter: brightness(1.15);
           }
 
-          /* DAY badge — sits beside the title plaque on desktop */
-          .kick3-desktop-day-badge {
-            position: absolute;
-            top: 10.95%;
-            left: 22%;
-            transform: translate(-50%, -50%);
-            background: rgba(20,20,30,0.85);
-            padding: 8px 16px;
-            border-radius: 2px;
-            font-family: 'Barlow Condensed', sans-serif;
-            font-size: clamp(10px, 0.85vw, 14px);
-            letter-spacing: 0.4em;
-            color: ${colours.gold};
-            font-weight: 600;
-            font-style: italic;
-            z-index: 5;
-            white-space: nowrap;
-          }
-
           /* Small-laptop adjustment — slightly tighter text */
           @media (min-width: 900px) and (max-width: 1199px) {
             .kick3-desktop-stage { max-width: 100%; }
@@ -2573,14 +2554,24 @@ Deliver your verdict as JSON.`;
                 />
               </picture>
 
-              {/* DAY badge top-left */}
-              <div className="kick3-desktop-day-badge">
-                DAY {TODAYS_QUESTION.number}
-              </div>
-
               {/* TITLE PLAQUE — sits over the empty navy banner at top centre */}
               <div className="kick3-desktop-zone" style={{ left: '44.99%', top: '10.95%', width: '39.97%', height: '13.94%' }}>
-                <div style={{ textAlign: 'center', width: '100%' }}>
+                <div style={{ textAlign: 'center', width: '100%', position: 'relative' }}>
+                  {/* DAY badge — sits in top-right of title plaque */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '-10px',
+                    right: '6%',
+                    ...condFont,
+                    fontSize: 'clamp(9px, 0.7vw, 12px)',
+                    letterSpacing: '0.35em',
+                    color: colours.gold,
+                    fontWeight: 600,
+                    fontStyle: 'italic',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    DAY {TODAYS_QUESTION.number}
+                  </div>
                   <h1 style={{
                     ...displayFont,
                     fontSize: 'clamp(28px, 3.4vw, 56px)',
@@ -2712,18 +2703,20 @@ Deliver your verdict as JSON.`;
               <div className="kick3-desktop-zone" style={{ left: '42.58%', top: '82.80%', width: '12.50%', height: '7.08%' }}>
                 <div style={{
                   ...condFont,
-                  fontSize: 'clamp(10px, 0.78vw, 13px)',
-                  letterSpacing: '0.08em',
-                  color: colours.muted,
-                  fontWeight: 500,
-                  width: '92%',
+                  fontSize: 'clamp(11px, 0.92vw, 15px)',
+                  letterSpacing: '0.06em',
+                  color: colours.cream,
+                  fontWeight: 700,
+                  width: '94%',
                   textAlign: 'center',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  transform: 'rotate(1.5deg)',
+                  transformOrigin: 'center center'
                 }}>
                   NEXT QUESTION IN{' '}
                   <span style={{
                     color: colours.gold,
-                    fontWeight: 700,
+                    fontWeight: 800,
                     fontVariantNumeric: 'tabular-nums',
                     marginLeft: '4px'
                   }}>
