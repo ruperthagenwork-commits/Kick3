@@ -2557,11 +2557,11 @@ Deliver your verdict as JSON.`;
               {/* TITLE PLAQUE — sits over the empty navy banner at top centre */}
               <div className="kick3-desktop-zone" style={{ left: '44.99%', top: '10.95%', width: '39.97%', height: '13.94%' }}>
                 <div style={{ textAlign: 'center', width: '100%', position: 'relative' }}>
-                  {/* DAY badge — sits in top-right of title plaque */}
+                  {/* DAY badge — sits in top-left of title plaque */}
                   <div style={{
                     position: 'absolute',
                     top: '-10px',
-                    right: '6%',
+                    left: '6%',
                     ...condFont,
                     fontSize: 'clamp(9px, 0.7vw, 12px)',
                     letterSpacing: '0.35em',
@@ -2710,7 +2710,7 @@ Deliver your verdict as JSON.`;
                   width: '94%',
                   textAlign: 'center',
                   whiteSpace: 'nowrap',
-                  transform: 'rotate(1.5deg)',
+                  transform: 'rotate(0.5deg)',
                   transformOrigin: 'center center'
                 }}>
                   NEXT QUESTION IN{' '}
