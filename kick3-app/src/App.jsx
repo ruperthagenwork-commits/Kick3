@@ -2709,9 +2709,7 @@ Deliver your verdict as JSON.`;
                   fontWeight: 700,
                   width: '94%',
                   textAlign: 'center',
-                  whiteSpace: 'nowrap',
-                  transform: 'rotate(2deg)',
-                  transformOrigin: 'center center'
+                  whiteSpace: 'nowrap'
                 }}>
                   NEXT QUESTION IN{' '}
                   <span style={{
