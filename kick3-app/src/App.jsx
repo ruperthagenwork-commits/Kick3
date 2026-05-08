@@ -2710,7 +2710,7 @@ Deliver your verdict as JSON.`;
                   width: '94%',
                   textAlign: 'center',
                   whiteSpace: 'nowrap',
-                  transform: 'rotate(0.5deg)',
+                  transform: 'rotate(2deg)',
                   transformOrigin: 'center center'
                 }}>
                   NEXT QUESTION IN{' '}
