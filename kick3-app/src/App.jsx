@@ -2700,7 +2700,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* COUNTDOWN — sits on the small dark card at bottom centre */}
-              <div className="kick3-desktop-zone" style={{ left: '42.58%', top: '82.80%', width: '12.50%', height: '7.08%' }}>
+              <div className="kick3-desktop-zone" style={{ left: '42.58%', top: '83.40%', width: '12.50%', height: '7.08%' }}>
                 <div style={{
                   ...condFont,
                   fontSize: 'clamp(11px, 0.92vw, 15px)',
