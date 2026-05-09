@@ -2372,7 +2372,7 @@ Deliver your verdict as JSON.`;
               </picture>
 
               {/* TITLE — small dark plaque at top */}
-              <div className="kick3-phone-zone" style={{ left: '24%', top: '5.5%', width: '52%', height: '6.5%' }}>
+              <div className="kick3-phone-zone" style={{ left: '24%', top: '5.5%', width: '52%', height: '8.5%' }}>
                 <div style={{ textAlign: 'center', width: '100%', position: 'relative' }}>
                   {/* DAY badge — top-left of title plaque */}
                   <div style={{
@@ -2400,11 +2400,30 @@ Deliver your verdict as JSON.`;
                   }}>
                     KICK 3
                   </h1>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    marginTop: '6px'
+                  }}>
+                    <div style={{ height: '1px', flex: '0 0 18px', background: colours.cream, opacity: 0.6 }} />
+                    <div style={{
+                      ...condFont,
+                      fontSize: 'clamp(8px, 2vw, 11px)',
+                      color: colours.cream,
+                      fontWeight: 500,
+                      letterSpacing: '0.3em'
+                    }}>
+                      WITH PETE THE PUNDIT
+                    </div>
+                    <div style={{ height: '1px', flex: '0 0 18px', background: colours.cream, opacity: 0.6 }} />
+                  </div>
                 </div>
               </div>
 
               {/* CHALKBOARD QUESTION — large dark area in centre */}
-              <div className="kick3-phone-zone" style={{ left: '20%', top: '14%', width: '61%', height: '38%' }}>
+              <div className="kick3-phone-zone" style={{ left: '21%', top: '18%', width: '61%', height: '36%' }}>
                 <div style={{ textAlign: 'center', width: '88%' }}>
                   <div style={{
                     ...condFont,
@@ -2448,33 +2467,34 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* PLAY TODAY — yellow plaque */}
-              <div className="kick3-phone-zone" style={{ left: '25.5%', top: '54%', width: '52.7%', height: '10%' }}>
+              <div className="kick3-phone-zone" style={{ left: '25.5%', top: '57%', width: '52.7%', height: '10%' }}>
                 <button
                   onClick={startGame}
                   style={{
                     width: '100%',
                     height: '100%',
                     background: 'transparent',
-                    color: colours.bg,
+                    color: colours.cream,
                     border: 'none',
                     ...displayFont,
-                    fontSize: 'clamp(14px, 3.6vw, 20px)',
-                    fontWeight: 700,
+                    fontSize: 'clamp(20px, 5.4vw, 30px)',
+                    fontWeight: 800,
                     letterSpacing: '0.08em',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '10px',
-                    cursor: 'pointer'
+                    gap: '12px',
+                    cursor: 'pointer',
+                    textShadow: '0 2px 4px rgba(0,0,0,0.5)'
                   }}
                 >
                   <span>PLAY TODAY</span>
-                  <span style={{ fontSize: 'clamp(16px, 4vw, 22px)', lineHeight: 1 }}>→</span>
+                  <span style={{ fontSize: 'clamp(22px, 6vw, 32px)', lineHeight: 1 }}>→</span>
                 </button>
               </div>
 
               {/* 1V1 MODE — red plaque */}
-              <div className="kick3-phone-zone" style={{ left: '26%', top: '64.5%', width: '50%', height: '10%' }}>
+              <div className="kick3-phone-zone" style={{ left: '23%', top: '63%', width: '50%', height: '10%' }}>
                 <button
                   onClick={startH2H}
                   style={{
@@ -2484,13 +2504,14 @@ Deliver your verdict as JSON.`;
                     color: colours.cream,
                     border: 'none',
                     ...displayFont,
-                    fontSize: 'clamp(12px, 3.2vw, 18px)',
-                    fontWeight: 600,
+                    fontSize: 'clamp(18px, 4.8vw, 26px)',
+                    fontWeight: 700,
                     letterSpacing: '0.12em',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    textShadow: '0 2px 4px rgba(0,0,0,0.5)'
                   }}
                 >
                   1V1 MODE
@@ -2498,18 +2519,18 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* COUNTDOWN — small dark plaque at bottom */}
-              <div className="kick3-phone-zone" style={{ left: '37.5%', top: '75.5%', width: '25%', height: '7%' }}>
+              <div className="kick3-phone-zone" style={{ left: '32%', top: '80.5%', width: '36%', height: '6%' }}>
                 <div style={{
                   ...condFont,
-                  fontSize: 'clamp(8px, 1.9vw, 11px)',
-                  letterSpacing: '0.06em',
+                  fontSize: 'clamp(8px, 2vw, 11px)',
+                  letterSpacing: '0.05em',
                   color: colours.cream,
                   fontWeight: 700,
                   width: '94%',
                   textAlign: 'center',
                   whiteSpace: 'nowrap'
                 }}>
-                  NEXT IN{' '}
+                  NEXT QUESTION IN{' '}
                   <span style={{
                     color: colours.gold,
                     fontWeight: 800,
