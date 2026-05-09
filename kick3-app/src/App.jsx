@@ -2372,12 +2372,12 @@ Deliver your verdict as JSON.`;
               </picture>
 
               {/* TITLE — small dark plaque at top */}
-              <div className="kick3-phone-zone" style={{ left: '24%', top: '5.5%', width: '52%', height: '8.5%' }}>
+              <div className="kick3-phone-zone" style={{ left: '26%', top: '5.5%', width: '52%', height: '8.5%' }}>
                 <div style={{ textAlign: 'center', width: '100%', position: 'relative' }}>
                   {/* DAY badge — top-left of title plaque */}
                   <div style={{
                     position: 'absolute',
-                    top: '-8px',
+                    top: '2px',
                     left: '6%',
                     ...condFont,
                     fontSize: 'clamp(8px, 2vw, 11px)',
@@ -2467,7 +2467,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* PLAY TODAY — yellow plaque */}
-              <div className="kick3-phone-zone" style={{ left: '25.5%', top: '57%', width: '52.7%', height: '10%' }}>
+              <div className="kick3-phone-zone" style={{ left: '25.5%', top: '54%', width: '52.7%', height: '10%' }}>
                 <button
                   onClick={startGame}
                   style={{
@@ -2494,7 +2494,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* 1V1 MODE — red plaque */}
-              <div className="kick3-phone-zone" style={{ left: '23%', top: '63%', width: '50%', height: '10%' }}>
+              <div className="kick3-phone-zone" style={{ left: '23%', top: '65%', width: '50%', height: '10%' }}>
                 <button
                   onClick={startH2H}
                   style={{
@@ -2519,7 +2519,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* COUNTDOWN — small dark plaque at bottom */}
-              <div className="kick3-phone-zone" style={{ left: '32%', top: '80.5%', width: '36%', height: '6%' }}>
+              <div className="kick3-phone-zone" style={{ left: '28%', top: '73%', width: '34%', height: '9%' }}>
                 <div style={{
                   ...condFont,
                   fontSize: 'clamp(8px, 2vw, 11px)',
