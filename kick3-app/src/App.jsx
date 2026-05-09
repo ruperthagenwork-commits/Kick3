@@ -2467,7 +2467,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* PLAY TODAY — yellow plaque */}
-              <div className="kick3-phone-zone" style={{ left: '25.5%', top: '54%', width: '52.7%', height: '10%' }}>
+              <div className="kick3-phone-zone" style={{ left: '25.5%', top: '55.5%', width: '52.7%', height: '10%' }}>
                 <button
                   onClick={startGame}
                   style={{
@@ -2494,7 +2494,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* 1V1 MODE — red plaque */}
-              <div className="kick3-phone-zone" style={{ left: '23%', top: '65%', width: '50%', height: '10%' }}>
+              <div className="kick3-phone-zone" style={{ left: '23%', top: '63.5%', width: '50%', height: '10%' }}>
                 <button
                   onClick={startH2H}
                   style={{
@@ -2519,10 +2519,10 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* COUNTDOWN — small dark plaque at bottom */}
-              <div className="kick3-phone-zone" style={{ left: '28%', top: '73%', width: '34%', height: '9%' }}>
+              <div className="kick3-phone-zone" style={{ left: '24%', top: '73%', width: '34%', height: '9%' }}>
                 <div style={{
                   ...condFont,
-                  fontSize: 'clamp(8px, 2vw, 11px)',
+                  fontSize: 'clamp(7px, 1.7vw, 10px)',
                   letterSpacing: '0.05em',
                   color: colours.cream,
                   fontWeight: 700,
