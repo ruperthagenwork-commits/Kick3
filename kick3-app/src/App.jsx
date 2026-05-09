@@ -2246,31 +2246,38 @@ Deliver your verdict as JSON.`;
             color: ${colours.text};
           }
 
-          /* ============ PHONE LAYOUT (default, < 900px) ============ */
-          .kick3-phone-wrap { display: flex; flex-direction: column; min-height: 100vh; }
+          /* ============ PHONE LAYOUT (default, < 900px) — Pete's bedroom ============ */
+          .kick3-phone-wrap { display: block; min-height: 100vh; }
           .kick3-desktop-wrap { display: none; }
 
-          .kick3-phone-pete {
+          .kick3-phone-stage {
             position: relative;
-            background: #2a1810;
+            width: 100%;
+            min-height: 100vh;
+            margin: 0 auto;
+            background: #1a0f0a;
             overflow: hidden;
-            width: 100%;
           }
-          .kick3-phone-pete img {
-            display: block;
+          .kick3-phone-stage > img.kick3-bg-phone,
+          .kick3-phone-stage picture img.kick3-bg-phone {
+            position: absolute;
+            inset: 0;
             width: 100%;
-            height: auto;
-            max-height: 52vh;
+            height: 100%;
             object-fit: cover;
             object-position: center top;
+            display: block;
+            user-select: none;
+            pointer-events: none;
           }
-          .kick3-phone-ui {
-            background: ${colours.bg};
-            padding: 28px 24px 32px 24px;
-            flex: 1 0 auto;
+          .kick3-phone-zone {
+            position: absolute;
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
           }
+          .kick3-phone-zone button { pointer-events: auto; }
 
           /* ============ DESKTOP LAYOUT (≥ 900px) ============ */
           @media (min-width: 900px) {
@@ -2348,194 +2355,171 @@ Deliver your verdict as JSON.`;
 
         <div className="kick3-home-root">
 
-          {/* ============ PHONE LAYOUT (unchanged from current live version) ============ */}
+          {/* ============ PHONE LAYOUT — Pete's bedroom + overlay UI ============ */}
+          {/* Plaque coordinates measured from kick3_pete_portrait_highres.png (2340x5064). */}
           <div className="kick3-phone-wrap">
-            {/* Hero illustration — Pete asleep at his desk */}
-            <div className="kick3-phone-pete">
+            <div className="kick3-phone-stage">
               <picture>
-                <source srcSet="/pete-desk.webp" type="image/webp" />
-                <img src="/pete-desk.jpg" alt="Pete the Pundit asleep at his desk" />
+                <source
+                  srcSet="/pete-bedroom-phone.webp 1x, /pete-bedroom-phone-2x.webp 2x"
+                  type="image/webp"
+                />
+                <img
+                  className="kick3-bg-phone"
+                  src="/pete-bedroom-phone.jpg"
+                  alt="Pete the Pundit asleep in his bedroom"
+                />
               </picture>
-              <div style={{
-                position: 'absolute',
-                top: '14px',
-                left: '14px',
-                background: 'rgba(20,20,30,0.85)',
-                padding: '6px 12px',
-                borderRadius: '2px',
-                ...condFont,
-                fontSize: '10px',
-                letterSpacing: '0.4em',
-                color: colours.gold,
-                fontWeight: 600,
-                fontStyle: 'italic'
-              }}>
-                DAY {TODAYS_QUESTION.number}
-              </div>
-            </div>
 
-            {/* Navy UI panel below the illustration */}
-            <div className="kick3-phone-ui">
-              {/* KICK 3 title block */}
-              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                <h1 style={{
-                  ...displayFont,
-                  fontSize: '64px',
-                  lineHeight: '0.85',
-                  margin: 0,
-                  fontWeight: 700,
-                  color: colours.gold,
-                  letterSpacing: '-0.01em',
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}>
-                  KICK<span style={{ color: colours.gold }}>3</span>
-                </h1>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '12px',
-                  marginTop: '10px'
-                }}>
-                  <div style={{ height: '1px', width: '32px', background: colours.muted }} />
+              {/* TITLE — small dark plaque at top */}
+              <div className="kick3-phone-zone" style={{ left: '24%', top: '4.5%', width: '52%', height: '4.5%' }}>
+                <div style={{ textAlign: 'center', width: '100%', position: 'relative' }}>
+                  {/* DAY badge — top-left of title plaque */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '-8px',
+                    left: '6%',
+                    ...condFont,
+                    fontSize: 'clamp(8px, 2vw, 11px)',
+                    letterSpacing: '0.3em',
+                    color: colours.gold,
+                    fontWeight: 600,
+                    fontStyle: 'italic',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    DAY {TODAYS_QUESTION.number}
+                  </div>
+                  <h1 style={{
+                    ...displayFont,
+                    fontSize: 'clamp(22px, 6vw, 36px)',
+                    lineHeight: '0.85',
+                    margin: 0,
+                    fontWeight: 700,
+                    color: colours.gold,
+                    letterSpacing: '-0.01em'
+                  }}>
+                    KICK 3
+                  </h1>
+                </div>
+              </div>
+
+              {/* CHALKBOARD QUESTION — large dark area in centre */}
+              <div className="kick3-phone-zone" style={{ left: '20%', top: '10%', width: '61%', height: '37%' }}>
+                <div style={{ textAlign: 'center', width: '88%' }}>
                   <div style={{
                     ...condFont,
-                    fontSize: '11px',
-                    color: colours.cream,
-                    fontWeight: 500,
-                    letterSpacing: '0.3em'
+                    fontSize: 'clamp(10px, 2.4vw, 14px)',
+                    letterSpacing: '0.3em',
+                    color: colours.gold,
+                    fontWeight: 600,
+                    marginBottom: '4px'
                   }}>
-                    WITH PETE THE PUNDIT
+                    TODAY&apos;S QUESTION
                   </div>
-                  <div style={{ height: '1px', width: '32px', background: colours.muted }} />
+                  <div style={{
+                    width: '32px',
+                    height: '2px',
+                    background: colours.gold,
+                    margin: '0 auto 12px auto',
+                    opacity: 0.7
+                  }} />
+                  <p style={{
+                    ...displayFont,
+                    fontSize: 'clamp(16px, 4.2vw, 24px)',
+                    lineHeight: '1.18',
+                    margin: 0,
+                    fontWeight: 500,
+                    color: '#f5f0e1',
+                    letterSpacing: '0.01em'
+                  }}>
+                    {TODAYS_QUESTION.text}
+                  </p>
+                  <div style={{ width: '50%', height: '1px', background: '#f5f0e1', opacity: 0.35, margin: '12px auto 8px auto' }} />
+                  <div style={{
+                    ...condFont,
+                    fontSize: 'clamp(8px, 2vw, 11px)',
+                    letterSpacing: '0.25em',
+                    color: CATEGORY_COLOURS[TODAYS_QUESTION.category] || colours.muted,
+                    fontWeight: 600
+                  }}>
+                    ● {TODAYS_QUESTION.category.toUpperCase()}
+                  </div>
                 </div>
               </div>
 
-              {/* Today's Question chalkboard */}
-              <div style={{
-                background: '#1a1a24',
-                border: `3px solid #4a3a28`,
-                borderRadius: '4px',
-                padding: '20px 18px 22px 18px',
-                marginBottom: '20px',
-                boxShadow: 'inset 0 0 30px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3)',
-                position: 'relative'
-              }}>
+              {/* PLAY TODAY — yellow plaque */}
+              <div className="kick3-phone-zone" style={{ left: '25.5%', top: '49.1%', width: '52.7%', height: '5%' }}>
+                <button
+                  onClick={startGame}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    background: 'transparent',
+                    color: colours.bg,
+                    border: 'none',
+                    ...displayFont,
+                    fontSize: 'clamp(14px, 3.6vw, 20px)',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <span>PLAY TODAY</span>
+                  <span style={{ fontSize: 'clamp(16px, 4vw, 22px)', lineHeight: 1 }}>→</span>
+                </button>
+              </div>
+
+              {/* 1V1 MODE — red plaque */}
+              <div className="kick3-phone-zone" style={{ left: '26%', top: '57%', width: '50%', height: '5.5%' }}>
+                <button
+                  onClick={startH2H}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    background: 'transparent',
+                    color: colours.cream,
+                    border: 'none',
+                    ...displayFont,
+                    fontSize: 'clamp(12px, 3.2vw, 18px)',
+                    fontWeight: 600,
+                    letterSpacing: '0.12em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  1V1 MODE
+                </button>
+              </div>
+
+              {/* COUNTDOWN — small dark plaque at bottom */}
+              <div className="kick3-phone-zone" style={{ left: '37.5%', top: '65.5%', width: '25%', height: '5%' }}>
                 <div style={{
-                  textAlign: 'center',
                   ...condFont,
-                  fontSize: '12px',
-                  letterSpacing: '0.3em',
-                  color: colours.gold,
-                  fontWeight: 600,
-                  marginBottom: '4px'
-                }}>
-                  TODAY&apos;S QUESTION
-                </div>
-                <div style={{ width: '40px', height: '2px', background: colours.gold, margin: '0 auto 14px auto', opacity: 0.7 }} />
-                <p style={{
-                  ...displayFont,
-                  fontSize: '24px',
-                  lineHeight: '1.15',
-                  margin: 0,
-                  fontWeight: 500,
-                  color: '#f5f0e1',
+                  fontSize: 'clamp(8px, 1.9vw, 11px)',
+                  letterSpacing: '0.06em',
+                  color: colours.cream,
+                  fontWeight: 700,
+                  width: '94%',
                   textAlign: 'center',
-                  letterSpacing: '0.01em'
+                  whiteSpace: 'nowrap'
                 }}>
-                  {TODAYS_QUESTION.text}
-                </p>
-                <div style={{ width: '60%', height: '1px', background: '#f5f0e1', opacity: 0.4, margin: '14px auto 0 auto' }} />
-                <div style={{
-                  ...condFont,
-                  fontSize: '10px',
-                  letterSpacing: '0.25em',
-                  color: CATEGORY_COLOURS[TODAYS_QUESTION.category] || colours.muted,
-                  fontWeight: 600,
-                  textAlign: 'center',
-                  marginTop: '10px'
-                }}>
-                  ● {TODAYS_QUESTION.category.toUpperCase()}
+                  NEXT IN{' '}
+                  <span style={{
+                    color: colours.gold,
+                    fontWeight: 800,
+                    fontVariantNumeric: 'tabular-nums',
+                    marginLeft: '3px'
+                  }}>
+                    {timeUntilNext}
+                  </span>
                 </div>
               </div>
-
-              {/* PLAY TODAY */}
-              <button onClick={startGame} style={{
-                width: '100%',
-                padding: '18px',
-                background: colours.gold,
-                color: colours.bg,
-                border: 'none',
-                borderRadius: '4px',
-                ...displayFont,
-                fontSize: '22px',
-                fontWeight: 700,
-                letterSpacing: '0.08em',
-                cursor: 'pointer',
-                marginBottom: '12px',
-                boxShadow: '0 3px 0 #8a7028, 0 5px 12px rgba(0,0,0,0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px'
-              }}>
-                <span>PLAY TODAY</span>
-                <span style={{ fontSize: '24px', lineHeight: 1 }}>→</span>
-              </button>
-
-              {/* 1V1 MODE */}
-              <button onClick={startH2H} style={{
-                width: '100%',
-                padding: '14px',
-                background: '#8b2335',
-                color: colours.cream,
-                border: 'none',
-                borderRadius: '4px',
-                ...displayFont,
-                fontSize: '17px',
-                fontWeight: 600,
-                letterSpacing: '0.1em',
-                cursor: 'pointer',
-                marginBottom: '20px',
-                boxShadow: '0 3px 0 #4a1119, 0 4px 10px rgba(0,0,0,0.25)'
-              }}>
-                1V1 MODE
-              </button>
-
-              {/* Countdown */}
-              <div style={{
-                textAlign: 'center',
-                ...condFont,
-                fontSize: '11px',
-                letterSpacing: '0.2em',
-                color: colours.muted,
-                fontWeight: 500
-              }}>
-                <span style={{ marginRight: '8px', opacity: 0.7 }}>◷</span>
-                NEXT QUESTION IN{' '}
-                <span style={{ color: colours.gold, fontWeight: 700, fontVariantNumeric: 'tabular-nums', marginLeft: '4px' }}>
-                  {timeUntilNext}
-                </span>
-              </div>
-
-              {/* Pete's intro line */}
-              <p style={{
-                ...condFont,
-                fontStyle: 'italic',
-                color: colours.muted,
-                textAlign: 'center',
-                fontSize: '13px',
-                marginTop: '24px',
-                marginBottom: 0,
-                padding: '0 8px',
-                lineHeight: '1.5',
-                opacity: 0.85
-              }}>
-                &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
-              </p>
             </div>
           </div>
 
