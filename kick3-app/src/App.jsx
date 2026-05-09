@@ -2519,7 +2519,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* COUNTDOWN — small dark plaque at bottom */}
-              <div className="kick3-phone-zone" style={{ left: '24%', top: '72%', width: '34%', height: '9%' }}>
+              <div className="kick3-phone-zone" style={{ left: '24%', top: '72.5%', width: '34%', height: '9%' }}>
                 <div style={{
                   ...condFont,
                   fontSize: 'clamp(7px, 1.7vw, 10px)',
