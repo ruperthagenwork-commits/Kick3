@@ -2467,7 +2467,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* PLAY TODAY — yellow plaque */}
-              <div className="kick3-phone-zone" style={{ left: '25.5%', top: '55.5%', width: '52.7%', height: '10%' }}>
+              <div className="kick3-phone-zone" style={{ left: '25.5%', top: '54.5%', width: '52.7%', height: '10%' }}>
                 <button
                   onClick={startGame}
                   style={{
@@ -2519,7 +2519,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* COUNTDOWN — small dark plaque at bottom */}
-              <div className="kick3-phone-zone" style={{ left: '24%', top: '73%', width: '34%', height: '9%' }}>
+              <div className="kick3-phone-zone" style={{ left: '24%', top: '72%', width: '34%', height: '9%' }}>
                 <div style={{
                   ...condFont,
                   fontSize: 'clamp(7px, 1.7vw, 10px)',
