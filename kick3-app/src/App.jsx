@@ -1606,9 +1606,34 @@ Deliver your verdict as JSON.`;
                   cursor: soloLocked ? 'not-allowed' : 'pointer',
                   marginBottom: '12px',
                   boxShadow: soloLocked ? 'none' : '0 4px 0 rgba(0,0,0,0.25)',
-                  opacity: soloLocked ? 0.7 : 1
+                  opacity: soloLocked ? 0.7 : 1,
+                  position: 'relative'
                 }}
               >
+                {/* Counter badge — left, only after 1+ plays used today, only if not locked */}
+                {!soloLocked && plays.solo > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'rgba(0,0,0,0.18)',
+                    color: '#000',
+                    ...condFont,
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    lineHeight: 1
+                  }} aria-label={`${MAX_PLAYS_PER_DAY - plays.solo} of ${MAX_PLAYS_PER_DAY} plays left`}>
+                    <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🎯</span>
+                    <span>{MAX_PLAYS_PER_DAY - plays.solo}/{MAX_PLAYS_PER_DAY}</span>
+                  </span>
+                )}
                 {soloLocked ? (
                   <>
                     <span style={{ fontSize: '20px', letterSpacing: 0 }} aria-hidden="true">🔒</span>
@@ -1644,9 +1669,34 @@ Deliver your verdict as JSON.`;
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '10px'
+                  gap: '10px',
+                  position: 'relative'
                 }}
               >
+                {/* Counter badge — left, only after 1+ plays used today, only if not locked */}
+                {!h2hLocked && plays.h2h > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'rgba(0,0,0,0.25)',
+                    color: colours.cream,
+                    ...condFont,
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    lineHeight: 1
+                  }} aria-label={`${MAX_PLAYS_PER_DAY - plays.h2h} of ${MAX_PLAYS_PER_DAY} 1v1 plays left`}>
+                    <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🥊</span>
+                    <span>{MAX_PLAYS_PER_DAY - plays.h2h}/{MAX_PLAYS_PER_DAY}</span>
+                  </span>
+                )}
                 {h2hLocked ? (
                   <>
                     <span style={{ fontSize: '18px', letterSpacing: 0 }} aria-hidden="true">🔒</span>
@@ -1656,42 +1706,6 @@ Deliver your verdict as JSON.`;
                   <span>1V1 MODE</span>
                 )}
               </button>
-
-              {/* Plays remaining counter — only shown after 1+ plays used today.
-                  Helps players see scarcity revealing itself as they approach it. */}
-              {(plays.solo > 0 || plays.h2h > 0) && (
-                <div style={{
-                  ...condFont,
-                  fontSize: '11px',
-                  letterSpacing: '0.15em',
-                  color: colours.gold,
-                  textAlign: 'center',
-                  marginBottom: '14px',
-                  marginTop: '-6px',
-                  opacity: 0.85,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: '14px',
-                  flexWrap: 'wrap'
-                }}>
-                  {plays.solo > 0 && (
-                    <span>
-                      <span style={{ opacity: 0.6 }}>SOLO</span>{' '}
-                      <span style={{ fontWeight: 700, color: soloLocked ? colours.muted : colours.gold }}>
-                        {Math.max(0, MAX_PLAYS_PER_DAY - plays.solo)}/{MAX_PLAYS_PER_DAY} LEFT
-                      </span>
-                    </span>
-                  )}
-                  {plays.h2h > 0 && (
-                    <span>
-                      <span style={{ opacity: 0.6 }}>1V1</span>{' '}
-                      <span style={{ fontWeight: 700, color: h2hLocked ? colours.muted : colours.gold }}>
-                        {Math.max(0, MAX_PLAYS_PER_DAY - plays.h2h)}/{MAX_PLAYS_PER_DAY} LEFT
-                      </span>
-                    </span>
-                  )}
-                </div>
-              )}
 
               {/* Countdown */}
               <div style={{
@@ -1997,9 +2011,34 @@ Deliver your verdict as JSON.`;
                     cursor: soloLocked ? 'not-allowed' : 'pointer',
                     marginBottom: '14px',
                     boxShadow: soloLocked ? 'none' : '0 5px 0 rgba(0,0,0,0.25)',
-                    opacity: soloLocked ? 0.7 : 1
+                    opacity: soloLocked ? 0.7 : 1,
+                    position: 'relative'
                   }}
                 >
+                  {/* Counter badge — left, only after 1+ plays used today, only if not locked */}
+                  {!soloLocked && plays.solo > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      left: '16px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'rgba(0,0,0,0.18)',
+                      color: '#000',
+                      ...condFont,
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      padding: '5px 10px',
+                      borderRadius: '5px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      lineHeight: 1
+                    }} aria-label={`${MAX_PLAYS_PER_DAY - plays.solo} of ${MAX_PLAYS_PER_DAY} plays left`}>
+                      <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🎯</span>
+                      <span>{MAX_PLAYS_PER_DAY - plays.solo}/{MAX_PLAYS_PER_DAY}</span>
+                    </span>
+                  )}
                   {soloLocked ? (
                     <>
                       <span style={{ fontSize: '24px', letterSpacing: 0 }} aria-hidden="true">🔒</span>
@@ -2035,9 +2074,34 @@ Deliver your verdict as JSON.`;
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '12px'
+                    gap: '12px',
+                    position: 'relative'
                   }}
                 >
+                  {/* Counter badge — left, only after 1+ plays used today, only if not locked */}
+                  {!h2hLocked && plays.h2h > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      left: '16px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'rgba(0,0,0,0.25)',
+                      color: colours.cream,
+                      ...condFont,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      padding: '5px 10px',
+                      borderRadius: '5px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      lineHeight: 1
+                    }} aria-label={`${MAX_PLAYS_PER_DAY - plays.h2h} of ${MAX_PLAYS_PER_DAY} 1v1 plays left`}>
+                      <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🥊</span>
+                      <span>{MAX_PLAYS_PER_DAY - plays.h2h}/{MAX_PLAYS_PER_DAY}</span>
+                    </span>
+                  )}
                   {h2hLocked ? (
                     <>
                       <span style={{ fontSize: '20px', letterSpacing: 0 }} aria-hidden="true">🔒</span>
@@ -2047,41 +2111,6 @@ Deliver your verdict as JSON.`;
                     <span>1V1 MODE</span>
                   )}
                 </button>
-
-                {/* Plays remaining counter — only shown after 1+ plays used today. */}
-                {(plays.solo > 0 || plays.h2h > 0) && (
-                  <div style={{
-                    ...condFont,
-                    fontSize: '12px',
-                    letterSpacing: '0.18em',
-                    color: colours.gold,
-                    textAlign: 'center',
-                    marginBottom: '16px',
-                    marginTop: '-8px',
-                    opacity: 0.85,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    gap: '18px',
-                    flexWrap: 'wrap'
-                  }}>
-                    {plays.solo > 0 && (
-                      <span>
-                        <span style={{ opacity: 0.6 }}>SOLO</span>{' '}
-                        <span style={{ fontWeight: 700, color: soloLocked ? colours.muted : colours.gold }}>
-                          {Math.max(0, MAX_PLAYS_PER_DAY - plays.solo)}/{MAX_PLAYS_PER_DAY} LEFT
-                        </span>
-                      </span>
-                    )}
-                    {plays.h2h > 0 && (
-                      <span>
-                        <span style={{ opacity: 0.6 }}>1V1</span>{' '}
-                        <span style={{ fontWeight: 700, color: h2hLocked ? colours.muted : colours.gold }}>
-                          {Math.max(0, MAX_PLAYS_PER_DAY - plays.h2h)}/{MAX_PLAYS_PER_DAY} LEFT
-                        </span>
-                      </span>
-                    )}
-                  </div>
-                )}
 
                 {/* Countdown */}
                 <div style={{
