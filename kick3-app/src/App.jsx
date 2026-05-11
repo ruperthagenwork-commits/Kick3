@@ -1954,6 +1954,51 @@ export default function Kick3() {
   // Share state — shows feedback in the share button.
   const [shareState, setShareState] = useState('idle'); // 'idle' | 'working' | 'shared' | 'copied' | 'error'
 
+  // ============ STREAK LOGIC ============
+  // Three values persisted to localStorage:
+  //   kick3_streak_current — current consecutive-day streak
+  //   kick3_streak_best    — highest streak ever achieved
+  //   kick3_streak_last_day — TODAYS_QUESTION.number of the last completed verdict
+  // Streak only updates when a verdict is recorded (recordStreak() called).
+  const readStreakFromStorage = () => {
+    try {
+      return {
+        current: parseInt(localStorage.getItem('kick3_streak_current') || '0', 10) || 0,
+        best:    parseInt(localStorage.getItem('kick3_streak_best')    || '0', 10) || 0,
+        lastDay: parseInt(localStorage.getItem('kick3_streak_last_day')|| '0', 10) || 0,
+      };
+    } catch {
+      // localStorage can throw in private mode / disabled storage
+      return { current: 0, best: 0, lastDay: 0 };
+    }
+  };
+  const [streak, setStreak] = useState(readStreakFromStorage);
+  // Tracks whether the player just hit a new personal best on the most recent verdict.
+  // Stored separately so we only show "NEW PERSONAL BEST" once per verdict.
+  const [isPersonalBest, setIsPersonalBest] = useState(false);
+
+  // Call when a verdict (solo or h2h) is successfully delivered.
+  // Idempotent — calling multiple times for the same day's question is a no-op.
+  const recordStreak = () => {
+    try {
+      const today = TODAYS_QUESTION.number;
+      const prev = readStreakFromStorage();
+      // Already recorded today — no change.
+      if (prev.lastDay === today) return;
+      // Consecutive day → +1. Otherwise → reset to 1.
+      const newCurrent = (prev.lastDay === today - 1) ? prev.current + 1 : 1;
+      const newBest = Math.max(prev.best, newCurrent);
+      const beatBest = newCurrent > prev.best && prev.best > 0;
+      localStorage.setItem('kick3_streak_current', String(newCurrent));
+      localStorage.setItem('kick3_streak_best',    String(newBest));
+      localStorage.setItem('kick3_streak_last_day',String(today));
+      setStreak({ current: newCurrent, best: newBest, lastDay: today });
+      setIsPersonalBest(beatBest);
+    } catch {
+      // Storage unavailable — silently skip. Game still works.
+    }
+  };
+
   // Render the verdict card to a JPEG blob.
   // 1.5x scale + 90% JPEG quality keeps file size ~250-350KB instead of ~1MB,
   // with no visible quality loss on phone screens.
@@ -2045,6 +2090,7 @@ export default function Kick3() {
     setSentence('');
     setVerdict(null);
     setError(null);
+    setIsPersonalBest(false);
     setScreen('draft');
   };
 
@@ -2058,6 +2104,7 @@ export default function Kick3() {
     setP2Sentence('');
     setH2hVerdict(null);
     setError(null);
+    setIsPersonalBest(false);
     setScreen('h2h-names');
   };
 
@@ -2149,6 +2196,7 @@ Score each /10, declare a winner, deliver verdict as JSON.`;
       const cleaned = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(cleaned);
       setH2hVerdict(parsed);
+      recordStreak();
       setScreen('h2h-verdict');
     } catch (e) {
       console.error(e);
@@ -2186,6 +2234,7 @@ Deliver your verdict as JSON.`;
       const cleaned = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(cleaned);
       setVerdict(parsed);
+      recordStreak();
       setScreen('verdict');
     } catch (e) {
       console.error(e);
@@ -2380,6 +2429,29 @@ Deliver your verdict as JSON.`;
               }}>
                 DAY {TODAYS_QUESTION.number}
               </div>
+              {/* Streak badge — top-right, only if there's a streak to show */}
+              {streak.current >= 1 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '14px',
+                  right: '14px',
+                  background: 'rgba(20,20,30,0.85)',
+                  color: colours.gold,
+                  ...condFont,
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '0.3em',
+                  padding: '6px 10px',
+                  borderRadius: '4px',
+                  border: `1px solid ${colours.gold}`,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
+                  <span>{streak.current} DAY STREAK</span>
+                </div>
+              )}
             </div>
 
             {/* Navy UI panel below illustration */}
@@ -2608,6 +2680,29 @@ Deliver your verdict as JSON.`;
                 }}>
                   DAY {TODAYS_QUESTION.number}
                 </div>
+                {/* Streak badge */}
+                {streak.current >= 1 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '18px',
+                    right: '18px',
+                    background: 'rgba(20,20,30,0.85)',
+                    color: colours.gold,
+                    ...condFont,
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    letterSpacing: '0.3em',
+                    padding: '8px 14px',
+                    borderRadius: '4px',
+                    border: `1px solid ${colours.gold}`,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
+                    <span>{streak.current} DAY STREAK</span>
+                  </div>
+                )}
               </div>
 
               {/* Navy UI panel below */}
@@ -3112,7 +3207,7 @@ Deliver your verdict as JSON.`;
               {/* Rating stamp */}
               <div style={{
                 textAlign: 'center',
-                marginBottom: '24px',
+                marginBottom: '16px',
                 padding: '10px',
                 border: `2px solid ${ratingColour}`,
                 background: `${ratingColour}11`,
@@ -3122,6 +3217,37 @@ Deliver your verdict as JSON.`;
                   {verdict.rating}
                 </div>
               </div>
+
+              {/* Streak line — sits inside the shared card */}
+              {streak.current >= 1 && (
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    ...condFont,
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    letterSpacing: '0.25em',
+                    color: colours.gold
+                  }}>
+                    <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
+                    <span>{streak.current} DAY STREAK</span>
+                  </div>
+                  {isPersonalBest && (
+                    <div style={{
+                      marginTop: '6px',
+                      ...condFont,
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      letterSpacing: '0.25em',
+                      color: colours.cream
+                    }}>
+                      <span aria-hidden="true">🏆</span> NEW PERSONAL BEST
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Question */}
               <div style={{ ...condFont, fontStyle: 'italic', color: colours.muted, fontSize: '13px', textAlign: 'center', marginBottom: '6px' }}>
@@ -3782,7 +3908,7 @@ Deliver your verdict as JSON.`;
               {/* Winner banner */}
               <div style={{
                 textAlign: 'center',
-                marginBottom: '20px',
+                marginBottom: '16px',
                 padding: '12px',
                 background: `${winnerColour}15`,
                 border: `2px solid ${winnerColour}`,
@@ -3795,6 +3921,37 @@ Deliver your verdict as JSON.`;
                   {winnerName.toUpperCase()} WINS
                 </div>
               </div>
+
+              {/* Streak line — sits inside the shared card */}
+              {streak.current >= 1 && (
+                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    ...condFont,
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    letterSpacing: '0.25em',
+                    color: colours.gold
+                  }}>
+                    <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
+                    <span>{streak.current} DAY STREAK</span>
+                  </div>
+                  {isPersonalBest && (
+                    <div style={{
+                      marginTop: '4px',
+                      ...condFont,
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      letterSpacing: '0.25em',
+                      color: colours.cream
+                    }}>
+                      <span aria-hidden="true">🏆</span> NEW PERSONAL BEST
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Question */}
               <div style={{ ...condFont, fontStyle: 'italic', color: colours.muted, fontSize: '12px', textAlign: 'center', marginBottom: '4px' }}>
