@@ -2247,13 +2247,22 @@ Deliver your verdict as JSON.`;
           }
 
           /* ============ PHONE LAYOUT (default, < 900px) — Pete's bedroom ============ */
-          .kick3-phone-wrap { display: block; min-height: 100vh; }
+          .kick3-phone-wrap {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            background: #1a0f0a;
+          }
           .kick3-desktop-wrap { display: none; }
 
+          /* Stage matches the illustration's native aspect ratio (1170x2532 = 0.4621).
+             This keeps painted-plaque overlay coords accurate regardless of phone aspect ratio.
+             Width is whatever fits the viewport; height is derived from aspect-ratio. */
           .kick3-phone-stage {
             position: relative;
             width: 100%;
-            min-height: 100vh;
+            aspect-ratio: 1170 / 2532;
             margin: 0 auto;
             background: #1a0f0a;
             overflow: hidden;
@@ -2372,7 +2381,7 @@ Deliver your verdict as JSON.`;
               </picture>
 
               {/* TITLE — small dark plaque at top */}
-              <div className="kick3-phone-zone" style={{ left: '26%', top: '5.5%', width: '52%', height: '8.5%' }}>
+              <div className="kick3-phone-zone" style={{ left: '24%', top: '4.5%', width: '52%', height: '6%' }}>
                 <div style={{ textAlign: 'center', width: '100%', position: 'relative' }}>
                   {/* DAY badge — top-left of title plaque */}
                   <div style={{
@@ -2423,7 +2432,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* CHALKBOARD QUESTION — large dark area in centre */}
-              <div className="kick3-phone-zone" style={{ left: '21%', top: '18%', width: '61%', height: '36%' }}>
+              <div className="kick3-phone-zone" style={{ left: '20%', top: '10%', width: '61%', height: '37%' }}>
                 <div style={{ textAlign: 'center', width: '88%' }}>
                   <div style={{
                     ...condFont,
@@ -2467,14 +2476,14 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* PLAY TODAY — yellow plaque */}
-              <div className="kick3-phone-zone" style={{ left: '25.5%', top: '54.5%', width: '52.7%', height: '10%' }}>
+              <div className="kick3-phone-zone" style={{ left: '25.5%', top: '49.1%', width: '52.7%', height: '5%' }}>
                 <button
                   onClick={startGame}
                   style={{
                     width: '100%',
                     height: '100%',
                     background: 'transparent',
-                    color: colours.cream,
+                    color: '#000',
                     border: 'none',
                     ...displayFont,
                     fontSize: 'clamp(20px, 5.4vw, 30px)',
@@ -2484,8 +2493,7 @@ Deliver your verdict as JSON.`;
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '12px',
-                    cursor: 'pointer',
-                    textShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                    cursor: 'pointer'
                   }}
                 >
                   <span>PLAY TODAY</span>
@@ -2494,7 +2502,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* 1V1 MODE — red plaque */}
-              <div className="kick3-phone-zone" style={{ left: '23%', top: '63.5%', width: '50%', height: '10%' }}>
+              <div className="kick3-phone-zone" style={{ left: '26%', top: '57%', width: '50%', height: '5.5%' }}>
                 <button
                   onClick={startH2H}
                   style={{
@@ -2519,7 +2527,7 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* COUNTDOWN — small dark plaque at bottom */}
-              <div className="kick3-phone-zone" style={{ left: '24%', top: '72.5%', width: '34%', height: '9%' }}>
+              <div className="kick3-phone-zone" style={{ left: '37.5%', top: '65.5%', width: '25%', height: '5%' }}>
                 <div style={{
                   ...condFont,
                   fontSize: 'clamp(7px, 1.7vw, 10px)',
@@ -2705,14 +2713,14 @@ Deliver your verdict as JSON.`;
               </div>
 
               {/* COUNTDOWN — sits on the small dark card at bottom centre */}
-              <div className="kick3-desktop-zone" style={{ left: '42.58%', top: '83.40%', width: '12.50%', height: '7.08%' }}>
+              <div className="kick3-desktop-zone" style={{ left: '42.58%', top: '83.40%', width: '18%', height: '7.08%' }}>
                 <div style={{
                   ...condFont,
                   fontSize: 'clamp(11px, 0.92vw, 15px)',
                   letterSpacing: '0.06em',
                   color: colours.cream,
                   fontWeight: 700,
-                  width: '94%',
+                  width: '100%',
                   textAlign: 'center',
                   whiteSpace: 'nowrap'
                 }}>
