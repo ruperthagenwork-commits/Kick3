@@ -2236,7 +2236,7 @@ Deliver your verdict as JSON.`;
   if (screen === 'home') {
     return (
       <>
-        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
         {/* Responsive CSS — phone uses the Pete-desk vertical layout, desktop uses the full bedroom with overlay UI */}
         <style>{`
           .kick3-home-root {
@@ -2246,47 +2246,34 @@ Deliver your verdict as JSON.`;
             color: ${colours.text};
           }
 
-          /* ============ PHONE LAYOUT (default, < 900px) — Pete's bedroom ============ */
+          /* ============ PHONE LAYOUT (default, < 900px) — half illustration, half navy UI ============ */
           .kick3-phone-wrap {
             display: flex;
-            justify-content: center;
-            align-items: flex-start;
+            flex-direction: column;
             min-height: 100vh;
-            background: #1a0f0a;
           }
           .kick3-desktop-wrap { display: none; }
 
-          /* Stage matches the illustration's native aspect ratio (1170x2532 = 0.4621).
-             This keeps painted-plaque overlay coords accurate regardless of phone aspect ratio.
-             Width is whatever fits the viewport; height is derived from aspect-ratio. */
-          .kick3-phone-stage {
+          .kick3-phone-pete {
             position: relative;
-            width: 100%;
-            aspect-ratio: 1170 / 2532;
-            margin: 0 auto;
-            background: #1a0f0a;
+            background: #2a1810;
             overflow: hidden;
-          }
-          .kick3-phone-stage > img.kick3-bg-phone,
-          .kick3-phone-stage picture img.kick3-bg-phone {
-            position: absolute;
-            inset: 0;
             width: 100%;
-            height: 100%;
+          }
+          .kick3-phone-pete img {
+            display: block;
+            width: 100%;
+            height: auto;
             object-fit: cover;
             object-position: center top;
-            display: block;
-            user-select: none;
-            pointer-events: none;
           }
-          .kick3-phone-zone {
-            position: absolute;
+          .kick3-phone-ui {
+            background: ${colours.bg};
+            padding: 28px 24px 32px 24px;
+            flex: 1 0 auto;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
+            flex-direction: column;
           }
-          .kick3-phone-zone button { pointer-events: auto; }
 
           /* ============ DESKTOP LAYOUT (≥ 900px) ============ */
           @media (min-width: 900px) {
@@ -2364,191 +2351,230 @@ Deliver your verdict as JSON.`;
 
         <div className="kick3-home-root">
 
-          {/* ============ PHONE LAYOUT — Pete's bedroom + overlay UI ============ */}
-          {/* Plaque coordinates measured from kick3_pete_portrait_highres.png (2340x5064). */}
+          {/* ============ PHONE LAYOUT — half illustration, half navy UI ============ */}
           <div className="kick3-phone-wrap">
-            <div className="kick3-phone-stage">
+            {/* Hero illustration — Pete's bedroom (mobile crop) */}
+            <div className="kick3-phone-pete">
               <picture>
                 <source
-                  srcSet="/pete-bedroom-phone.webp 1x, /pete-bedroom-phone-2x.webp 2x"
+                  srcSet="/pete-bedroom-mobile.webp 1x, /pete-bedroom-mobile-2x.webp 2x"
                   type="image/webp"
                 />
                 <img
-                  className="kick3-bg-phone"
-                  src="/pete-bedroom-phone.jpg"
-                  alt="Pete the Pundit asleep in his bedroom"
+                  src="/pete-bedroom-mobile.jpg"
+                  alt="Pete the Pundit asleep in his study"
                 />
               </picture>
+              {/* DAY badge — top-left corner of illustration */}
+              <div style={{
+                position: 'absolute',
+                top: '14px',
+                left: '14px',
+                background: 'rgba(20,20,30,0.85)',
+                color: colours.gold,
+                ...condFont,
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.3em',
+                padding: '6px 10px',
+                borderRadius: '4px',
+                border: `1px solid ${colours.gold}`
+              }}>
+                DAY {TODAYS_QUESTION.number}
+              </div>
+            </div>
 
-              {/* TITLE — small dark plaque at top */}
-              <div className="kick3-phone-zone" style={{ left: '24%', top: '4.5%', width: '52%', height: '6%' }}>
-                <div style={{ textAlign: 'center', width: '100%', position: 'relative' }}>
-                  {/* DAY badge — top-left of title plaque */}
+            {/* Navy UI panel below illustration */}
+            <div className="kick3-phone-ui">
+              {/* Title block — big bold KICK 3 */}
+              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                <h1 style={{
+                  ...displayFont,
+                  fontSize: 'clamp(64px, 17vw, 88px)',
+                  lineHeight: '0.85',
+                  margin: 0,
+                  fontWeight: 700,
+                  color: colours.gold,
+                  letterSpacing: '0.01em',
+                  textTransform: 'uppercase'
+                }}>
+                  KICK 3
+                </h1>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  marginTop: '10px'
+                }}>
+                  <div style={{ height: '1px', flex: '0 0 28px', background: colours.cream, opacity: 0.7 }} />
                   <div style={{
-                    position: 'absolute',
-                    top: '2px',
-                    left: '6%',
                     ...condFont,
-                    fontSize: 'clamp(8px, 2vw, 11px)',
-                    letterSpacing: '0.3em',
-                    color: colours.gold,
+                    fontSize: '13px',
+                    color: colours.cream,
                     fontWeight: 600,
-                    fontStyle: 'italic',
-                    whiteSpace: 'nowrap'
+                    letterSpacing: '0.28em'
                   }}>
-                    DAY {TODAYS_QUESTION.number}
+                    WITH PETE THE PUNDIT
                   </div>
-                  <h1 style={{
-                    ...displayFont,
-                    fontSize: 'clamp(22px, 6vw, 36px)',
-                    lineHeight: '0.85',
-                    margin: 0,
-                    fontWeight: 700,
-                    color: colours.gold,
-                    letterSpacing: '-0.01em'
-                  }}>
-                    KICK 3
-                  </h1>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    marginTop: '6px'
-                  }}>
-                    <div style={{ height: '1px', flex: '0 0 18px', background: colours.cream, opacity: 0.6 }} />
-                    <div style={{
-                      ...condFont,
-                      fontSize: 'clamp(8px, 2vw, 11px)',
-                      color: colours.cream,
-                      fontWeight: 500,
-                      letterSpacing: '0.3em'
-                    }}>
-                      WITH PETE THE PUNDIT
-                    </div>
-                    <div style={{ height: '1px', flex: '0 0 18px', background: colours.cream, opacity: 0.6 }} />
-                  </div>
+                  <div style={{ height: '1px', flex: '0 0 28px', background: colours.cream, opacity: 0.7 }} />
                 </div>
               </div>
 
-              {/* CHALKBOARD QUESTION — large dark area in centre */}
-              <div className="kick3-phone-zone" style={{ left: '20%', top: '10%', width: '61%', height: '37%' }}>
-                <div style={{ textAlign: 'center', width: '88%' }}>
+              {/* Question chalkboard — wooden frame around dark slate */}
+              <div style={{
+                background: 'linear-gradient(135deg, #6b4423 0%, #4a2e15 50%, #5c3a1d 100%)',
+                padding: '10px',
+                borderRadius: '6px',
+                marginBottom: '22px',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1)'
+              }}>
+                <div style={{
+                  background: '#1a1d23',
+                  borderRadius: '3px',
+                  padding: '18px 18px 16px 18px',
+                  textAlign: 'center',
+                  boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.6)',
+                  position: 'relative'
+                }}>
+                  {/* Subtle chalk-dust texture using radial gradients */}
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: '3px',
+                    pointerEvents: 'none',
+                    background: 'radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.025) 0%, transparent 50%), radial-gradient(ellipse at 80% 70%, rgba(255,255,255,0.02) 0%, transparent 50%)'
+                  }} />
                   <div style={{
                     ...condFont,
-                    fontSize: 'clamp(10px, 2.4vw, 14px)',
+                    fontSize: '11px',
                     letterSpacing: '0.3em',
                     color: colours.gold,
                     fontWeight: 600,
-                    marginBottom: '4px'
+                    marginBottom: '4px',
+                    position: 'relative'
                   }}>
                     TODAY&apos;S QUESTION
                   </div>
                   <div style={{
-                    width: '32px',
+                    width: '36px',
                     height: '2px',
                     background: colours.gold,
-                    margin: '0 auto 12px auto',
-                    opacity: 0.7
+                    margin: '0 auto 14px auto',
+                    opacity: 0.7,
+                    position: 'relative'
                   }} />
                   <p style={{
-                    ...displayFont,
-                    fontSize: 'clamp(15px, 3.8vw, 22px)',
+                    fontFamily: "'Permanent Marker', 'Teko', cursive",
+                    fontSize: 'clamp(20px, 5.4vw, 26px)',
                     lineHeight: '1.18',
                     margin: 0,
-                    fontWeight: 500,
                     color: '#f5f0e1',
-                    letterSpacing: '0.01em'
+                    letterSpacing: '0.02em',
+                    textTransform: 'uppercase',
+                    textShadow: '0 1px 0 rgba(0,0,0,0.3)',
+                    position: 'relative'
                   }}>
                     {TODAYS_QUESTION.text}
                   </p>
-                  <div style={{ width: '50%', height: '1px', background: '#f5f0e1', opacity: 0.35, margin: '12px auto 8px auto' }} />
+                  <div style={{ width: '50%', height: '1px', background: '#f5f0e1', opacity: 0.3, margin: '14px auto 8px auto', position: 'relative' }} />
                   <div style={{
                     ...condFont,
-                    fontSize: 'clamp(8px, 2vw, 11px)',
+                    fontSize: '10px',
                     letterSpacing: '0.25em',
                     color: CATEGORY_COLOURS[TODAYS_QUESTION.category] || colours.muted,
-                    fontWeight: 600
+                    fontWeight: 600,
+                    position: 'relative'
                   }}>
                     ● {TODAYS_QUESTION.category.toUpperCase()}
                   </div>
                 </div>
               </div>
 
-              {/* PLAY TODAY — yellow plaque */}
-              <div className="kick3-phone-zone" style={{ left: '25.5%', top: '49.1%', width: '52.7%', height: '5%' }}>
-                <button
-                  onClick={startGame}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    background: 'transparent',
-                    color: '#000',
-                    border: 'none',
-                    ...displayFont,
-                    fontSize: 'clamp(20px, 5.4vw, 30px)',
-                    fontWeight: 800,
-                    letterSpacing: '0.08em',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '12px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <span>PLAY TODAY</span>
-                  <span style={{ fontSize: 'clamp(22px, 6vw, 32px)', lineHeight: 1 }}>→</span>
-                </button>
-              </div>
+              {/* PLAY TODAY — yellow */}
+              <button
+                onClick={startGame}
+                style={{
+                  width: '100%',
+                  padding: '18px 20px',
+                  background: colours.gold,
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(20px, 5.4vw, 24px)',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '12px',
+                  cursor: 'pointer',
+                  marginBottom: '12px',
+                  boxShadow: '0 4px 0 rgba(0,0,0,0.25)'
+                }}
+              >
+                <span>PLAY TODAY</span>
+                <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
+              </button>
 
-              {/* 1V1 MODE — red plaque */}
-              <div className="kick3-phone-zone" style={{ left: '26%', top: '57%', width: '50%', height: '5.5%' }}>
-                <button
-                  onClick={startH2H}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    background: 'transparent',
-                    color: colours.cream,
-                    border: 'none',
-                    ...displayFont,
-                    fontSize: 'clamp(18px, 4.8vw, 26px)',
-                    fontWeight: 700,
-                    letterSpacing: '0.12em',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    textShadow: '0 2px 4px rgba(0,0,0,0.5)'
-                  }}
-                >
-                  1V1 MODE
-                </button>
-              </div>
-
-              {/* COUNTDOWN — small dark plaque at bottom */}
-              <div className="kick3-phone-zone" style={{ left: '37.5%', top: '65.5%', width: '25%', height: '5%' }}>
-                <div style={{
-                  ...condFont,
-                  fontSize: 'clamp(7px, 1.7vw, 10px)',
-                  letterSpacing: '0.05em',
+              {/* 1V1 MODE — red */}
+              <button
+                onClick={startH2H}
+                style={{
+                  width: '100%',
+                  padding: '15px 20px',
+                  background: colours.accent,
                   color: colours.cream,
+                  border: 'none',
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(16px, 4.4vw, 19px)',
                   fontWeight: 700,
-                  width: '94%',
-                  textAlign: 'center',
-                  whiteSpace: 'nowrap'
+                  letterSpacing: '0.12em',
+                  cursor: 'pointer',
+                  marginBottom: '20px',
+                  boxShadow: '0 4px 0 rgba(0,0,0,0.25)'
+                }}
+              >
+                1V1 MODE
+              </button>
+
+              {/* Countdown */}
+              <div style={{
+                ...condFont,
+                fontSize: '11px',
+                letterSpacing: '0.06em',
+                color: colours.cream,
+                fontWeight: 700,
+                textAlign: 'center',
+                marginBottom: '18px'
+              }}>
+                NEXT QUESTION IN{' '}
+                <span style={{
+                  color: colours.gold,
+                  fontWeight: 800,
+                  fontVariantNumeric: 'tabular-nums',
+                  marginLeft: '4px'
                 }}>
-                  NEXT QUESTION IN{' '}
-                  <span style={{
-                    color: colours.gold,
-                    fontWeight: 800,
-                    fontVariantNumeric: 'tabular-nums',
-                    marginLeft: '3px'
-                  }}>
-                    {timeUntilNext}
-                  </span>
-                </div>
+                  {timeUntilNext}
+                </span>
               </div>
+
+              {/* Pete's italic intro quote */}
+              <p style={{
+                ...condFont,
+                fontStyle: 'italic',
+                fontSize: '13px',
+                color: colours.muted,
+                textAlign: 'center',
+                margin: 0,
+                padding: '0 8px',
+                lineHeight: '1.5',
+                opacity: 0.85
+              }}>
+                &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
+              </p>
             </div>
           </div>
 
@@ -2749,7 +2775,7 @@ Deliver your verdict as JSON.`;
     const cards = draftRounds[currentRound] || [];
     return (
       <>
-        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
         <div style={bgStyle}>
           <div style={pitchOverlay} />
           <div style={container}>
@@ -2877,7 +2903,7 @@ Deliver your verdict as JSON.`;
   if (screen === 'defend') {
     return (
       <>
-        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
         <div style={bgStyle}>
           <div style={pitchOverlay} />
           <div style={container}>
@@ -2987,7 +3013,7 @@ Deliver your verdict as JSON.`;
 
     return (
       <>
-        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
         <div style={bgStyle}>
           <div style={pitchOverlay} />
           <div style={container}>
@@ -3235,7 +3261,7 @@ Deliver your verdict as JSON.`;
     const canStart = p1Name.trim() && p2Name.trim();
     return (
       <>
-        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
         <div style={bgStyle}>
           <div style={pitchOverlay} />
           <div style={container}>
@@ -3364,7 +3390,7 @@ Deliver your verdict as JSON.`;
     if (!config) return null;
     return (
       <>
-        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
         <div style={{ ...bgStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={pitchOverlay} />
           <div style={{ ...container, textAlign: 'center' }}>
@@ -3437,7 +3463,7 @@ Deliver your verdict as JSON.`;
     );
     return (
       <>
-        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
         <div style={bgStyle}>
           <div style={pitchOverlay} />
           <div style={container}>
@@ -3508,7 +3534,7 @@ Deliver your verdict as JSON.`;
 
     return (
       <>
-        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
         <div style={bgStyle}>
           <div style={pitchOverlay} />
           <div style={container}>
@@ -3682,7 +3708,7 @@ Deliver your verdict as JSON.`;
 
     return (
       <>
-        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
         <div style={bgStyle}>
           <div style={pitchOverlay} />
           <div style={container}>
