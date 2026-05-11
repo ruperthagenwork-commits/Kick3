@@ -918,6 +918,75 @@ export default function Kick3() {
     }
   };
 
+  // ============ DAILY PLAY LIMIT (3 solo + 3 1v1 per day) ============
+  // Counters reset automatically when TODAYS_QUESTION.number advances.
+  // localStorage keys:
+  //   kick3_solo_plays — count of solo plays today
+  //   kick3_h2h_plays  — count of 1v1 plays today
+  //   kick3_plays_day  — the question.number these counters apply to
+  const MAX_PLAYS_PER_DAY = 3;
+  const readPlaysFromStorage = () => {
+    try {
+      const today = TODAYS_QUESTION.number;
+      const storedDay = parseInt(localStorage.getItem('kick3_plays_day') || '0', 10) || 0;
+      // If the day has rolled over, counters are effectively zero for today.
+      if (storedDay !== today) return { solo: 0, h2h: 0, day: today };
+      return {
+        solo: parseInt(localStorage.getItem('kick3_solo_plays') || '0', 10) || 0,
+        h2h:  parseInt(localStorage.getItem('kick3_h2h_plays')  || '0', 10) || 0,
+        day:  storedDay,
+      };
+    } catch {
+      return { solo: 0, h2h: 0, day: TODAYS_QUESTION.number };
+    }
+  };
+  const [plays, setPlays] = useState(readPlaysFromStorage);
+
+  const recordPlay = (kind /* 'solo' | 'h2h' */) => {
+    try {
+      const today = TODAYS_QUESTION.number;
+      const prev = readPlaysFromStorage();
+      // If day rolled over since last play, reset both counters first
+      const baseSolo = prev.day === today ? prev.solo : 0;
+      const baseH2h  = prev.day === today ? prev.h2h  : 0;
+      const newSolo = kind === 'solo' ? baseSolo + 1 : baseSolo;
+      const newH2h  = kind === 'h2h'  ? baseH2h  + 1 : baseH2h;
+      localStorage.setItem('kick3_solo_plays', String(newSolo));
+      localStorage.setItem('kick3_h2h_plays',  String(newH2h));
+      localStorage.setItem('kick3_plays_day',  String(today));
+      setPlays({ solo: newSolo, h2h: newH2h, day: today });
+    } catch { /* silent */ }
+  };
+
+  const soloLocked = plays.solo >= MAX_PLAYS_PER_DAY;
+  const h2hLocked  = plays.h2h  >= MAX_PLAYS_PER_DAY;
+
+  // ============ SCORE DISTRIBUTION STATS ============
+  // Lifetime tally of how many of each score (1-10) the player has earned.
+  // Stored as a JSON object: { "1": 0, "2": 1, ..., "10": 3 }.
+  const readScoreStatsFromStorage = () => {
+    try {
+      const raw = localStorage.getItem('kick3_score_counts');
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return (parsed && typeof parsed === 'object') ? parsed : {};
+    } catch {
+      return {};
+    }
+  };
+  const [scoreStats, setScoreStats] = useState(readScoreStatsFromStorage);
+
+  const recordScore = (score) => {
+    const s = Math.max(1, Math.min(10, Math.round(score || 0)));
+    if (!s) return;
+    try {
+      const prev = readScoreStatsFromStorage();
+      const next = { ...prev, [s]: (prev[s] || 0) + 1 };
+      localStorage.setItem('kick3_score_counts', JSON.stringify(next));
+      setScoreStats(next);
+    } catch { /* silent */ }
+  };
+
   // Render the verdict card to a JPEG blob.
   // 1.5x scale + 90% JPEG quality keeps file size ~250-350KB instead of ~1MB,
   // with no visible quality loss on phone screens.
@@ -1002,6 +1071,7 @@ export default function Kick3() {
   }[shareState];
 
   const startGame = () => {
+    if (soloLocked) return; // Daily limit reached — button should be locked anyway
     setMode('solo');
     setDraftRounds(generateDraft());
     setCurrentRound(0);
@@ -1014,6 +1084,7 @@ export default function Kick3() {
   };
 
   const startH2H = () => {
+    if (h2hLocked) return; // Daily limit reached — button should be locked anyway
     setMode('h2h');
     setP1Name('');
     setP2Name('');
@@ -1116,6 +1187,9 @@ Score each /10, declare a winner, deliver verdict as JSON.`;
       const parsed = JSON.parse(cleaned);
       setH2hVerdict(parsed);
       recordStreak();
+      recordPlay('h2h');
+      // For h2h the score is the higher of the two — that's what Pete reacted to
+      recordScore(Math.max(parsed.p1Score || 0, parsed.p2Score || 0));
       setScreen('h2h-verdict');
     } catch (e) {
       console.error(e);
@@ -1154,6 +1228,8 @@ Deliver your verdict as JSON.`;
       const parsed = JSON.parse(cleaned);
       setVerdict(parsed);
       recordStreak();
+      recordPlay('solo');
+      recordScore(parsed.score);
       setScreen('verdict');
     } catch (e) {
       console.error(e);
@@ -1483,11 +1559,12 @@ Deliver your verdict as JSON.`;
               {/* PLAY TODAY — yellow */}
               <button
                 onClick={startGame}
+                disabled={soloLocked}
                 style={{
                   width: '100%',
                   padding: '18px 20px',
-                  background: colours.gold,
-                  color: '#000',
+                  background: soloLocked ? '#3a3a44' : colours.gold,
+                  color: soloLocked ? colours.muted : '#000',
                   border: 'none',
                   borderRadius: '10px',
                   ...displayFont,
@@ -1498,35 +1575,58 @@ Deliver your verdict as JSON.`;
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '12px',
-                  cursor: 'pointer',
+                  cursor: soloLocked ? 'not-allowed' : 'pointer',
                   marginBottom: '12px',
-                  boxShadow: '0 4px 0 rgba(0,0,0,0.25)'
+                  boxShadow: soloLocked ? 'none' : '0 4px 0 rgba(0,0,0,0.25)',
+                  opacity: soloLocked ? 0.7 : 1
                 }}
               >
-                <span>PLAY TODAY</span>
-                <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
+                {soloLocked ? (
+                  <>
+                    <span style={{ fontSize: '20px', letterSpacing: 0 }} aria-hidden="true">🔒</span>
+                    <span>COME BACK TOMORROW</span>
+                  </>
+                ) : (
+                  <>
+                    <span>PLAY TODAY</span>
+                    <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
+                  </>
+                )}
               </button>
 
               {/* 1V1 MODE — red */}
               <button
                 onClick={startH2H}
+                disabled={h2hLocked}
                 style={{
                   width: '100%',
                   padding: '15px 20px',
-                  background: colours.accent,
-                  color: colours.cream,
+                  background: h2hLocked ? '#3a3a44' : colours.accent,
+                  color: h2hLocked ? colours.muted : colours.cream,
                   border: 'none',
                   borderRadius: '10px',
                   ...displayFont,
                   fontSize: 'clamp(16px, 4.4vw, 19px)',
                   fontWeight: 700,
                   letterSpacing: '0.12em',
-                  cursor: 'pointer',
+                  cursor: h2hLocked ? 'not-allowed' : 'pointer',
                   marginBottom: '20px',
-                  boxShadow: '0 4px 0 rgba(0,0,0,0.25)'
+                  boxShadow: h2hLocked ? 'none' : '0 4px 0 rgba(0,0,0,0.25)',
+                  opacity: h2hLocked ? 0.7 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px'
                 }}
               >
-                1V1 MODE
+                {h2hLocked ? (
+                  <>
+                    <span style={{ fontSize: '18px', letterSpacing: 0 }} aria-hidden="true">🔒</span>
+                    <span>1V1 LIMIT REACHED</span>
+                  </>
+                ) : (
+                  <span>1V1 MODE</span>
+                )}
               </button>
 
               {/* Countdown */}
@@ -1572,6 +1672,50 @@ Deliver your verdict as JSON.`;
                 borderTop: `1px solid rgba(212,175,55,0.15)`,
                 textAlign: 'center'
               }}>
+                {/* Quick links row — HOW TO PLAY · MY STATS */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '14px',
+                  marginBottom: '14px'
+                }}>
+                  <button
+                    onClick={() => setScreen('howto')}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      ...condFont,
+                      fontSize: '11px',
+                      letterSpacing: '0.25em',
+                      color: colours.gold,
+                      fontWeight: 600,
+                      opacity: 0.85,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    HOW TO PLAY
+                  </button>
+                  <span style={{ color: colours.muted, opacity: 0.4 }}>·</span>
+                  <button
+                    onClick={() => setScreen('stats')}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      ...condFont,
+                      fontSize: '11px',
+                      letterSpacing: '0.25em',
+                      color: colours.gold,
+                      fontWeight: 600,
+                      opacity: 0.85,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    MY STATS
+                  </button>
+                </div>
                 <a
                   href="mailto:contactkick3@gmail.com"
                   style={{
@@ -1760,11 +1904,12 @@ Deliver your verdict as JSON.`;
                 {/* PLAY TODAY — yellow */}
                 <button
                   onClick={startGame}
+                  disabled={soloLocked}
                   style={{
                     width: '100%',
                     padding: '22px 24px',
-                    background: colours.gold,
-                    color: '#000',
+                    background: soloLocked ? '#3a3a44' : colours.gold,
+                    color: soloLocked ? colours.muted : '#000',
                     border: 'none',
                     borderRadius: '12px',
                     ...displayFont,
@@ -1775,35 +1920,58 @@ Deliver your verdict as JSON.`;
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '14px',
-                    cursor: 'pointer',
+                    cursor: soloLocked ? 'not-allowed' : 'pointer',
                     marginBottom: '14px',
-                    boxShadow: '0 5px 0 rgba(0,0,0,0.25)'
+                    boxShadow: soloLocked ? 'none' : '0 5px 0 rgba(0,0,0,0.25)',
+                    opacity: soloLocked ? 0.7 : 1
                   }}
                 >
-                  <span>PLAY TODAY</span>
-                  <span style={{ fontSize: '26px', lineHeight: 1 }}>→</span>
+                  {soloLocked ? (
+                    <>
+                      <span style={{ fontSize: '24px', letterSpacing: 0 }} aria-hidden="true">🔒</span>
+                      <span>COME BACK TOMORROW</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>PLAY TODAY</span>
+                      <span style={{ fontSize: '26px', lineHeight: 1 }}>→</span>
+                    </>
+                  )}
                 </button>
 
                 {/* 1V1 MODE — red */}
                 <button
                   onClick={startH2H}
+                  disabled={h2hLocked}
                   style={{
                     width: '100%',
                     padding: '18px 24px',
-                    background: colours.accent,
-                    color: colours.cream,
+                    background: h2hLocked ? '#3a3a44' : colours.accent,
+                    color: h2hLocked ? colours.muted : colours.cream,
                     border: 'none',
                     borderRadius: '12px',
                     ...displayFont,
                     fontSize: 'clamp(18px, 1.8vw, 22px)',
                     fontWeight: 700,
                     letterSpacing: '0.12em',
-                    cursor: 'pointer',
+                    cursor: h2hLocked ? 'not-allowed' : 'pointer',
                     marginBottom: '24px',
-                    boxShadow: '0 5px 0 rgba(0,0,0,0.25)'
+                    boxShadow: h2hLocked ? 'none' : '0 5px 0 rgba(0,0,0,0.25)',
+                    opacity: h2hLocked ? 0.7 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px'
                   }}
                 >
-                  1V1 MODE
+                  {h2hLocked ? (
+                    <>
+                      <span style={{ fontSize: '20px', letterSpacing: 0 }} aria-hidden="true">🔒</span>
+                      <span>1V1 LIMIT REACHED</span>
+                    </>
+                  ) : (
+                    <span>1V1 MODE</span>
+                  )}
                 </button>
 
                 {/* Countdown */}
@@ -1849,6 +2017,49 @@ Deliver your verdict as JSON.`;
                   borderTop: `1px solid rgba(212,175,55,0.15)`,
                   textAlign: 'center'
                 }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '16px',
+                    marginBottom: '14px'
+                  }}>
+                    <button
+                      onClick={() => setScreen('howto')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        ...condFont,
+                        fontSize: '12px',
+                        letterSpacing: '0.28em',
+                        color: colours.gold,
+                        fontWeight: 600,
+                        opacity: 0.85,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      HOW TO PLAY
+                    </button>
+                    <span style={{ color: colours.muted, opacity: 0.4 }}>·</span>
+                    <button
+                      onClick={() => setScreen('stats')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        ...condFont,
+                        fontSize: '12px',
+                        letterSpacing: '0.28em',
+                        color: colours.gold,
+                        fontWeight: 600,
+                        opacity: 0.85,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      MY STATS
+                    </button>
+                  </div>
                   <a
                     href="mailto:contactkick3@gmail.com"
                     style={{
@@ -3147,6 +3358,340 @@ Deliver your verdict as JSON.`;
                 {timeUntilNext}
               </div>
             </div>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- HOW TO PLAY ----------
+  if (screen === 'howto') {
+    const steps = [
+      {
+        n: 1,
+        title: "EVERY DAY, ONE QUESTION",
+        body: "Pete poses a daily debate. Title-deciders, dressing-room moments, beach kickabouts. Something to argue about."
+      },
+      {
+        n: 2,
+        title: "PICK 3 FROM A RANDOM DRAW",
+        body: "Three rounds. Two players per round. Choose one. Six cards become three picks — your squad."
+      },
+      {
+        n: 3,
+        title: "DEFEND IN 300 CHARACTERS",
+        body: "Why these three? Convince Pete. He's seen forty years of football and he can spot a lazy argument."
+      },
+      {
+        n: 4,
+        title: "PETE DELIVERS A VERDICT",
+        body: "Score out of 10. A grudging nod or an absolute roasting. Share the verdict card — your streak, your score, Pete's face."
+      },
+      {
+        n: 5,
+        title: "3 SOLO + 3 1V1 PER DAY",
+        body: "Limited plays. Use them. Come back tomorrow. Keep the streak alive."
+      },
+    ];
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '640px' }}>
+            {/* Header */}
+            <div style={{ textAlign: 'center', paddingTop: '8px', marginBottom: '8px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px' }}>
+                A QUICK WORD FROM PETE
+              </div>
+              <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                HOW TO PLAY
+              </h1>
+            </div>
+
+            {/* Pete's grumpy welcome */}
+            <p style={{
+              ...condFont,
+              fontStyle: 'italic',
+              color: colours.cream,
+              fontSize: '15px',
+              textAlign: 'center',
+              marginTop: '20px',
+              marginBottom: '28px',
+              lineHeight: 1.4,
+              opacity: 0.9
+            }}>
+              &ldquo;Right. You're here. I'll keep this short — I've got football to watch.&rdquo;
+            </p>
+
+            {/* Steps */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '28px' }}>
+              {steps.map(s => (
+                <div key={s.n} style={{
+                  background: colours.surface,
+                  borderLeft: `3px solid ${colours.gold}`,
+                  padding: '16px 18px',
+                  display: 'flex',
+                  gap: '16px',
+                  alignItems: 'flex-start'
+                }}>
+                  <div style={{
+                    ...displayFont,
+                    fontSize: '36px',
+                    fontWeight: 700,
+                    color: colours.gold,
+                    lineHeight: 0.9,
+                    flexShrink: 0,
+                    minWidth: '40px'
+                  }}>
+                    {s.n}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ ...condFont, fontSize: '13px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '6px' }}>
+                      {s.title}
+                    </div>
+                    <div style={{ ...condFont, fontSize: '15px', color: colours.cream, lineHeight: 1.4 }}>
+                      {s.body}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Sign-off */}
+            <p style={{
+              ...condFont,
+              fontStyle: 'italic',
+              color: colours.muted,
+              fontSize: '14px',
+              textAlign: 'center',
+              marginBottom: '24px',
+              lineHeight: 1.5
+            }}>
+              &ldquo;Argue well. Surprise me. Don't pick three goalkeepers.&rdquo;
+              <br />
+              <span style={{ fontSize: '12px', letterSpacing: '0.2em', opacity: 0.6 }}>— PETE</span>
+            </p>
+
+            {/* Got it button */}
+            <button
+              onClick={() => setScreen('home')}
+              style={{
+                width: '100%',
+                padding: '16px',
+                background: colours.gold,
+                color: '#000',
+                border: 'none',
+                borderRadius: '8px',
+                ...displayFont,
+                fontSize: '20px',
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                cursor: 'pointer',
+                boxShadow: '0 4px 0 rgba(0,0,0,0.25)'
+              }}
+            >
+              GOT IT — TAKE ME BACK
+            </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- MY STATS ----------
+  if (screen === 'stats') {
+    // Compute total plays + max count for bar scaling
+    const counts = {};
+    let totalPlays = 0;
+    let maxCount = 0;
+    for (let s = 1; s <= 10; s++) {
+      const c = scoreStats[s] || scoreStats[String(s)] || 0;
+      counts[s] = c;
+      totalPlays += c;
+      if (c > maxCount) maxCount = c;
+    }
+    // Find rarest non-zero score band as a fun stat
+    const peteRating = (() => {
+      if (totalPlays === 0) return "No verdicts yet. Pete's waiting.";
+      const tens = counts[10] || 0;
+      const nines = counts[9] || 0;
+      if (tens > 0) return `You've made Pete say a 10. Rare air.`;
+      if (nines > 0) return `${nines} score${nines === 1 ? '' : 's'} of 9. Pete's impressed.`;
+      const sevens = counts[7] || 0;
+      const eights = counts[8] || 0;
+      if (sevens + eights >= 3) return "Pete's been nodding. Keep arguing well.";
+      return "Plenty to argue for. Pete's listening.";
+    })();
+
+    // Colour by score band (matches Pete reaction tiers)
+    const colourForScore = (s) => {
+      if (s >= 9) return '#9bd99b';        // delighted — green
+      if (s >= 7) return colours.gold;     // respect — gold
+      if (s >= 5) return '#d4af55';        // sceptical — muted gold
+      if (s >= 3) return '#d49955';        // disappointed — amber
+      return colours.accent;               // fury — red
+    };
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '640px' }}>
+            {/* Header */}
+            <div style={{ textAlign: 'center', paddingTop: '8px', marginBottom: '20px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px' }}>
+                YOUR KICK 3 RECORD
+              </div>
+              <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                MY STATS
+              </h1>
+            </div>
+
+            {/* Top summary cards: streak + best + total */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '8px',
+              marginBottom: '24px'
+            }}>
+              <div style={{ background: colours.surface, padding: '12px 8px', textAlign: 'center', borderTop: `2px solid ${colours.accent}` }}>
+                <div style={{ ...displayFont, fontSize: '28px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
+                  {streak.current}
+                </div>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.2em', color: colours.muted, marginTop: '4px' }}>
+                  STREAK
+                </div>
+              </div>
+              <div style={{ background: colours.surface, padding: '12px 8px', textAlign: 'center', borderTop: `2px solid ${colours.gold}` }}>
+                <div style={{ ...displayFont, fontSize: '28px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
+                  {streak.best}
+                </div>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.2em', color: colours.muted, marginTop: '4px' }}>
+                  BEST
+                </div>
+              </div>
+              <div style={{ background: colours.surface, padding: '12px 8px', textAlign: 'center', borderTop: `2px solid ${colours.cream}` }}>
+                <div style={{ ...displayFont, fontSize: '28px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
+                  {totalPlays}
+                </div>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.2em', color: colours.muted, marginTop: '4px' }}>
+                  VERDICTS
+                </div>
+              </div>
+            </div>
+
+            {/* Pete's read on you */}
+            <p style={{
+              ...condFont,
+              fontStyle: 'italic',
+              color: colours.cream,
+              fontSize: '14px',
+              textAlign: 'center',
+              marginBottom: '24px',
+              lineHeight: 1.4,
+              opacity: 0.9
+            }}>
+              &ldquo;{peteRating}&rdquo;
+            </p>
+
+            {/* Score distribution */}
+            <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: colours.gold, marginBottom: '12px', textAlign: 'left' }}>
+              SCORE DISTRIBUTION
+            </div>
+            <div style={{
+              background: colours.surface,
+              padding: '16px',
+              marginBottom: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              {[10,9,8,7,6,5,4,3,2,1].map(score => {
+                const c = counts[score];
+                const widthPct = maxCount > 0 ? (c / maxCount) * 100 : 0;
+                const barColour = colourForScore(score);
+                return (
+                  <div key={score} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      ...displayFont,
+                      fontSize: '18px',
+                      fontWeight: 700,
+                      color: barColour,
+                      minWidth: '24px',
+                      textAlign: 'right',
+                      lineHeight: 1
+                    }}>
+                      {score}
+                    </div>
+                    <div style={{
+                      flex: 1,
+                      height: '20px',
+                      background: 'rgba(255,255,255,0.05)',
+                      position: 'relative',
+                      borderRadius: '2px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        width: `${widthPct}%`,
+                        height: '100%',
+                        background: barColour,
+                        opacity: c > 0 ? 0.8 : 0,
+                        transition: 'width 0.3s'
+                      }} />
+                    </div>
+                    <div style={{
+                      ...condFont,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      color: c > 0 ? colours.cream : colours.muted,
+                      minWidth: '28px',
+                      textAlign: 'left'
+                    }}>
+                      {c}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Hint if no plays yet */}
+            {totalPlays === 0 && (
+              <p style={{
+                ...condFont,
+                fontSize: '13px',
+                color: colours.muted,
+                textAlign: 'center',
+                marginBottom: '20px',
+                fontStyle: 'italic'
+              }}>
+                Play your first verdict and Pete's score lands here.
+              </p>
+            )}
+
+            {/* Back button */}
+            <button
+              onClick={() => setScreen('home')}
+              style={{
+                width: '100%',
+                padding: '16px',
+                background: colours.gold,
+                color: '#000',
+                border: 'none',
+                borderRadius: '8px',
+                ...displayFont,
+                fontSize: '20px',
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                cursor: 'pointer',
+                boxShadow: '0 4px 0 rgba(0,0,0,0.25)'
+              }}
+            >
+              BACK TO HOME
+            </button>
           </div>
         </div>
         <Analytics />
