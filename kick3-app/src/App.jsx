@@ -2252,8 +2252,6 @@ Deliver your verdict as JSON.`;
             flex-direction: column;
             min-height: 100vh;
           }
-          .kick3-desktop-wrap { display: none; }
-
           .kick3-phone-pete {
             position: relative;
             background: #2a1810;
@@ -2275,55 +2273,48 @@ Deliver your verdict as JSON.`;
             flex-direction: column;
           }
 
-          /* ============ DESKTOP LAYOUT (≥ 900px) ============ */
+          /* Hide phone layout on desktop */
           @media (min-width: 900px) {
             .kick3-phone-wrap { display: none; }
-            .kick3-desktop-wrap {
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              background: ${colours.bg};
-              min-height: 100vh;
-              width: 100%;
-              padding: 0;
-            }
           }
 
-          .kick3-desktop-stage {
-            position: relative;
+          /* ============ DESKTOP LAYOUT (NEW — half-and-half) ============ */
+          .kick3-desktop-new-wrap {
+            display: none;
+            min-height: 100vh;
             width: 100%;
-            max-width: 1920px;
+            background: ${colours.bg};
+            padding: 32px 24px 48px 24px;
+          }
+          .kick3-desktop-new-inner {
+            max-width: 1100px;
             margin: 0 auto;
-            aspect-ratio: 16 / 9;
+            display: flex;
+            flex-direction: column;
+          }
+          .kick3-desktop-new-pete {
+            position: relative;
             background: #2a1810;
             overflow: hidden;
-          }
-          .kick3-desktop-stage picture {
-            position: absolute;
-            inset: 0;
-            display: block;
-          }
-          .kick3-desktop-stage > img.kick3-bg,
-          .kick3-desktop-stage picture img.kick3-bg {
-            position: absolute;
-            inset: 0;
             width: 100%;
-            height: 100%;
-            object-fit: cover;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            margin-bottom: 32px;
+          }
+          .kick3-desktop-new-pete img {
             display: block;
-            user-select: none;
-            pointer-events: none;
+            width: 100%;
+            height: auto;
           }
-          .kick3-desktop-zone {
-            position: absolute;
-            transform: translate(-50%, -50%);
+          .kick3-desktop-new-ui {
+            background: ${colours.bg};
+            padding: 0 8px;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
+            flex-direction: column;
           }
-          /* Make sure interactive zones are clickable above the image */
-          .kick3-desktop-zone button { pointer-events: auto; }
+          @media (min-width: 900px) {
+            .kick3-desktop-new-wrap { display: block; }
+          }
 
           /* Desktop button hover effects (phone has none) */
           .kick3-desktop-btn-play {
@@ -2343,10 +2334,6 @@ Deliver your verdict as JSON.`;
             filter: brightness(1.15);
           }
 
-          /* Small-laptop adjustment — slightly tighter text */
-          @media (min-width: 900px) and (max-width: 1199px) {
-            .kick3-desktop-stage { max-width: 100%; }
-          }
         `}</style>
 
         <div className="kick3-home-root">
@@ -2578,47 +2565,53 @@ Deliver your verdict as JSON.`;
             </div>
           </div>
 
-          {/* ============ DESKTOP LAYOUT (Pete's bedroom + overlay UI) ============ */}
-          <div className="kick3-desktop-wrap">
-            <div className="kick3-desktop-stage">
-              <picture>
-                <source
-                  srcSet="/pete-bedroom-desktop.webp 1x, /pete-bedroom-desktop-2x.webp 2x"
-                  type="image/webp"
-                />
-                <img
-                  className="kick3-bg"
-                  src="/pete-bedroom-desktop.jpg"
-                  alt="Pete the Pundit asleep in his bedroom"
-                />
-              </picture>
+          {/* ============ DESKTOP LAYOUT (NEW — half illustration, half navy UI) ============ */}
+          <div className="kick3-desktop-new-wrap">
+            <div className="kick3-desktop-new-inner">
+              {/* Hero illustration — Pete's bedroom wide */}
+              <div className="kick3-desktop-new-pete">
+                <picture>
+                  <source
+                    srcSet="/pete-bedroom-desktop-wide.webp 1x, /pete-bedroom-desktop-wide-2x.webp 2x"
+                    type="image/webp"
+                  />
+                  <img
+                    src="/pete-bedroom-desktop-wide.jpg"
+                    alt="Pete the Pundit asleep in his study"
+                  />
+                </picture>
+                {/* DAY badge */}
+                <div style={{
+                  position: 'absolute',
+                  top: '18px',
+                  left: '18px',
+                  background: 'rgba(20,20,30,0.85)',
+                  color: colours.gold,
+                  ...condFont,
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  letterSpacing: '0.3em',
+                  padding: '8px 14px',
+                  borderRadius: '4px',
+                  border: `1px solid ${colours.gold}`
+                }}>
+                  DAY {TODAYS_QUESTION.number}
+                </div>
+              </div>
 
-              {/* TITLE PLAQUE — sits over the empty navy banner at top centre */}
-              <div className="kick3-desktop-zone" style={{ left: '44.99%', top: '10.95%', width: '39.97%', height: '13.94%' }}>
-                <div style={{ textAlign: 'center', width: '100%', position: 'relative' }}>
-                  {/* DAY badge — sits in top-left of title plaque */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '-10px',
-                    left: '12%',
-                    ...condFont,
-                    fontSize: 'clamp(9px, 0.7vw, 12px)',
-                    letterSpacing: '0.35em',
-                    color: colours.gold,
-                    fontWeight: 600,
-                    fontStyle: 'italic',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    DAY {TODAYS_QUESTION.number}
-                  </div>
+              {/* Navy UI panel below */}
+              <div className="kick3-desktop-new-ui">
+                {/* Title block — big bold KICK 3 */}
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                   <h1 style={{
                     ...displayFont,
-                    fontSize: 'clamp(28px, 3.4vw, 56px)',
+                    fontSize: 'clamp(72px, 7vw, 104px)',
                     lineHeight: '0.85',
                     margin: 0,
                     fontWeight: 700,
                     color: colours.gold,
-                    letterSpacing: '-0.01em'
+                    letterSpacing: '0.01em',
+                    textTransform: 'uppercase'
                   }}>
                     KICK 3
                   </h1>
@@ -2626,129 +2619,150 @@ Deliver your verdict as JSON.`;
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '10px',
-                    marginTop: '6px'
+                    gap: '12px',
+                    marginTop: '12px'
                   }}>
-                    <div style={{ height: '1px', flex: '0 0 24px', background: colours.cream, opacity: 0.6 }} />
+                    <div style={{ height: '1px', flex: '0 0 36px', background: colours.cream, opacity: 0.7 }} />
                     <div style={{
                       ...condFont,
-                      fontSize: 'clamp(9px, 0.75vw, 13px)',
+                      fontSize: '15px',
                       color: colours.cream,
-                      fontWeight: 500,
-                      letterSpacing: '0.3em'
+                      fontWeight: 600,
+                      letterSpacing: '0.28em'
                     }}>
                       WITH PETE THE PUNDIT
                     </div>
-                    <div style={{ height: '1px', flex: '0 0 24px', background: colours.cream, opacity: 0.6 }} />
+                    <div style={{ height: '1px', flex: '0 0 36px', background: colours.cream, opacity: 0.7 }} />
                   </div>
                 </div>
-              </div>
 
-              {/* CHALKBOARD — empty slate area in centre */}
-              <div className="kick3-desktop-zone" style={{ left: '44.47%', top: '37.48%', width: '34.97%', height: '34.95%' }}>
-                <div style={{ textAlign: 'center', width: '78%' }}>
+                {/* Question chalkboard — wooden frame around slate */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #6b4423 0%, #4a2e15 50%, #5c3a1d 100%)',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  marginBottom: '26px',
+                  boxShadow: '0 3px 8px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1)'
+                }}>
                   <div style={{
-                    ...condFont,
-                    fontSize: 'clamp(11px, 0.85vw, 15px)',
-                    letterSpacing: '0.3em',
-                    color: colours.gold,
-                    fontWeight: 600,
-                    marginBottom: '6px'
+                    background: '#1a1d23',
+                    borderRadius: '4px',
+                    padding: '22px 24px 20px 24px',
+                    textAlign: 'center',
+                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.6)',
+                    position: 'relative'
                   }}>
-                    TODAY&apos;S QUESTION
-                  </div>
-                  <div style={{
-                    width: '40px',
-                    height: '2px',
-                    background: colours.gold,
-                    margin: '0 auto 16px auto',
-                    opacity: 0.7
-                  }} />
-                  <p style={{
-                    ...displayFont,
-                    fontSize: 'clamp(18px, 1.7vw, 28px)',
-                    lineHeight: '1.2',
-                    margin: 0,
-                    fontWeight: 500,
-                    color: '#f5f0e1',
-                    letterSpacing: '0.01em'
-                  }}>
-                    {TODAYS_QUESTION.text}
-                  </p>
-                  <div style={{ width: '50%', height: '1px', background: '#f5f0e1', opacity: 0.35, margin: '14px auto 10px auto' }} />
-                  <div style={{
-                    ...condFont,
-                    fontSize: 'clamp(9px, 0.7vw, 12px)',
-                    letterSpacing: '0.25em',
-                    color: CATEGORY_COLOURS[TODAYS_QUESTION.category] || colours.muted,
-                    fontWeight: 600
-                  }}>
-                    ● {TODAYS_QUESTION.category.toUpperCase()}
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      borderRadius: '4px',
+                      pointerEvents: 'none',
+                      background: 'radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.025) 0%, transparent 50%), radial-gradient(ellipse at 80% 70%, rgba(255,255,255,0.02) 0%, transparent 50%)'
+                    }} />
+                    <div style={{
+                      ...condFont,
+                      fontSize: '13px',
+                      letterSpacing: '0.3em',
+                      color: colours.gold,
+                      fontWeight: 600,
+                      marginBottom: '6px',
+                      position: 'relative'
+                    }}>
+                      TODAY&apos;S QUESTION
+                    </div>
+                    <div style={{
+                      width: '44px',
+                      height: '2px',
+                      background: colours.gold,
+                      margin: '0 auto 16px auto',
+                      opacity: 0.7,
+                      position: 'relative'
+                    }} />
+                    <p style={{
+                      fontFamily: "'Permanent Marker', 'Teko', cursive",
+                      fontSize: 'clamp(24px, 2.4vw, 32px)',
+                      lineHeight: '1.2',
+                      margin: 0,
+                      color: '#f5f0e1',
+                      letterSpacing: '0.02em',
+                      textTransform: 'uppercase',
+                      textShadow: '0 1px 0 rgba(0,0,0,0.3)',
+                      position: 'relative'
+                    }}>
+                      {TODAYS_QUESTION.text}
+                    </p>
+                    <div style={{ width: '50%', height: '1px', background: '#f5f0e1', opacity: 0.3, margin: '16px auto 10px auto', position: 'relative' }} />
+                    <div style={{
+                      ...condFont,
+                      fontSize: '12px',
+                      letterSpacing: '0.25em',
+                      color: CATEGORY_COLOURS[TODAYS_QUESTION.category] || colours.muted,
+                      fontWeight: 600,
+                      position: 'relative'
+                    }}>
+                      ● {TODAYS_QUESTION.category.toUpperCase()}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* PLAY TODAY BUTTON — sits on the painted yellow rectangle */}
-              <div className="kick3-desktop-zone" style={{ left: '43.50%', top: '63.36%', width: '28.52%', height: '10.51%' }}>
+                {/* PLAY TODAY — yellow */}
                 <button
                   onClick={startGame}
-                  className="kick3-desktop-btn-play"
                   style={{
                     width: '100%',
-                    height: '100%',
-                    background: 'transparent',
-                    color: colours.bg,
+                    padding: '22px 24px',
+                    background: colours.gold,
+                    color: '#000',
                     border: 'none',
+                    borderRadius: '12px',
                     ...displayFont,
-                    fontSize: 'clamp(20px, 2vw, 36px)',
-                    fontWeight: 700,
+                    fontSize: 'clamp(24px, 2.4vw, 30px)',
+                    fontWeight: 800,
                     letterSpacing: '0.08em',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '14px'
+                    gap: '14px',
+                    cursor: 'pointer',
+                    marginBottom: '14px',
+                    boxShadow: '0 5px 0 rgba(0,0,0,0.25)'
                   }}
                 >
                   <span>PLAY TODAY</span>
-                  <span style={{ fontSize: 'clamp(22px, 2.3vw, 40px)', lineHeight: 1 }}>→</span>
+                  <span style={{ fontSize: '26px', lineHeight: 1 }}>→</span>
                 </button>
-              </div>
 
-              {/* 1V1 MODE BUTTON — sits on the painted red rectangle */}
-              <div className="kick3-desktop-zone" style={{ left: '42.37%', top: '72.78%', width: '23.80%', height: '8.43%' }}>
+                {/* 1V1 MODE — red */}
                 <button
                   onClick={startH2H}
-                  className="kick3-desktop-btn-h2h"
                   style={{
                     width: '100%',
-                    height: '100%',
-                    background: 'transparent',
+                    padding: '18px 24px',
+                    background: colours.accent,
                     color: colours.cream,
                     border: 'none',
+                    borderRadius: '12px',
                     ...displayFont,
-                    fontSize: 'clamp(16px, 1.6vw, 28px)',
-                    fontWeight: 600,
+                    fontSize: 'clamp(18px, 1.8vw, 22px)',
+                    fontWeight: 700,
                     letterSpacing: '0.12em',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
+                    cursor: 'pointer',
+                    marginBottom: '24px',
+                    boxShadow: '0 5px 0 rgba(0,0,0,0.25)'
                   }}
                 >
                   1V1 MODE
                 </button>
-              </div>
 
-              {/* COUNTDOWN — sits on the small dark card at bottom centre */}
-              <div className="kick3-desktop-zone" style={{ left: '42.58%', top: '83.40%', width: '18%', height: '7.08%' }}>
+                {/* Countdown */}
                 <div style={{
                   ...condFont,
-                  fontSize: 'clamp(11px, 0.92vw, 15px)',
+                  fontSize: '13px',
                   letterSpacing: '0.06em',
                   color: colours.cream,
                   fontWeight: 700,
-                  width: '100%',
                   textAlign: 'center',
-                  whiteSpace: 'nowrap'
+                  marginBottom: '20px'
                 }}>
                   NEXT QUESTION IN{' '}
                   <span style={{
@@ -2760,6 +2774,21 @@ Deliver your verdict as JSON.`;
                     {timeUntilNext}
                   </span>
                 </div>
+
+                {/* Pete's italic intro quote */}
+                <p style={{
+                  ...condFont,
+                  fontStyle: 'italic',
+                  fontSize: '15px',
+                  color: colours.muted,
+                  textAlign: 'center',
+                  margin: 0,
+                  padding: '0 10px',
+                  lineHeight: '1.5',
+                  opacity: 0.85
+                }}>
+                  &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
+                </p>
               </div>
             </div>
           </div>
