@@ -1424,29 +1424,57 @@ Deliver your verdict as JSON.`;
               }}>
                 DAY {TODAYS_QUESTION.number}
               </div>
-              {/* Streak badge — top-right, only if there's a streak to show */}
-              {streak.current >= 1 && (
-                <div style={{
-                  position: 'absolute',
-                  top: '14px',
-                  right: '14px',
-                  background: 'rgba(20,20,30,0.85)',
-                  color: colours.gold,
-                  ...condFont,
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  letterSpacing: '0.3em',
-                  padding: '6px 10px',
-                  borderRadius: '4px',
-                  border: `1px solid ${colours.gold}`,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
-                  <span>{streak.current} DAY STREAK</span>
-                </div>
-              )}
+              {/* Top-right stack: streak badge (if any) + STATS button (always) */}
+              <div style={{
+                position: 'absolute',
+                top: '14px',
+                right: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                gap: '6px'
+              }}>
+                {streak.current >= 1 && (
+                  <div style={{
+                    background: 'rgba(20,20,30,0.85)',
+                    color: colours.gold,
+                    ...condFont,
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    letterSpacing: '0.3em',
+                    padding: '6px 10px',
+                    borderRadius: '4px',
+                    border: `1px solid ${colours.gold}`,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
+                    <span>{streak.current} DAY STREAK</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => setScreen('stats')}
+                  style={{
+                    background: 'rgba(20,20,30,0.85)',
+                    color: colours.gold,
+                    ...condFont,
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    letterSpacing: '0.3em',
+                    padding: '6px 10px',
+                    borderRadius: '4px',
+                    border: `1px solid ${colours.gold}`,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <span style={{ fontSize: '12px', letterSpacing: 0 }} aria-hidden="true">📊</span>
+                  <span>STATS</span>
+                </button>
+              </div>
             </div>
 
             {/* Navy UI panel below illustration */}
@@ -1629,6 +1657,42 @@ Deliver your verdict as JSON.`;
                 )}
               </button>
 
+              {/* Plays remaining counter — only shown after 1+ plays used today.
+                  Helps players see scarcity revealing itself as they approach it. */}
+              {(plays.solo > 0 || plays.h2h > 0) && (
+                <div style={{
+                  ...condFont,
+                  fontSize: '11px',
+                  letterSpacing: '0.15em',
+                  color: colours.gold,
+                  textAlign: 'center',
+                  marginBottom: '14px',
+                  marginTop: '-6px',
+                  opacity: 0.85,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: '14px',
+                  flexWrap: 'wrap'
+                }}>
+                  {plays.solo > 0 && (
+                    <span>
+                      <span style={{ opacity: 0.6 }}>SOLO</span>{' '}
+                      <span style={{ fontWeight: 700, color: soloLocked ? colours.muted : colours.gold }}>
+                        {Math.max(0, MAX_PLAYS_PER_DAY - plays.solo)}/{MAX_PLAYS_PER_DAY} LEFT
+                      </span>
+                    </span>
+                  )}
+                  {plays.h2h > 0 && (
+                    <span>
+                      <span style={{ opacity: 0.6 }}>1V1</span>{' '}
+                      <span style={{ fontWeight: 700, color: h2hLocked ? colours.muted : colours.gold }}>
+                        {Math.max(0, MAX_PLAYS_PER_DAY - plays.h2h)}/{MAX_PLAYS_PER_DAY} LEFT
+                      </span>
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Countdown */}
               <div style={{
                 ...condFont,
@@ -1665,6 +1729,32 @@ Deliver your verdict as JSON.`;
                 &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
               </p>
 
+              {/* HOW TO PLAY — secondary button, visible in bottom third of home */}
+              <button
+                onClick={() => setScreen('howto')}
+                style={{
+                  width: '100%',
+                  marginTop: '24px',
+                  padding: '14px 20px',
+                  background: 'transparent',
+                  color: colours.gold,
+                  border: `1.5px solid ${colours.gold}`,
+                  borderRadius: '8px',
+                  ...condFont,
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  letterSpacing: '0.25em',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px'
+                }}
+              >
+                <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📖</span>
+                <span>HOW TO PLAY</span>
+              </button>
+
               {/* Contact footer */}
               <div style={{
                 marginTop: '24px',
@@ -1672,50 +1762,6 @@ Deliver your verdict as JSON.`;
                 borderTop: `1px solid rgba(212,175,55,0.15)`,
                 textAlign: 'center'
               }}>
-                {/* Quick links row — HOW TO PLAY · MY STATS */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: '14px',
-                  marginBottom: '14px'
-                }}>
-                  <button
-                    onClick={() => setScreen('howto')}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      padding: 0,
-                      ...condFont,
-                      fontSize: '11px',
-                      letterSpacing: '0.25em',
-                      color: colours.gold,
-                      fontWeight: 600,
-                      opacity: 0.85,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    HOW TO PLAY
-                  </button>
-                  <span style={{ color: colours.muted, opacity: 0.4 }}>·</span>
-                  <button
-                    onClick={() => setScreen('stats')}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      padding: 0,
-                      ...condFont,
-                      fontSize: '11px',
-                      letterSpacing: '0.25em',
-                      color: colours.gold,
-                      fontWeight: 600,
-                      opacity: 0.85,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    MY STATS
-                  </button>
-                </div>
                 <a
                   href="mailto:contactkick3@gmail.com"
                   style={{
@@ -1770,29 +1816,57 @@ Deliver your verdict as JSON.`;
                 }}>
                   DAY {TODAYS_QUESTION.number}
                 </div>
-                {/* Streak badge */}
-                {streak.current >= 1 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '18px',
-                    right: '18px',
-                    background: 'rgba(20,20,30,0.85)',
-                    color: colours.gold,
-                    ...condFont,
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    letterSpacing: '0.3em',
-                    padding: '8px 14px',
-                    borderRadius: '4px',
-                    border: `1px solid ${colours.gold}`,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
-                    <span>{streak.current} DAY STREAK</span>
-                  </div>
-                )}
+                {/* Top-right stack: streak badge (if any) + STATS button (always) */}
+                <div style={{
+                  position: 'absolute',
+                  top: '18px',
+                  right: '18px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-end',
+                  gap: '8px'
+                }}>
+                  {streak.current >= 1 && (
+                    <div style={{
+                      background: 'rgba(20,20,30,0.85)',
+                      color: colours.gold,
+                      ...condFont,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      letterSpacing: '0.3em',
+                      padding: '8px 14px',
+                      borderRadius: '4px',
+                      border: `1px solid ${colours.gold}`,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
+                      <span>{streak.current} DAY STREAK</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setScreen('stats')}
+                    style={{
+                      background: 'rgba(20,20,30,0.85)',
+                      color: colours.gold,
+                      ...condFont,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      letterSpacing: '0.3em',
+                      padding: '8px 14px',
+                      borderRadius: '4px',
+                      border: `1px solid ${colours.gold}`,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📊</span>
+                    <span>STATS</span>
+                  </button>
+                </div>
               </div>
 
               {/* Navy UI panel below */}
@@ -1974,6 +2048,41 @@ Deliver your verdict as JSON.`;
                   )}
                 </button>
 
+                {/* Plays remaining counter — only shown after 1+ plays used today. */}
+                {(plays.solo > 0 || plays.h2h > 0) && (
+                  <div style={{
+                    ...condFont,
+                    fontSize: '12px',
+                    letterSpacing: '0.18em',
+                    color: colours.gold,
+                    textAlign: 'center',
+                    marginBottom: '16px',
+                    marginTop: '-8px',
+                    opacity: 0.85,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '18px',
+                    flexWrap: 'wrap'
+                  }}>
+                    {plays.solo > 0 && (
+                      <span>
+                        <span style={{ opacity: 0.6 }}>SOLO</span>{' '}
+                        <span style={{ fontWeight: 700, color: soloLocked ? colours.muted : colours.gold }}>
+                          {Math.max(0, MAX_PLAYS_PER_DAY - plays.solo)}/{MAX_PLAYS_PER_DAY} LEFT
+                        </span>
+                      </span>
+                    )}
+                    {plays.h2h > 0 && (
+                      <span>
+                        <span style={{ opacity: 0.6 }}>1V1</span>{' '}
+                        <span style={{ fontWeight: 700, color: h2hLocked ? colours.muted : colours.gold }}>
+                          {Math.max(0, MAX_PLAYS_PER_DAY - plays.h2h)}/{MAX_PLAYS_PER_DAY} LEFT
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {/* Countdown */}
                 <div style={{
                   ...condFont,
@@ -2010,6 +2119,32 @@ Deliver your verdict as JSON.`;
                   &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
                 </p>
 
+                {/* HOW TO PLAY — secondary button, visible in bottom third of home */}
+                <button
+                  onClick={() => setScreen('howto')}
+                  style={{
+                    width: '100%',
+                    marginTop: '28px',
+                    padding: '16px 22px',
+                    background: 'transparent',
+                    color: colours.gold,
+                    border: `1.5px solid ${colours.gold}`,
+                    borderRadius: '10px',
+                    ...condFont,
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    letterSpacing: '0.28em',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px'
+                  }}
+                >
+                  <span style={{ fontSize: '16px', letterSpacing: 0 }} aria-hidden="true">📖</span>
+                  <span>HOW TO PLAY</span>
+                </button>
+
                 {/* Contact footer */}
                 <div style={{
                   marginTop: '28px',
@@ -2017,49 +2152,6 @@ Deliver your verdict as JSON.`;
                   borderTop: `1px solid rgba(212,175,55,0.15)`,
                   textAlign: 'center'
                 }}>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    gap: '16px',
-                    marginBottom: '14px'
-                  }}>
-                    <button
-                      onClick={() => setScreen('howto')}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        padding: 0,
-                        ...condFont,
-                        fontSize: '12px',
-                        letterSpacing: '0.28em',
-                        color: colours.gold,
-                        fontWeight: 600,
-                        opacity: 0.85,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      HOW TO PLAY
-                    </button>
-                    <span style={{ color: colours.muted, opacity: 0.4 }}>·</span>
-                    <button
-                      onClick={() => setScreen('stats')}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        padding: 0,
-                        ...condFont,
-                        fontSize: '12px',
-                        letterSpacing: '0.28em',
-                        color: colours.gold,
-                        fontWeight: 600,
-                        opacity: 0.85,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      MY STATS
-                    </button>
-                  </div>
                   <a
                     href="mailto:contactkick3@gmail.com"
                     style={{
@@ -3544,11 +3636,14 @@ Deliver your verdict as JSON.`;
             {/* Header */}
             <div style={{ textAlign: 'center', paddingTop: '8px', marginBottom: '20px' }}>
               <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px' }}>
-                YOUR KICK 3 RECORD
+                ALL-TIME RECORD
               </div>
               <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
                 MY STATS
               </h1>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.muted, marginTop: '6px', opacity: 0.7 }}>
+                LIFETIME &mdash; SINCE DAY 1
+              </div>
             </div>
 
             {/* Top summary cards: streak + best + total */}
