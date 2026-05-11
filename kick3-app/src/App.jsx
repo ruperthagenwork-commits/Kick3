@@ -3624,16 +3624,20 @@ Deliver your verdict as JSON.`;
 
   // ---------- MY STATS ----------
   if (screen === 'stats') {
-    // Compute total plays + max count for bar scaling
+    // Compute total plays + max count for bar scaling + weighted average
     const counts = {};
     let totalPlays = 0;
     let maxCount = 0;
+    let scoreSum = 0; // weighted sum of (score × count) for average
     for (let s = 1; s <= 10; s++) {
       const c = scoreStats[s] || scoreStats[String(s)] || 0;
       counts[s] = c;
       totalPlays += c;
+      scoreSum += s * c;
       if (c > maxCount) maxCount = c;
     }
+    // Average score to one decimal place. Show "—" if no plays yet.
+    const averageScore = totalPlays > 0 ? (scoreSum / totalPlays).toFixed(1) : '—';
     // Find rarest non-zero score band as a fun stat
     const peteRating = (() => {
       if (totalPlays === 0) return "No verdicts yet. Pete's waiting.";
@@ -3670,40 +3674,29 @@ Deliver your verdict as JSON.`;
               <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
                 MY STATS
               </h1>
-              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.muted, marginTop: '6px', opacity: 0.7 }}>
-                LIFETIME &mdash; SINCE DAY 1
-              </div>
             </div>
 
-            {/* Top summary cards: streak + best + total */}
+            {/* Top summary cards: VERDICTS + AVG SCORE */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '8px',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '10px',
               marginBottom: '24px'
             }}>
-              <div style={{ background: colours.surface, padding: '12px 8px', textAlign: 'center', borderTop: `2px solid ${colours.accent}` }}>
-                <div style={{ ...displayFont, fontSize: '28px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
-                  {streak.current}
-                </div>
-                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.2em', color: colours.muted, marginTop: '4px' }}>
-                  STREAK
-                </div>
-              </div>
-              <div style={{ background: colours.surface, padding: '12px 8px', textAlign: 'center', borderTop: `2px solid ${colours.gold}` }}>
-                <div style={{ ...displayFont, fontSize: '28px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
-                  {streak.best}
-                </div>
-                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.2em', color: colours.muted, marginTop: '4px' }}>
-                  BEST
-                </div>
-              </div>
-              <div style={{ background: colours.surface, padding: '12px 8px', textAlign: 'center', borderTop: `2px solid ${colours.cream}` }}>
-                <div style={{ ...displayFont, fontSize: '28px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
+              <div style={{ background: colours.surface, padding: '16px 10px', textAlign: 'center', borderTop: `2px solid ${colours.cream}` }}>
+                <div style={{ ...displayFont, fontSize: '36px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
                   {totalPlays}
                 </div>
-                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.2em', color: colours.muted, marginTop: '4px' }}>
+                <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: colours.muted, marginTop: '6px' }}>
                   VERDICTS
+                </div>
+              </div>
+              <div style={{ background: colours.surface, padding: '16px 10px', textAlign: 'center', borderTop: `2px solid ${colours.gold}` }}>
+                <div style={{ ...displayFont, fontSize: '36px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
+                  {averageScore}
+                </div>
+                <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: colours.muted, marginTop: '6px' }}>
+                  AVG SCORE
                 </div>
               </div>
             </div>
