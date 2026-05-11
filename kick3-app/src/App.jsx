@@ -2018,6 +2018,17 @@ export default function Kick3() {
     }
   };
 
+  // Maps a verdict score (1-10) to Pete's reaction image.
+  // Five reactions, in five score bands. Score is clamped to 1-10.
+  const petePictureFor = (score) => {
+    const s = Math.max(1, Math.min(10, Math.round(score || 0)));
+    if (s <= 2) return { src: '/pete-fury.webp',         alt: "Pete is furious" };
+    if (s <= 4) return { src: '/pete-disappointed.webp', alt: "Pete is disappointed" };
+    if (s <= 6) return { src: '/pete-sceptical.webp',    alt: "Pete is sceptical" };
+    if (s <= 8) return { src: '/pete-respect.webp',      alt: "Pete is impressed" };
+    return                  { src: '/pete-delighted.webp',     alt: "Pete is delighted" };
+  };
+
   const shareLabel = {
     idle: 'SHARE VERDICT',
     working: 'GENERATING…',
@@ -3147,20 +3158,31 @@ Deliver your verdict as JSON.`;
                 </div>
               )}
 
-              {/* Ron's verdict */}
+              {/* Pete's verdict */}
               <div style={{ borderTop: `1px solid ${colours.goldDim}`, paddingTop: '20px' }}>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', marginBottom: '12px' }}>
                   <div style={{
-                    width: '40px', height: '40px', borderRadius: '50%',
-                    background: `linear-gradient(135deg, ${colours.gold} 0%, ${colours.goldDim} 100%)`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '56px', height: '56px', borderRadius: '50%',
                     flexShrink: 0,
-                    ...displayFont,
-                    fontSize: '20px',
-                    fontWeight: 700,
-                    color: colours.bg
-                  }}>P</div>
-                  <div>
+                    overflow: 'hidden',
+                    border: `2px solid ${colours.gold}`,
+                    boxShadow: `0 0 12px rgba(212,175,55,0.25)`,
+                    background: colours.bg
+                  }}>
+                    <img
+                      src={petePictureFor(verdict.score).src}
+                      alt={petePictureFor(verdict.score).alt}
+                      crossOrigin="anonymous"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        objectPosition: 'center top',
+                        display: 'block'
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.25em', color: colours.gold, marginBottom: '2px' }}>
                       PETE&apos;S VERDICT
                     </div>
@@ -3806,18 +3828,29 @@ Deliver your verdict as JSON.`;
 
               {/* Pete's verdict */}
               <div style={{ borderTop: `1px solid ${colours.goldDim}`, paddingTop: '16px' }}>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', marginBottom: '12px' }}>
                   <div style={{
-                    width: '40px', height: '40px', borderRadius: '50%',
-                    background: `linear-gradient(135deg, ${colours.gold} 0%, ${colours.goldDim} 100%)`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '56px', height: '56px', borderRadius: '50%',
                     flexShrink: 0,
-                    ...displayFont,
-                    fontSize: '20px',
-                    fontWeight: 700,
-                    color: colours.bg
-                  }}>P</div>
-                  <div>
+                    overflow: 'hidden',
+                    border: `2px solid ${colours.gold}`,
+                    boxShadow: `0 0 12px rgba(212,175,55,0.25)`,
+                    background: colours.bg
+                  }}>
+                    <img
+                      src={petePictureFor(Math.max(h2hVerdict.p1Score || 0, h2hVerdict.p2Score || 0)).src}
+                      alt={petePictureFor(Math.max(h2hVerdict.p1Score || 0, h2hVerdict.p2Score || 0)).alt}
+                      crossOrigin="anonymous"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        objectPosition: 'center top',
+                        display: 'block'
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.25em', color: colours.gold, marginBottom: '2px' }}>
                       PETE&apos;S VERDICT
                     </div>
