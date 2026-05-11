@@ -869,6 +869,7 @@ export default function Kick3() {
   // Refs for the verdict cards (used by the share-image generator)
   const soloCardRef = useRef(null);
   const h2hCardRef = useRef(null);
+  const statsCardRef = useRef(null);
 
   // Share state — shows feedback in the share button.
   const [shareState, setShareState] = useState('idle'); // 'idle' | 'working' | 'shared' | 'copied' | 'error'
@@ -1040,6 +1041,63 @@ export default function Kick3() {
       }
     } catch (err) {
       // User cancelling the share sheet on iOS throws — that's not an error
+      if (err.name === 'AbortError') {
+        setShareState('idle');
+        return;
+      }
+      console.error('Share failed:', err);
+      setShareState('error');
+    } finally {
+      setTimeout(() => setShareState('idle'), 2500);
+    }
+  };
+
+  // SHARE STATS — same pattern as shareCard but for the lifetime stats screen.
+  // Builds the share text from the current scoreStats / totalPlays / average.
+  const shareStats = async () => {
+    setShareState('working');
+    try {
+      const blob = await renderCardToBlob(statsCardRef);
+      if (!blob) throw new Error('Render failed');
+
+      const filename = `kick3-my-stats.jpg`;
+      const file = new File([blob], filename, { type: 'image/jpeg' });
+
+      // Build a quick text summary for the share sheet (image is the headline,
+      // but text is what appears alongside in messaging apps that show both).
+      let total = 0, sum = 0;
+      for (let s = 1; s <= 10; s++) {
+        const c = scoreStats[s] || scoreStats[String(s)] || 0;
+        total += c;
+        sum += s * c;
+      }
+      const avg = total > 0 ? (sum / total).toFixed(1) : '—';
+      const shareText = total > 0
+        ? `My Kick 3 record: ${total} verdicts, ${avg} avg — kick3.app`
+        : `Kick 3 — kick3.app`;
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Kick 3 — My Stats',
+          text: shareText
+        });
+        setShareState('shared');
+      } else if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/jpeg': blob })
+        ]);
+        setShareState('copied');
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        setShareState('shared');
+      }
+    } catch (err) {
       if (err.name === 'AbortError') {
         setShareState('idle');
         return;
@@ -3666,127 +3724,188 @@ Deliver your verdict as JSON.`;
         <div style={bgStyle}>
           <div style={pitchOverlay} />
           <div style={{ ...container, maxWidth: '640px' }}>
-            {/* Header */}
-            <div style={{ textAlign: 'center', paddingTop: '8px', marginBottom: '20px' }}>
-              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px' }}>
-                ALL-TIME RECORD
-              </div>
-              <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
-                MY STATS
-              </h1>
-            </div>
-
-            {/* Top summary cards: VERDICTS + AVG SCORE */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: '10px',
-              marginBottom: '24px'
+            {/* Capturable region — everything inside this ref becomes the share image.
+                Padding + bg make the screenshot look like a polished card not a screen-grab. */}
+            <div ref={statsCardRef} style={{
+              background: colours.bg,
+              padding: '20px 16px 24px',
+              marginBottom: '20px'
             }}>
-              <div style={{ background: colours.surface, padding: '16px 10px', textAlign: 'center', borderTop: `2px solid ${colours.cream}` }}>
-                <div style={{ ...displayFont, fontSize: '36px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
-                  {totalPlays}
+              {/* Header */}
+              <div style={{ textAlign: 'center', paddingTop: '4px', marginBottom: '20px' }}>
+                <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px' }}>
+                  ALL-TIME RECORD
                 </div>
-                <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: colours.muted, marginTop: '6px' }}>
-                  VERDICTS
-                </div>
+                <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                  MY STATS
+                </h1>
               </div>
-              <div style={{ background: colours.surface, padding: '16px 10px', textAlign: 'center', borderTop: `2px solid ${colours.gold}` }}>
-                <div style={{ ...displayFont, fontSize: '36px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
-                  {averageScore}
-                </div>
-                <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: colours.muted, marginTop: '6px' }}>
-                  AVG SCORE
-                </div>
-              </div>
-            </div>
 
-            {/* Pete's read on you */}
-            <p style={{
-              ...condFont,
-              fontStyle: 'italic',
-              color: colours.cream,
-              fontSize: '14px',
-              textAlign: 'center',
-              marginBottom: '24px',
-              lineHeight: 1.4,
-              opacity: 0.9
-            }}>
-              &ldquo;{peteRating}&rdquo;
-            </p>
-
-            {/* Score distribution */}
-            <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: colours.gold, marginBottom: '12px', textAlign: 'left' }}>
-              SCORE DISTRIBUTION
-            </div>
-            <div style={{
-              background: colours.surface,
-              padding: '16px',
-              marginBottom: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
-            }}>
-              {[10,9,8,7,6,5,4,3,2,1].map(score => {
-                const c = counts[score];
-                const widthPct = maxCount > 0 ? (c / maxCount) * 100 : 0;
-                const barColour = colourForScore(score);
-                return (
-                  <div key={score} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                      ...displayFont,
-                      fontSize: '18px',
-                      fontWeight: 700,
-                      color: barColour,
-                      minWidth: '24px',
-                      textAlign: 'right',
-                      lineHeight: 1
-                    }}>
-                      {score}
-                    </div>
-                    <div style={{
-                      flex: 1,
-                      height: '20px',
-                      background: 'rgba(255,255,255,0.05)',
-                      position: 'relative',
-                      borderRadius: '2px',
-                      overflow: 'hidden'
-                    }}>
-                      <div style={{
-                        width: `${widthPct}%`,
-                        height: '100%',
-                        background: barColour,
-                        opacity: c > 0 ? 0.8 : 0,
-                        transition: 'width 0.3s'
-                      }} />
-                    </div>
-                    <div style={{
-                      ...condFont,
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      color: c > 0 ? colours.cream : colours.muted,
-                      minWidth: '28px',
-                      textAlign: 'left'
-                    }}>
-                      {c}
-                    </div>
+              {/* Top summary cards: VERDICTS + AVG SCORE */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '10px',
+                marginBottom: '24px'
+              }}>
+                <div style={{ background: colours.surface, padding: '16px 10px', textAlign: 'center', borderTop: `2px solid ${colours.cream}` }}>
+                  <div style={{ ...displayFont, fontSize: '36px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
+                    {totalPlays}
                   </div>
-                );
-              })}
-            </div>
+                  <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: colours.muted, marginTop: '6px' }}>
+                    VERDICTS
+                  </div>
+                </div>
+                <div style={{ background: colours.surface, padding: '16px 10px', textAlign: 'center', borderTop: `2px solid ${colours.gold}` }}>
+                  <div style={{ ...displayFont, fontSize: '36px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
+                    {averageScore}
+                  </div>
+                  <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: colours.muted, marginTop: '6px' }}>
+                    AVG SCORE
+                  </div>
+                </div>
+              </div>
 
-            {/* Hint if no plays yet */}
-            {totalPlays === 0 && (
+              {/* Pete's read on you */}
               <p style={{
                 ...condFont,
-                fontSize: '13px',
-                color: colours.muted,
+                fontStyle: 'italic',
+                color: colours.cream,
+                fontSize: '14px',
                 textAlign: 'center',
-                marginBottom: '20px',
-                fontStyle: 'italic'
+                marginBottom: '24px',
+                lineHeight: 1.4,
+                opacity: 0.9
               }}>
-                Play your first verdict and Pete's score lands here.
+                &ldquo;{peteRating}&rdquo;
               </p>
+
+              {/* Score distribution */}
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: colours.gold, marginBottom: '12px', textAlign: 'left' }}>
+                SCORE DISTRIBUTION
+              </div>
+              <div style={{
+                background: colours.surface,
+                padding: '16px',
+                marginBottom: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                {[10,9,8,7,6,5,4,3,2,1].map(score => {
+                  const c = counts[score];
+                  const widthPct = maxCount > 0 ? (c / maxCount) * 100 : 0;
+                  const barColour = colourForScore(score);
+                  return (
+                    <div key={score} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        ...displayFont,
+                        fontSize: '18px',
+                        fontWeight: 700,
+                        color: barColour,
+                        minWidth: '24px',
+                        textAlign: 'right',
+                        lineHeight: 1
+                      }}>
+                        {score}
+                      </div>
+                      <div style={{
+                        flex: 1,
+                        height: '20px',
+                        background: 'rgba(255,255,255,0.05)',
+                        position: 'relative',
+                        borderRadius: '2px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${widthPct}%`,
+                          height: '100%',
+                          background: barColour,
+                          opacity: c > 0 ? 0.8 : 0,
+                          transition: 'width 0.3s'
+                        }} />
+                      </div>
+                      <div style={{
+                        ...condFont,
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        color: c > 0 ? colours.cream : colours.muted,
+                        minWidth: '28px',
+                        textAlign: 'left'
+                      }}>
+                        {c}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Hint if no plays yet */}
+              {totalPlays === 0 && (
+                <p style={{
+                  ...condFont,
+                  fontSize: '13px',
+                  color: colours.muted,
+                  textAlign: 'center',
+                  marginBottom: '12px',
+                  fontStyle: 'italic'
+                }}>
+                  Play your first verdict and Pete's score lands here.
+                </p>
+              )}
+
+              {/* kick3.app footer — baked into every share image for URL marketing */}
+              <div style={{
+                ...condFont,
+                fontSize: '12px',
+                letterSpacing: '0.3em',
+                color: colours.gold,
+                textAlign: 'center',
+                paddingTop: '12px',
+                fontWeight: 700,
+                opacity: 0.85
+              }}>
+                KICK3.APP
+              </div>
+            </div>
+
+            {/* SHARE STATS button — only render when there's something worth sharing */}
+            {totalPlays > 0 && (
+              <button
+                onClick={shareStats}
+                disabled={shareState === 'working'}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  background: shareState === 'shared' || shareState === 'copied' ? '#27AE60' : colours.gold,
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '8px',
+                  ...displayFont,
+                  fontSize: '20px',
+                  fontWeight: 700,
+                  letterSpacing: '0.1em',
+                  cursor: shareState === 'working' ? 'wait' : 'pointer',
+                  boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                  marginBottom: '10px',
+                  opacity: shareState === 'working' ? 0.7 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px'
+                }}
+              >
+                {shareState === 'idle' && (
+                  <>
+                    <span style={{ fontSize: '18px', letterSpacing: 0 }} aria-hidden="true">📤</span>
+                    <span>SHARE STATS</span>
+                  </>
+                )}
+                {shareState === 'working' && <span>GENERATING…</span>}
+                {shareState === 'shared'  && <span>SHARED ✓</span>}
+                {shareState === 'copied'  && <span>COPIED ✓</span>}
+                {shareState === 'error'   && <span>TRY AGAIN</span>}
+              </button>
             )}
 
             {/* Back button */}
@@ -3795,16 +3914,16 @@ Deliver your verdict as JSON.`;
               style={{
                 width: '100%',
                 padding: '16px',
-                background: colours.gold,
-                color: '#000',
-                border: 'none',
+                background: totalPlays > 0 ? 'transparent' : colours.gold,
+                color: totalPlays > 0 ? colours.gold : '#000',
+                border: totalPlays > 0 ? `2px solid ${colours.gold}` : 'none',
                 borderRadius: '8px',
                 ...displayFont,
-                fontSize: '20px',
+                fontSize: totalPlays > 0 ? '18px' : '20px',
                 fontWeight: 700,
                 letterSpacing: '0.1em',
                 cursor: 'pointer',
-                boxShadow: '0 4px 0 rgba(0,0,0,0.25)'
+                boxShadow: totalPlays > 0 ? 'none' : '0 4px 0 rgba(0,0,0,0.25)'
               }}
             >
               BACK TO HOME
