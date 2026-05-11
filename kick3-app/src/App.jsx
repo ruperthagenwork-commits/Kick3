@@ -2645,6 +2645,29 @@ Deliver your verdict as JSON.`;
               }}>
                 &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
               </p>
+
+              {/* Contact footer */}
+              <div style={{
+                marginTop: '24px',
+                paddingTop: '16px',
+                borderTop: `1px solid rgba(212,175,55,0.15)`,
+                textAlign: 'center'
+              }}>
+                <a
+                  href="mailto:contactkick3@gmail.com"
+                  style={{
+                    ...condFont,
+                    fontSize: '11px',
+                    letterSpacing: '0.25em',
+                    color: colours.muted,
+                    textDecoration: 'none',
+                    fontWeight: 600,
+                    opacity: 0.7
+                  }}
+                >
+                  TELL PETE WHAT YOU THINK &rarr;
+                </a>
+              </div>
             </div>
           </div>
 
@@ -2895,6 +2918,29 @@ Deliver your verdict as JSON.`;
                 }}>
                   &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
                 </p>
+
+                {/* Contact footer */}
+                <div style={{
+                  marginTop: '28px',
+                  paddingTop: '20px',
+                  borderTop: `1px solid rgba(212,175,55,0.15)`,
+                  textAlign: 'center'
+                }}>
+                  <a
+                    href="mailto:contactkick3@gmail.com"
+                    style={{
+                      ...condFont,
+                      fontSize: '12px',
+                      letterSpacing: '0.28em',
+                      color: colours.muted,
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      opacity: 0.7
+                    }}
+                  >
+                    TELL PETE WHAT YOU THINK &rarr;
+                  </a>
+                </div>
               </div>
             </div>
           </div>
