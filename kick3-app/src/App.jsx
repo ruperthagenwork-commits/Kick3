@@ -2662,10 +2662,14 @@ Deliver your verdict as JSON.`;
                     color: colours.muted,
                     textDecoration: 'none',
                     fontWeight: 600,
-                    opacity: 0.7
+                    opacity: 0.7,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
                   }}
                 >
-                  TELL PETE WHAT YOU THINK &rarr;
+                  <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">✉️</span>
+                  <span>CONTACT THE TEAM AT KICK 3 &rarr;</span>
                 </a>
               </div>
             </div>
@@ -2935,10 +2939,14 @@ Deliver your verdict as JSON.`;
                       color: colours.muted,
                       textDecoration: 'none',
                       fontWeight: 600,
-                      opacity: 0.7
+                      opacity: 0.7,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
                     }}
                   >
-                    TELL PETE WHAT YOU THINK &rarr;
+                    <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">✉️</span>
+                    <span>CONTACT THE TEAM AT KICK 3 &rarr;</span>
                   </a>
                 </div>
               </div>
