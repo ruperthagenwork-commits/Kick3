@@ -765,7 +765,7 @@ FACTUAL HUMILITY (IMPORTANT):
 - Never invent club histories, transfer records, or career achievements you're not certain about.
 
 YOUR JOB:
-The user picks 3 players for a football debate question and writes one sentence defending their squad. You score the argument out of 10 and deliver a verdict.
+The user picks 3 players for a football debate question and writes a short argument (up to 300 characters — usually 1-3 sentences) defending their squad. You score the argument out of 10 and deliver a verdict.
 
 THE 10-POINT SCORE — use the FULL range. 9s and 10s are achievable and you should reward them when earned:
 
@@ -779,7 +779,7 @@ THE 10-POINT SCORE — use the FULL range. 9s and 10s are achievable and you sho
 
 CRITICAL: Do NOT default to 7 or 8 for everything decent. Reserve 7 for "good," save 8 for "very good," and actively hand out 9s when someone gives you something sharp. A user who delivers a clever, specific argument backed by inspired picks should get 9. A user whose argument genuinely makes you reconsider something should get 10.
 
-The score reflects BOTH the squad picks AND how well the sentence defends them. A good argument can save a weird squad. A boring sentence pulls down a great squad.
+The score reflects BOTH the squad picks AND how well the argument defends them. A good argument can save a weird squad. A weak argument pulls down a great squad.
 
 OUTPUT FORMAT (strictly):
 Return ONLY valid JSON, nothing else. No markdown fences. The JSON has these fields:
@@ -811,7 +811,7 @@ FACTUAL HUMILITY (IMPORTANT):
 - Iconic well-known moments are fine ("Aguerooooo", "Solskjaer 1999", "Zidane's headbutt"). Specific stats you're not sure of are not.
 
 YOUR JOB IN HEAD-TO-HEAD MODE:
-Two players have each picked a 3-player squad and written a sentence defending their choice. Your job is to:
+Two players have each picked a 3-player squad and written a short argument defending their choice. Your job is to:
 1. Score each player's argument out of 10 (use the full range — see scoring guide below)
 2. Declare a winner (the higher score wins; if tied, you must pick one)
 3. Deliver a single combined verdict that addresses BOTH players by name
@@ -828,7 +828,7 @@ THE 10-POINT SCORE — use the FULL range. 9s and 10s are achievable and you sho
 
 CRITICAL: Do NOT default to 7 or 8 for everything decent. Reserve 7 for "good," save 8 for "very good," and actively hand out 9s when one player delivers something sharp the other doesn't. The whole point of head-to-head is meaningful score gaps — if both players give thoughtful answers, find the differentiator and score accordingly.
 
-The score reflects BOTH the squad picks AND the sentence quality. Reward arguments that directly counter the opponent's squad.
+The score reflects BOTH the squad picks AND the argument quality. Reward arguments that directly counter the opponent's squad.
 
 OUTPUT FORMAT (strictly):
 Return ONLY valid JSON, no markdown fences:
@@ -1134,7 +1134,7 @@ Score each /10, declare a winner, deliver verdict as JSON.`;
 The user's squad of 3:
 ${squad.map((p, i) => `${i+1}. ${p.name} (${p.tier}) — ${p.note}`).join('\n')}
 
-Their one-sentence defence: "${sentence || '(They did not write a defence.)'}"
+Their defence: "${sentence || '(They did not write a defence.)'}"
 
 Deliver your verdict as JSON.`;
 
@@ -2102,12 +2102,12 @@ Deliver your verdict as JSON.`;
             </div>
 
             <p style={{ ...condFont, fontStyle: 'italic', color: colours.muted, fontSize: '14px', textAlign: 'center', marginBottom: '12px' }}>
-              One sentence. Make it count. Pete's listening.
+              Make your case. Pete's listening.
             </p>
 
             <textarea
               value={sentence}
-              onChange={e => setSentence(e.target.value.slice(0, 200))}
+              onChange={e => setSentence(e.target.value.slice(0, 300))}
               placeholder="e.g. Iniesta has done it before and the other two are pure ice."
               style={{
                 width: '100%',
@@ -2126,7 +2126,7 @@ Deliver your verdict as JSON.`;
               }}
             />
             <div style={{ textAlign: 'right', ...condFont, color: colours.muted, fontSize: '11px', marginTop: '4px', marginBottom: '20px' }}>
-              {sentence.length}/200
+              {sentence.length}/300
             </div>
 
             {error && (
@@ -2805,12 +2805,12 @@ Deliver your verdict as JSON.`;
             </div>
 
             <p style={{ ...condFont, fontStyle: 'italic', color: colours.muted, fontSize: '14px', textAlign: 'center', marginBottom: '8px' }}>
-              One sentence. Make Pete proud.
+              Make your case. Make Pete proud.
             </p>
 
             <textarea
               value={sentence}
-              onChange={e => setSentence(e.target.value.slice(0, 200))}
+              onChange={e => setSentence(e.target.value.slice(0, 300))}
               placeholder={`e.g. ${oppSquad[0]?.name || 'Their pick'} won't get near my back three.`}
               style={{
                 width: '100%',
@@ -2829,7 +2829,7 @@ Deliver your verdict as JSON.`;
               }}
             />
             <div style={{ textAlign: 'right', ...condFont, color: colours.muted, fontSize: '11px', marginTop: '4px', marginBottom: '20px' }}>
-              {sentence.length}/200
+              {sentence.length}/300
             </div>
 
             {error && (
