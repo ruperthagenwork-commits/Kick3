@@ -1834,6 +1834,75 @@ Deliver your verdict as JSON.`;
                 borderTop: `1px solid rgba(212,175,55,0.15)`,
                 textAlign: 'center'
               }}>
+                {/* Socials row — links go to @kick3.app on each platform */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '14px'
+                }}>
+                  <div style={{
+                    ...condFont,
+                    fontSize: '10px',
+                    letterSpacing: '0.3em',
+                    color: colours.muted,
+                    fontWeight: 600,
+                    opacity: 0.7
+                  }}>
+                    FOLLOW @KICK3.APP
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    gap: '14px',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <a
+                      href="https://www.instagram.com/kick3.app"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Kick 3 on Instagram"
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: colours.gold,
+                        opacity: 0.85,
+                        transition: 'opacity 0.15s'
+                      }}
+                    >
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="5" ry="5"/>
+                        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                        <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                      </svg>
+                    </a>
+                    <a
+                      href="https://www.tiktok.com/@kick3.app"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Kick 3 on TikTok"
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: colours.gold,
+                        opacity: 0.85,
+                        transition: 'opacity 0.15s'
+                      }}
+                    >
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43V8.92a8.16 8.16 0 0 0 4.77 1.52V7a4.85 4.85 0 0 1-1.84-.31z"/>
+                      </svg>
+                    </a>
+                  </div>
+                </div>
+
                 <a
                   href="mailto:contactkick3@gmail.com"
                   style={{
@@ -2239,6 +2308,75 @@ Deliver your verdict as JSON.`;
                   borderTop: `1px solid rgba(212,175,55,0.15)`,
                   textAlign: 'center'
                 }}>
+                  {/* Socials row — links go to @kick3.app on each platform */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{
+                      ...condFont,
+                      fontSize: '11px',
+                      letterSpacing: '0.3em',
+                      color: colours.muted,
+                      fontWeight: 600,
+                      opacity: 0.7
+                    }}>
+                      FOLLOW @KICK3.APP
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      gap: '16px',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <a
+                        href="https://www.instagram.com/kick3.app"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Kick 3 on Instagram"
+                        style={{
+                          width: '44px',
+                          height: '44px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: colours.gold,
+                          opacity: 0.85,
+                          transition: 'opacity 0.15s'
+                        }}
+                      >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="3" y="3" width="18" height="18" rx="5" ry="5"/>
+                          <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                        </svg>
+                      </a>
+                      <a
+                        href="https://www.tiktok.com/@kick3.app"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Kick 3 on TikTok"
+                        style={{
+                          width: '44px',
+                          height: '44px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: colours.gold,
+                          opacity: 0.85,
+                          transition: 'opacity 0.15s'
+                        }}
+                      >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43V8.92a8.16 8.16 0 0 0 4.77 1.52V7a4.85 4.85 0 0 1-1.84-.31z"/>
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
+
                   <a
                     href="mailto:contactkick3@gmail.com"
                     style={{
@@ -2836,6 +2974,40 @@ Deliver your verdict as JSON.`;
                 fontVariantNumeric: 'tabular-nums'
               }}>
                 {timeUntilNext}
+              </div>
+
+              {/* Socials — links to @kick3.app on Instagram and TikTok */}
+              <div style={{
+                marginTop: '16px',
+                paddingTop: '12px',
+                borderTop: `1px solid rgba(212,175,55,0.10)`,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <div style={{
+                  ...condFont, fontSize: '10px', letterSpacing: '0.3em',
+                  color: colours.muted, fontWeight: 600, opacity: 0.7
+                }}>
+                  FOLLOW @KICK3.APP
+                </div>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                  <a href="https://www.instagram.com/kick3.app" target="_blank" rel="noopener noreferrer" aria-label="Kick 3 on Instagram"
+                     style={{ width: '40px', height: '40px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: colours.gold, opacity: 0.85 }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="3" y="3" width="18" height="18" rx="5" ry="5"/>
+                      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                    </svg>
+                  </a>
+                  <a href="https://www.tiktok.com/@kick3.app" target="_blank" rel="noopener noreferrer" aria-label="Kick 3 on TikTok"
+                     style={{ width: '40px', height: '40px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: colours.gold, opacity: 0.85 }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43V8.92a8.16 8.16 0 0 0 4.77 1.52V7a4.85 4.85 0 0 1-1.84-.31z"/>
+                    </svg>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -3535,6 +3707,40 @@ Deliver your verdict as JSON.`;
                 fontVariantNumeric: 'tabular-nums'
               }}>
                 {timeUntilNext}
+              </div>
+
+              {/* Socials — links to @kick3.app on Instagram and TikTok */}
+              <div style={{
+                marginTop: '16px',
+                paddingTop: '12px',
+                borderTop: `1px solid rgba(212,175,55,0.10)`,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <div style={{
+                  ...condFont, fontSize: '10px', letterSpacing: '0.3em',
+                  color: colours.muted, fontWeight: 600, opacity: 0.7
+                }}>
+                  FOLLOW @KICK3.APP
+                </div>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                  <a href="https://www.instagram.com/kick3.app" target="_blank" rel="noopener noreferrer" aria-label="Kick 3 on Instagram"
+                     style={{ width: '40px', height: '40px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: colours.gold, opacity: 0.85 }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="3" y="3" width="18" height="18" rx="5" ry="5"/>
+                      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                    </svg>
+                  </a>
+                  <a href="https://www.tiktok.com/@kick3.app" target="_blank" rel="noopener noreferrer" aria-label="Kick 3 on TikTok"
+                     style={{ width: '40px', height: '40px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: colours.gold, opacity: 0.85 }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43V8.92a8.16 8.16 0 0 0 4.77 1.52V7a4.85 4.85 0 0 1-1.84-.31z"/>
+                    </svg>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
