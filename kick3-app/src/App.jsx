@@ -2462,7 +2462,7 @@ Deliver your verdict as JSON.`;
                 </div>
               </div>
 
-              {/* SOLO */}
+              {/* PLAY TODAY */}
               <button onClick={startGame} style={{
                 width: '100%',
                 padding: '18px',
@@ -2482,7 +2482,7 @@ Deliver your verdict as JSON.`;
                 justifyContent: 'center',
                 gap: '12px'
               }}>
-                <span>SOLO</span>
+                <span>PLAY TODAY</span>
                 <span style={{ fontSize: '24px', lineHeight: 1 }}>→</span>
               </button>
 
@@ -2649,7 +2649,7 @@ Deliver your verdict as JSON.`;
                 </div>
               </div>
 
-              {/* SOLO BUTTON — sits on the painted yellow rectangle */}
+              {/* PLAY TODAY BUTTON — sits on the painted yellow rectangle */}
               <div className="kick3-desktop-zone" style={{ left: '43.50%', top: '63.36%', width: '28.52%', height: '10.51%' }}>
                 <button
                   onClick={startGame}
@@ -2670,7 +2670,7 @@ Deliver your verdict as JSON.`;
                     gap: '14px'
                   }}
                 >
-                  <span>SOLO</span>
+                  <span>PLAY TODAY</span>
                   <span style={{ fontSize: 'clamp(22px, 2.3vw, 40px)', lineHeight: 1 }}>→</span>
                 </button>
               </div>
