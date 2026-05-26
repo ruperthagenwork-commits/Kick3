@@ -1007,6 +1007,15 @@ export default function Kick3() {
   // Share state — shows feedback in the share button.
   const [shareState, setShareState] = useState('idle'); // 'idle' | 'working' | 'shared' | 'copied' | 'error'
 
+  // ============ TOURNAMENT MODE — BETA GATE ============
+  // tournamentBetaActive is true if ?beta=pete is (or was) in the URL.
+  // When true, the green TOURNAMENT MODE button is rendered on the home screen.
+  // When false, the button is not rendered — invisible to anyone without the flag.
+  // Evaluated once on mount; URL changes don't re-evaluate (refresh to toggle).
+  const [tournamentBetaActive] = useState(() => {
+    try { return isTournamentBetaActive(); } catch { return false; }
+  });
+
   // ============ STREAK LOGIC ============
   // Three values persisted to localStorage:
   //   kick3_streak_current — current consecutive-day streak
@@ -1579,6 +1588,13 @@ Deliver your verdict as JSON.`;
             transform: scale(1.03);
             filter: brightness(1.15);
           }
+          .kick3-desktop-btn-tournament {
+            transition: transform 0.15s ease, filter 0.15s ease;
+          }
+          .kick3-desktop-btn-tournament:hover {
+            transform: scale(1.03);
+            filter: brightness(1.1);
+          }
 
         `}</style>
 
@@ -1774,6 +1790,47 @@ Deliver your verdict as JSON.`;
                   </div>
                 </div>
               </div>
+
+              {/* TOURNAMENT MODE — green (beta-only, hidden unless ?beta=pete) */}
+              {tournamentBetaActive && (
+                <button
+                  onClick={() => setScreen('tournament-home')}
+                  style={{
+                    width: '100%',
+                    padding: '18px 20px',
+                    background: '#5fb04a',
+                    color: '#0a1a08',
+                    border: 'none',
+                    borderRadius: '10px',
+                    ...displayFont,
+                    fontSize: 'clamp(20px, 5.4vw, 24px)',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px',
+                    cursor: 'pointer',
+                    marginBottom: '12px',
+                    boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                    position: 'relative'
+                  }}
+                  aria-label="Open tournament mode"
+                >
+                  <span>TOURNAMENT MODE</span>
+                  <span style={{
+                    background: 'rgba(0,0,0,0.18)',
+                    color: '#0a1a08',
+                    ...condFont,
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    padding: '3px 7px',
+                    borderRadius: '4px',
+                    lineHeight: 1
+                  }}>BETA</span>
+                </button>
+              )}
 
               {/* PLAY TODAY — yellow */}
               <button
@@ -2248,6 +2305,48 @@ Deliver your verdict as JSON.`;
                     </div>
                   </div>
                 </div>
+
+                {/* TOURNAMENT MODE — green (beta-only, hidden unless ?beta=pete) */}
+                {tournamentBetaActive && (
+                  <button
+                    onClick={() => setScreen('tournament-home')}
+                    className="kick3-desktop-btn-tournament"
+                    style={{
+                      width: '100%',
+                      padding: '22px 24px',
+                      background: '#5fb04a',
+                      color: '#0a1a08',
+                      border: 'none',
+                      borderRadius: '12px',
+                      ...displayFont,
+                      fontSize: 'clamp(24px, 2.4vw, 30px)',
+                      fontWeight: 800,
+                      letterSpacing: '0.08em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '14px',
+                      cursor: 'pointer',
+                      marginBottom: '14px',
+                      boxShadow: '0 5px 0 rgba(0,0,0,0.25)',
+                      position: 'relative'
+                    }}
+                    aria-label="Open tournament mode"
+                  >
+                    <span>TOURNAMENT MODE</span>
+                    <span style={{
+                      background: 'rgba(0,0,0,0.18)',
+                      color: '#0a1a08',
+                      ...condFont,
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      padding: '4px 8px',
+                      borderRadius: '5px',
+                      lineHeight: 1
+                    }}>BETA</span>
+                  </button>
+                )}
 
                 {/* PLAY TODAY — yellow */}
                 <button
@@ -4268,6 +4367,91 @@ Deliver your verdict as JSON.`;
               BACK TO HOME
             </button>
           </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT HOME SCREEN (placeholder — real screen in Task 3) ----------
+  if (screen === 'tournament-home') {
+    const cycle = getTournamentCycle(new Date());
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={{
+          minHeight: '100vh',
+          width: '100%',
+          background: colours.bg,
+          color: colours.text,
+          padding: '40px 24px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '24px',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            ...displayFont,
+            fontSize: 'clamp(28px, 6vw, 44px)',
+            fontWeight: 800,
+            color: '#5fb04a',
+            letterSpacing: '0.06em'
+          }}>
+            TOURNAMENT MODE
+          </div>
+          <div style={{
+            ...condFont,
+            fontSize: '14px',
+            letterSpacing: '0.18em',
+            color: colours.cream,
+            fontWeight: 600
+          }}>
+            COMING SOON
+          </div>
+          <div style={{
+            ...condFont,
+            fontSize: '13px',
+            color: colours.muted,
+            maxWidth: '420px',
+            lineHeight: 1.6,
+            marginTop: '12px'
+          }}>
+            Placeholder screen. The real tournament home — Pete on the lounger, PLAY NOW, RECORD, the lot — arrives in Task 3.
+          </div>
+          <div style={{
+            ...condFont,
+            fontSize: '12px',
+            color: colours.muted,
+            background: 'rgba(95,176,74,0.1)',
+            border: '1px solid rgba(95,176,74,0.3)',
+            padding: '10px 16px',
+            borderRadius: '6px',
+            marginTop: '8px'
+          }}>
+            {cycle
+              ? `Live: Cycle ${cycle.cycleNumber} of ${cycle.totalCycles}, Day ${cycle.dayInCycle} — opponent ${cycle.opponent}`
+              : 'Outside tournament window (11 Jun – 19 Jul 2026)'}
+          </div>
+          <button
+            onClick={() => setScreen('home')}
+            style={{
+              marginTop: '20px',
+              padding: '14px 28px',
+              background: 'transparent',
+              color: colours.gold,
+              border: `2px solid ${colours.gold}`,
+              borderRadius: '8px',
+              ...displayFont,
+              fontSize: '16px',
+              fontWeight: 700,
+              letterSpacing: '0.12em',
+              cursor: 'pointer'
+            }}
+          >
+            ← BACK TO HOME
+          </button>
         </div>
         <Analytics />
       </>
