@@ -842,32 +842,25 @@ Return ONLY valid JSON, no markdown fences:
 
 Be specific. Mention players by name. Use both player names in the verdict. Make the verdict feel like a referee's judgement after watching both arguments.`;
 
-// ============ TOURNAMENT MODE — FOUNDATIONS ============
-// Pure plumbing. No UI yet. Defines:
-//   - When the tournament runs (11 June – 19 July 2026, 13 synchronised 3-day cycles)
-//   - getTournamentCycle(date) — given a date, returns which cycle/day is live (or null if outside window)
-//   - Beta gate (?beta=pete) — hides tournament UI from anyone without the flag, even after merge to main
-//   - Debug day override (?debug=tournament-day-1/2/3) — for testing all three days in one sitting
-//   - readTournamentState / writeTournamentState — localStorage helpers, namespace kick3_tournament_v1
-// This block produces zero visible change. It only defines functions and reads from localStorage.
+// ============ TOURNAMENT MODE — FOUNDATIONS (v2 — trio-based) ============
+// Pure plumbing. Defines:
+//   - Tournament window: 11 June – 19 July 2026.
+//   - getTournamentStatus(date) — returns trio number, days-until-next-trio, locked-out state.
+//     Each tournament attempt = three rounds in one sitting (Pub Mate → Statistician → Pete).
+//     Same trio of questions runs for 3 consecutive days, then rotates.
+//   - Beta gate (?beta=pete) — hides tournament UI from anyone without the flag.
+//   - Debug overrides — for testing without waiting for real dates.
+//   - readTournamentState / writeTournamentState — localStorage helpers (namespace kick3_tournament_v1).
 
 const TOURNAMENT_CONFIG = {
-  // World Cup window. Cycles tick over at UK midnight, same as the daily question.
-  startDate: '2026-06-11',  // Day 1 of Cycle 1
-  endDate:   '2026-07-19',  // Last day of the tournament window (World Cup final day)
-  cycleLengthDays: 3,
-  // Opponent for each day in a cycle (index 0 = Day 1).
-  opponents: ['Pub Mate', 'Statistician', 'Pete the Pundit'],
-  // localStorage namespace. Versioned so we can migrate cleanly later if the shape changes.
+  startDate: '2026-06-11',  // Day 1 of Trio 1
+  endDate:   '2026-07-19',  // Last day of the window (World Cup final day)
+  daysPerTrio: 3,           // Same trio runs for 3 consecutive days, then rotates
   storageKey: 'kick3_tournament_v1',
-  // Beta flag — when present in URL or localStorage, tournament UI is visible.
-  // Used during build to hide tournament mode from the public after we eventually merge to main.
-  // For now the branch isolation handles hiding anyway; this is belt-and-braces for launch week.
   betaParam: 'pete',
 };
 
-// Parse 'YYYY-MM-DD' into a Date at UK midnight (treating the date as a calendar day in UK time).
-// We use UTC noon as the anchor so DST transitions don't push us across a day boundary.
+// Parse 'YYYY-MM-DD' into a Date anchored at UTC noon (DST-safe day comparison).
 const parseTournamentDate = (str) => {
   const [y, m, d] = str.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
@@ -879,33 +872,35 @@ const daysBetween = (from, to) => {
   return Math.floor(ms / (1000 * 60 * 60 * 24));
 };
 
-// Given a Date, return tournament status. Returns null if outside the tournament window.
-// Inside the window, returns { cycleNumber, dayInCycle, opponent, totalCycles }.
-//   cycleNumber: 1-based (Cycle 1 starts on TOURNAMENT_CONFIG.startDate)
-//   dayInCycle:  1, 2, or 3
-//   opponent:    string name of today's opponent
-//   totalCycles: total cycles in the window (derived, currently 13)
-const getTournamentCycle = (date) => {
+// Today's date as a YYYY-MM-DD string. Used as the lastPlayedDate key.
+const todayDateString = (date = new Date()) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+// Given a Date, return tournament status:
+//   - null if outside the tournament window
+//   - { trioNumber, dayInTrio, totalTrios } if inside the window
+//     trioNumber: 1-based (Trio 1 starts on startDate, runs for 3 days, then Trio 2 begins).
+//     dayInTrio:  1, 2, or 3 (which of the 3 days within this trio it is).
+//     totalTrios: count of trios across the entire window.
+const getTournamentStatus = (date) => {
   const start = parseTournamentDate(TOURNAMENT_CONFIG.startDate);
   const end   = parseTournamentDate(TOURNAMENT_CONFIG.endDate);
-  // Snap input date to noon UTC for the same DST-safe comparison.
   const dayAnchor = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0));
   if (dayAnchor < start || dayAnchor > end) return null;
-  const offset = daysBetween(start, dayAnchor);  // 0 on Day 1 of Cycle 1
-  const cycleNumber = Math.floor(offset / TOURNAMENT_CONFIG.cycleLengthDays) + 1;
-  const dayInCycle  = (offset % TOURNAMENT_CONFIG.cycleLengthDays) + 1;
-  const totalCycles = Math.ceil((daysBetween(start, end) + 1) / TOURNAMENT_CONFIG.cycleLengthDays);
-  return {
-    cycleNumber,
-    dayInCycle,
-    opponent: TOURNAMENT_CONFIG.opponents[dayInCycle - 1],
-    totalCycles,
-  };
+  const offset = daysBetween(start, dayAnchor);
+  const trioNumber = Math.floor(offset / TOURNAMENT_CONFIG.daysPerTrio) + 1;
+  const dayInTrio  = (offset % TOURNAMENT_CONFIG.daysPerTrio) + 1;
+  const totalTrios = Math.ceil((daysBetween(start, end) + 1) / TOURNAMENT_CONFIG.daysPerTrio);
+  return { trioNumber, dayInTrio, totalTrios };
 };
 
 // Read beta flag from URL (?beta=pete) or localStorage.
 // On first visit with the URL param, persist to localStorage so the flag survives navigation.
-// To turn off: visit kick3.app?beta=off (clears the flag).
+// To turn off: visit ?beta=off (clears the flag).
 const isTournamentBetaActive = () => {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -924,42 +919,39 @@ const isTournamentBetaActive = () => {
   }
 };
 
-// Debug day override — lets us test all three rounds in one sitting without waiting for real days.
-// Usage: kick3.app?debug=tournament-day-1   (or -day-2, -day-3)
-// Returns 1, 2, 3, or null if no override is set.
-const getTournamentDebugDay = () => {
+// Debug overrides — let us test tournament states without waiting for real dates.
+// Usage:
+//   ?debug=tournament-unlock   → force the PLAY NOW button to be available (skip lockout)
+//   ?debug=tournament-locked   → force the locked-out countdown view (just played)
+// Returns 'unlock' | 'locked' | null.
+const getTournamentDebugMode = () => {
   try {
     const params = new URLSearchParams(window.location.search);
     const debug = params.get('debug');
-    if (debug === 'tournament-day-1') return 1;
-    if (debug === 'tournament-day-2') return 2;
-    if (debug === 'tournament-day-3') return 3;
+    if (debug === 'tournament-unlock') return 'unlock';
+    if (debug === 'tournament-locked') return 'locked';
     return null;
   } catch {
     return null;
   }
 };
 
-// Default tournament state for a player who has never played a tournament before.
+// Default tournament state for a player who has never attempted a tournament.
 const defaultTournamentState = () => ({
-  cycleNumber: null,        // Which cycle they're currently in (null = haven't started one)
-  dayInCycle: null,         // 1, 2, or 3
-  lastPlayedDate: null,     // ISO date string of last completed round
-  cycleResults: [],         // [{ day: 1, won: true, playerTotal: 26, opponentTotal: 19 }, ...]
-  trophyCount: 0,           // Lifetime trophies (wins against Pete)
-  tournamentsAttempted: 0,  // Lifetime count of cycles entered
-  status: 'idle',           // 'idle' | 'in-progress' | 'won-cycle' | 'lost-cycle'
+  lastPlayedDate: null,         // YYYY-MM-DD of last attempted tournament
+  lastAttemptResult: null,      // 'won' | 'lost-r1' | 'lost-r2' | 'lost-r3' | null
+  trophyCount: 0,               // Lifetime trophies (Pete wins)
+  tournamentsAttempted: 0,      // Lifetime count of attempts started
+  tournamentsCompleted: 0,      // Lifetime count of attempts that reached Round 3 (win or loss)
 });
 
-// Read tournament state from localStorage. Falls back to defaults on any failure
-// (private mode, disabled storage, corrupted JSON).
+// Read tournament state from localStorage. Falls back to defaults on any failure.
 const readTournamentState = () => {
   try {
     const raw = localStorage.getItem(TOURNAMENT_CONFIG.storageKey);
     if (!raw) return defaultTournamentState();
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return defaultTournamentState();
-    // Merge with defaults so any missing fields get sensible values.
     return { ...defaultTournamentState(), ...parsed };
   } catch {
     return defaultTournamentState();
@@ -971,6 +963,13 @@ const writeTournamentState = (state) => {
   try {
     localStorage.setItem(TOURNAMENT_CONFIG.storageKey, JSON.stringify(state));
   } catch { /* silent */ }
+};
+
+// Has the player already attempted today's tournament? Returns true/false.
+// Used to gate the PLAY NOW button on the tournament home screen.
+const hasPlayedTournamentToday = (state, date = new Date()) => {
+  if (!state || !state.lastPlayedDate) return false;
+  return state.lastPlayedDate === todayDateString(date);
 };
 
 // ============ END TOURNAMENT MODE — FOUNDATIONS ============
@@ -4373,85 +4372,423 @@ Deliver your verdict as JSON.`;
     );
   }
 
-  // ---------- TOURNAMENT HOME SCREEN (placeholder — real screen in Task 3) ----------
+  // ---------- TOURNAMENT HOME SCREEN ----------
+  // Real screen. Pete-on-the-lounger banner, dynamic cycle context, PLAY NOW + RECORD.
+  // PLAY NOW is gated by hasPlayedTournamentToday(); locked = countdown to UK midnight.
+  // RECORD is inactive in Task 3 (greyed out) — wired up properly in Task 4.
   if (screen === 'tournament-home') {
-    const cycle = getTournamentCycle(new Date());
+    const tournamentStatus = getTournamentStatus(new Date());
+    const debugMode = getTournamentDebugMode();
+    const tournamentState = readTournamentState();
+    const playedToday = debugMode === 'unlock'
+      ? false
+      : debugMode === 'locked'
+        ? true
+        : hasPlayedTournamentToday(tournamentState);
+    const insideWindow = !!tournamentStatus;
+    const canPlay = insideWindow && !playedToday;
+
+    // Dynamic context line — three states.
+    let contextLine;
+    if (!insideWindow) {
+      contextLine = 'Tournament returns 11 June 2026. Beat Pete in Round 3 to win a trophy.';
+    } else if (playedToday) {
+      contextLine = `You\u2019ve played today. Trio ${tournamentStatus.trioNumber} of ${tournamentStatus.totalTrios}. Come back tomorrow.`;
+    } else {
+      contextLine = `Trio ${tournamentStatus.trioNumber} of ${tournamentStatus.totalTrios}. Three rounds, one sitting. Beat Pete to win a trophy.`;
+    }
+
     return (
       <>
         <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
-        <div style={{
-          minHeight: '100vh',
-          width: '100%',
-          background: colours.bg,
-          color: colours.text,
-          padding: '40px 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '24px',
-          textAlign: 'center'
-        }}>
-          <div style={{
-            ...displayFont,
-            fontSize: 'clamp(28px, 6vw, 44px)',
-            fontWeight: 800,
-            color: '#5fb04a',
-            letterSpacing: '0.06em'
-          }}>
-            TOURNAMENT MODE
+
+        {/* Responsive CSS — phone = banner bleeds to edges, desktop = banner framed in a card */}
+        <style>{`
+          .kick3-tour-root {
+            min-height: 100vh;
+            width: 100%;
+            background: ${colours.bg};
+            color: ${colours.text};
+          }
+          /* ============ PHONE LAYOUT (default, < 900px) ============ */
+          .kick3-tour-phone-wrap {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+          }
+          .kick3-tour-phone-banner {
+            position: relative;
+            background: #1a2840;
+            overflow: hidden;
+            width: 100%;
+          }
+          .kick3-tour-phone-banner img {
+            display: block;
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+            object-position: center center;
+          }
+          .kick3-tour-phone-ui {
+            background: ${colours.bg};
+            padding: 28px 24px 40px 24px;
+            flex: 1 0 auto;
+            display: flex;
+            flex-direction: column;
+          }
+          @media (min-width: 900px) {
+            .kick3-tour-phone-wrap { display: none; }
+          }
+
+          /* ============ DESKTOP LAYOUT ============ */
+          .kick3-tour-desktop-wrap {
+            display: none;
+            min-height: 100vh;
+            width: 100%;
+            background: ${colours.bg};
+            padding: 32px 24px 48px 24px;
+          }
+          .kick3-tour-desktop-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+          }
+          .kick3-tour-desktop-banner {
+            position: relative;
+            background: #1a2840;
+            overflow: hidden;
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            margin-bottom: 32px;
+          }
+          .kick3-tour-desktop-banner img {
+            display: block;
+            width: 100%;
+            height: auto;
+          }
+          .kick3-tour-desktop-ui {
+            padding: 0 8px;
+            display: flex;
+            flex-direction: column;
+          }
+          @media (min-width: 900px) {
+            .kick3-tour-desktop-wrap { display: block; }
+          }
+
+          /* Button hover effects (desktop only) */
+          .kick3-tour-btn-play {
+            transition: transform 0.15s ease, filter 0.15s ease;
+          }
+          .kick3-tour-btn-play:hover:not(:disabled) {
+            transform: scale(1.03);
+            filter: brightness(1.1);
+          }
+        `}</style>
+
+        <div className="kick3-tour-root">
+
+          {/* ============ PHONE LAYOUT ============ */}
+          <div className="kick3-tour-phone-wrap">
+            <div className="kick3-tour-phone-banner">
+              <picture>
+                <source srcSet="/pete-tournament.webp" type="image/webp" />
+                <img src="/pete-tournament.jpg" alt="Pete the Pundit on a sun lounger at the World Cup" />
+              </picture>
+              {/* BACK chip — top-left */}
+              <button
+                onClick={() => setScreen('home')}
+                style={{
+                  position: 'absolute',
+                  top: '14px',
+                  left: '14px',
+                  background: 'rgba(20,20,30,0.85)',
+                  color: colours.gold,
+                  ...condFont,
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '0.18em',
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  border: `1px solid ${colours.gold}`,
+                  cursor: 'pointer'
+                }}
+                aria-label="Back to main home"
+              >
+                ← BACK
+              </button>
+            </div>
+
+            <div className="kick3-tour-phone-ui">
+              {/* Wordmark */}
+              <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                <div style={{
+                  ...displayFont,
+                  fontSize: 'clamp(40px, 11vw, 56px)',
+                  fontWeight: 800,
+                  color: '#5fb04a',
+                  letterSpacing: '0.04em',
+                  lineHeight: 1
+                }}>
+                  TOURNAMENT MODE
+                </div>
+                <div style={{
+                  ...condFont,
+                  fontSize: '11px',
+                  letterSpacing: '0.3em',
+                  color: colours.muted,
+                  fontWeight: 600,
+                  marginTop: '10px'
+                }}>
+                  — BEAT PETE TO WIN A TROPHY —
+                </div>
+              </div>
+
+              {/* Cycle context */}
+              <div style={{
+                ...condFont,
+                fontSize: '13px',
+                color: colours.cream,
+                textAlign: 'center',
+                lineHeight: 1.55,
+                marginTop: '20px',
+                marginBottom: '24px',
+                padding: '0 4px'
+              }}>
+                {contextLine}
+              </div>
+
+              {/* PLAY NOW — green */}
+              <button
+                onClick={() => { /* Wired up in Task 5 */ }}
+                disabled={!canPlay}
+                style={{
+                  width: '100%',
+                  padding: '18px 20px',
+                  background: canPlay ? '#5fb04a' : '#3a3a44',
+                  color: canPlay ? '#0a1a08' : colours.muted,
+                  border: 'none',
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(20px, 5.4vw, 24px)',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  cursor: canPlay ? 'pointer' : 'not-allowed',
+                  marginBottom: '12px',
+                  boxShadow: canPlay ? '0 4px 0 rgba(0,0,0,0.25)' : 'none',
+                  opacity: canPlay ? 1 : 0.7,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                }}
+              >
+                {!insideWindow ? (
+                  <span>TOURNAMENT NOT LIVE</span>
+                ) : playedToday ? (
+                  <>
+                    <span style={{ fontSize: '18px' }} aria-hidden="true">⏳</span>
+                    <span>NEXT IN {timeUntilNext}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>PLAY NOW</span>
+                    <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
+                  </>
+                )}
+              </button>
+
+              {/* RECORD — gold outline, inactive in Task 3 */}
+              <button
+                disabled
+                style={{
+                  width: '100%',
+                  padding: '15px 20px',
+                  background: 'transparent',
+                  color: colours.muted,
+                  border: `2px solid ${colours.muted}`,
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(16px, 4.4vw, 19px)',
+                  fontWeight: 700,
+                  letterSpacing: '0.12em',
+                  cursor: 'not-allowed',
+                  marginBottom: '24px',
+                  opacity: 0.6,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
+                }}
+              >
+                <span style={{ fontSize: '16px' }} aria-hidden="true">🏆</span>
+                <span>RECORD (COMING SOON)</span>
+              </button>
+
+              {/* Pete taunt */}
+              <div style={{
+                ...condFont,
+                fontStyle: 'italic',
+                fontSize: '12px',
+                color: colours.muted,
+                textAlign: 'center',
+                lineHeight: 1.55,
+                padding: '0 12px'
+              }}>
+                &ldquo;I&rsquo;ve forgotten more football than you&rsquo;ll ever know. Three rounds. Beat me. I&rsquo;ll wait.&rdquo;
+              </div>
+            </div>
           </div>
-          <div style={{
-            ...condFont,
-            fontSize: '14px',
-            letterSpacing: '0.18em',
-            color: colours.cream,
-            fontWeight: 600
-          }}>
-            COMING SOON
+
+          {/* ============ DESKTOP LAYOUT ============ */}
+          <div className="kick3-tour-desktop-wrap">
+            <div className="kick3-tour-desktop-inner">
+              <div className="kick3-tour-desktop-banner">
+                <picture>
+                  <source srcSet="/pete-tournament.webp" type="image/webp" />
+                  <img src="/pete-tournament.jpg" alt="Pete the Pundit on a sun lounger at the World Cup" />
+                </picture>
+                {/* BACK chip — top-left of banner */}
+                <button
+                  onClick={() => setScreen('home')}
+                  style={{
+                    position: 'absolute',
+                    top: '18px',
+                    left: '18px',
+                    background: 'rgba(20,20,30,0.85)',
+                    color: colours.gold,
+                    ...condFont,
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    padding: '10px 16px',
+                    borderRadius: '5px',
+                    border: `1px solid ${colours.gold}`,
+                    cursor: 'pointer'
+                  }}
+                  aria-label="Back to main home"
+                >
+                  ← BACK
+                </button>
+              </div>
+
+              <div className="kick3-tour-desktop-ui">
+                {/* Wordmark */}
+                <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+                  <div style={{
+                    ...displayFont,
+                    fontSize: 'clamp(48px, 5vw, 64px)',
+                    fontWeight: 800,
+                    color: '#5fb04a',
+                    letterSpacing: '0.04em',
+                    lineHeight: 1
+                  }}>
+                    TOURNAMENT MODE
+                  </div>
+                  <div style={{
+                    ...condFont,
+                    fontSize: '13px',
+                    letterSpacing: '0.3em',
+                    color: colours.muted,
+                    fontWeight: 600,
+                    marginTop: '14px'
+                  }}>
+                    — BEAT PETE TO WIN A TROPHY —
+                  </div>
+                </div>
+
+                {/* Cycle context */}
+                <div style={{
+                  ...condFont,
+                  fontSize: '15px',
+                  color: colours.cream,
+                  textAlign: 'center',
+                  lineHeight: 1.55,
+                  marginTop: '24px',
+                  marginBottom: '28px',
+                  maxWidth: '600px',
+                  marginLeft: 'auto',
+                  marginRight: 'auto'
+                }}>
+                  {contextLine}
+                </div>
+
+                {/* PLAY NOW — green */}
+                <button
+                  onClick={() => { /* Wired up in Task 5 */ }}
+                  disabled={!canPlay}
+                  className="kick3-tour-btn-play"
+                  style={{
+                    width: '100%',
+                    padding: '22px 24px',
+                    background: canPlay ? '#5fb04a' : '#3a3a44',
+                    color: canPlay ? '#0a1a08' : colours.muted,
+                    border: 'none',
+                    borderRadius: '12px',
+                    ...displayFont,
+                    fontSize: 'clamp(24px, 2.4vw, 30px)',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                    cursor: canPlay ? 'pointer' : 'not-allowed',
+                    marginBottom: '14px',
+                    boxShadow: canPlay ? '0 5px 0 rgba(0,0,0,0.25)' : 'none',
+                    opacity: canPlay ? 1 : 0.7,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px'
+                  }}
+                >
+                  {!insideWindow ? (
+                    <span>TOURNAMENT NOT LIVE</span>
+                  ) : playedToday ? (
+                    <>
+                      <span style={{ fontSize: '22px' }} aria-hidden="true">⏳</span>
+                      <span>NEXT IN {timeUntilNext}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>PLAY NOW</span>
+                      <span style={{ fontSize: '26px', lineHeight: 1 }}>→</span>
+                    </>
+                  )}
+                </button>
+
+                {/* RECORD — gold outline, inactive */}
+                <button
+                  disabled
+                  style={{
+                    width: '100%',
+                    padding: '18px 24px',
+                    background: 'transparent',
+                    color: colours.muted,
+                    border: `2px solid ${colours.muted}`,
+                    borderRadius: '12px',
+                    ...displayFont,
+                    fontSize: 'clamp(18px, 1.8vw, 22px)',
+                    fontWeight: 700,
+                    letterSpacing: '0.12em',
+                    cursor: 'not-allowed',
+                    marginBottom: '28px',
+                    opacity: 0.6,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }} aria-hidden="true">🏆</span>
+                  <span>RECORD (COMING SOON)</span>
+                </button>
+
+                {/* Pete taunt */}
+                <div style={{
+                  ...condFont,
+                  fontStyle: 'italic',
+                  fontSize: '14px',
+                  color: colours.muted,
+                  textAlign: 'center',
+                  lineHeight: 1.55,
+                  maxWidth: '600px',
+                  marginLeft: 'auto',
+                  marginRight: 'auto',
+                  padding: '0 12px'
+                }}>
+                  &ldquo;I&rsquo;ve forgotten more football than you&rsquo;ll ever know. Three rounds. Beat me. I&rsquo;ll wait.&rdquo;
+                </div>
+              </div>
+            </div>
           </div>
-          <div style={{
-            ...condFont,
-            fontSize: '13px',
-            color: colours.muted,
-            maxWidth: '420px',
-            lineHeight: 1.6,
-            marginTop: '12px'
-          }}>
-            Placeholder screen. The real tournament home — Pete on the lounger, PLAY NOW, RECORD, the lot — arrives in Task 3.
-          </div>
-          <div style={{
-            ...condFont,
-            fontSize: '12px',
-            color: colours.muted,
-            background: 'rgba(95,176,74,0.1)',
-            border: '1px solid rgba(95,176,74,0.3)',
-            padding: '10px 16px',
-            borderRadius: '6px',
-            marginTop: '8px'
-          }}>
-            {cycle
-              ? `Live: Cycle ${cycle.cycleNumber} of ${cycle.totalCycles}, Day ${cycle.dayInCycle} — opponent ${cycle.opponent}`
-              : 'Outside tournament window (11 Jun – 19 Jul 2026)'}
-          </div>
-          <button
-            onClick={() => setScreen('home')}
-            style={{
-              marginTop: '20px',
-              padding: '14px 28px',
-              background: 'transparent',
-              color: colours.gold,
-              border: `2px solid ${colours.gold}`,
-              borderRadius: '8px',
-              ...displayFont,
-              fontSize: '16px',
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              cursor: 'pointer'
-            }}
-          >
-            ← BACK TO HOME
-          </button>
+
         </div>
         <Analytics />
       </>
