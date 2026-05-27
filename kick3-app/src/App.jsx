@@ -4708,17 +4708,24 @@ Deliver your verdict as JSON.`;
       : debugMode === 'locked'
         ? true
         : hasPlayedTournamentToday(tournamentState);
-    const insideWindow = !!tournamentStatus;
+    // debug=unlock and debug=locked both simulate "tournament is live today" — they
+    // would be useless if insideWindow gated them out. Outside debug, insideWindow
+    // strictly enforces the real 11 Jun – 19 Jul window.
+    const insideWindow = !!tournamentStatus || debugMode === 'unlock' || debugMode === 'locked';
     const canPlay = insideWindow && !playedToday;
 
     // Dynamic context line — three states.
+    // Safe access: debug modes can flip insideWindow=true while tournamentStatus is still null
+    // (when real today is outside the window). Use sensible debug fallbacks for trio numbers.
+    const trioNumber = tournamentStatus?.trioNumber ?? 1;
+    const totalTrios = tournamentStatus?.totalTrios ?? 13;
     let contextLine;
     if (!insideWindow) {
       contextLine = 'Tournament returns 11 June 2026. Beat Pete in Round 3 to win a trophy.';
     } else if (playedToday) {
-      contextLine = `You\u2019ve played today. Trio ${tournamentStatus.trioNumber} of ${tournamentStatus.totalTrios}. Come back tomorrow.`;
+      contextLine = `You\u2019ve played today. Trio ${trioNumber} of ${totalTrios}. Come back tomorrow.`;
     } else {
-      contextLine = `Trio ${tournamentStatus.trioNumber} of ${tournamentStatus.totalTrios}. Three rounds, one sitting. Beat Pete to win a trophy.`;
+      contextLine = `Trio ${trioNumber} of ${totalTrios}. Three rounds, one sitting. Beat Pete to win a trophy.`;
     }
 
     return (
