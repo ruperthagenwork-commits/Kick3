@@ -5324,13 +5324,13 @@ Deliver your verdict as JSON.`;
             {/* Header */}
             <div style={{ textAlign: 'center', paddingTop: '8px', marginBottom: '20px' }}>
               <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: '#5fb04a', marginBottom: '6px', fontWeight: 600 }}>
-                ROUND {tournamentRound} \u2014 VS {tournamentOpponent.shortLabel}
+                ROUND {tournamentRound} — VS {tournamentOpponent.shortLabel}
               </div>
               <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: r.won ? '#5fb04a' : colours.accent, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
                 {r.won ? 'YOU ADVANCE' : 'YOU LOST'}
               </h1>
               <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.3em', color: colours.muted, marginTop: '10px' }}>
-                VAR DECISION \u2022 {tournamentAttribute && tournamentAttribute.toUpperCase()}
+                VAR DECISION • {tournamentAttribute && tournamentAttribute.toUpperCase()}
               </div>
             </div>
 
@@ -5363,7 +5363,7 @@ Deliver your verdict as JSON.`;
               </div>
               {r.viaLegacy && (
                 <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, marginTop: '12px', fontStyle: 'italic' }}>
-                  TIED ON {tournamentAttribute.toUpperCase()} \u2014 LEGACY TIEBREAK
+                  TIED ON {tournamentAttribute.toUpperCase()} — LEGACY TIEBREAK
                 </div>
               )}
             </div>
@@ -5479,7 +5479,7 @@ Deliver your verdict as JSON.`;
                 }}
               >
                 <span>CONTINUE TO ROUND 2</span>
-                <span style={{ fontSize: '22px', lineHeight: 1 }}>\u2192</span>
+                <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
               </button>
             )}
             {r.won && isFinalRound && (
@@ -5503,7 +5503,7 @@ Deliver your verdict as JSON.`;
                 }}
               >
                 <span>CONTINUE TO ROUND 3</span>
-                <span style={{ fontSize: '22px', lineHeight: 1 }}>\u2192</span>
+                <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
               </button>
             )}
             <button
@@ -5522,7 +5522,7 @@ Deliver your verdict as JSON.`;
                 cursor: 'pointer'
               }}
             >
-              \u2190 BACK TO TOURNAMENT
+              ← BACK TO TOURNAMENT
             </button>
           </div>
         </div>
@@ -5548,7 +5548,7 @@ Deliver your verdict as JSON.`;
             PETE THE PUNDIT
           </div>
           <div style={{ ...condFont, fontSize: '14px', color: colours.muted, maxWidth: '420px', lineHeight: 1.6, marginTop: '8px' }}>
-            You\u2019ve beaten Pete\u2019s producer. Round 3 vs Pete the Pundit is being built in Task 6 \u2014 the AI defence screen, Pete\u2019s reveal, the trophy on the line. Coming next.
+            You’ve beaten Pete’s producer. Round 3 vs Pete the Pundit is being built in Task 6 — the AI defence screen, Pete’s reveal, the trophy on the line. Coming next.
           </div>
           <button
             onClick={() => endTournamentAttempt('reached-r3')}
@@ -5558,7 +5558,7 @@ Deliver your verdict as JSON.`;
               ...displayFont, fontSize: '15px', fontWeight: 700, letterSpacing: '0.12em', cursor: 'pointer'
             }}
           >
-            \u2190 BACK TO TOURNAMENT
+            ← BACK TO TOURNAMENT
           </button>
         </div>
         <Analytics />
