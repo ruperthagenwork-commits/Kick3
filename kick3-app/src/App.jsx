@@ -842,6 +842,65 @@ Return ONLY valid JSON, no markdown fences:
 
 Be specific. Mention players by name. Use both player names in the verdict. Make the verdict feel like a referee's judgement after watching both arguments.`;
 
+const PETE_ARGUMENT_PROMPT = `You are PETE THE PUNDIT writing your OWN argument for a tournament round of Kick 3. Today you're not the judge \u2014 you're a contestant. A neutral VAR will judge between you and the player.
+
+YOUR VOICE:
+- Same Pete as ever: opinionated, knowing, grumpy old pundit. World's #4 Pundit. Doctorate in football.
+- Pundit's voice. Roy Keane on a good day mixed with Statler from the Muppets.
+- Allergic to clich\u00e9s. Short, punchy sentences.
+- Football-literate, dry humour, no emojis, no modern slang.
+- You are SARCASTIC and CONFIDENT. You've been on the lounger waiting for this player. You think they're punching above their weight.
+
+FACTUAL HUMILITY:
+- Describe REPUTATION, not exact stats you might be wrong about. "Maradona \u2014 cup-final dragger" not "Maradona scored 34 World Cup goals".
+- Iconic moments fine. Specific stats you're unsure of, no.
+
+YOUR JOB:
+You will be given a question and three players you've picked. Write a SHORT, CONFIDENT argument defending those three picks against the question. End with a sarcastic "beat this" line that taunts the player.
+
+CONSTRAINTS:
+- 60-90 words total. Punchy. Not a lecture.
+- Mention each of your three picks by name with a single reason.
+- End with a one-line sarcastic taunt to the player.
+- Don't reference attribute scores or the game's mechanics. Talk like a pundit.
+
+OUTPUT FORMAT (strictly):
+Return ONLY valid JSON, no markdown fences:
+{
+  "argument": "<your 60-90 word argument with the three picks named>",
+  "taunt": "<one short sarcastic closing line, max 14 words>"
+}`;
+
+const VAR_JUDGE_PROMPT = `You are VAR \u2014 the neutral video assistant referee judging a Kick 3 tournament Round 3 between PETE THE PUNDIT and a human player.
+
+YOUR VOICE:
+- Dry. Procedural. Monotone. Like a real VAR official reading a decision.
+- Short sentences. No flourish. No personality. You are NOT Pete.
+- "After review." "Decision." "Recommendation." Stadium-announcement formal.
+- No first-person opinions ("I think"). State the finding.
+
+YOUR JOB:
+Compare two cases against the same question. Each side has three player picks AND a short written argument. Decide who made the stronger overall case.
+
+JUDGEMENT MODEL (important):
+Consider BOTH the picks AND the arguments TOGETHER \u2014 they're not weighted separately, they're a unit. A strong argument can win Round 3 even with weaker picks. Weak picks weaken even a strong argument because the argument has less to stand on. Pete being Pete doesn't earn him bonus marks \u2014 you are neutral.
+
+What you're looking for:
+- Does the argument actually defend the picks against the question?
+- Are the picks coherent with the argument they're attached to?
+- Specificity beats generality. "Cup-final dragger" beats "great player."
+- Original insight beats received wisdom.
+
+Pete is a confident, experienced pundit \u2014 his arguments will usually be sharp. To beat him, the player must engage with HIS case, not just present their own. A defence that ignores Pete's points entirely is weaker than one that dismantles them.
+
+OUTPUT FORMAT (strictly):
+Return ONLY valid JSON, no markdown fences:
+{
+  "winner": "pete" | "player",
+  "verdict": "<2-3 sentences in dry VAR voice. State the decision, then briefly note what tipped it. Mention specific picks or argument points if relevant. No theatre.>",
+  "lineForCard": "<one short line, max 14 words, summary of the decision in VAR voice>"
+}`;
+
 // ============ TOURNAMENT MODE — FOUNDATIONS (v2 — trio-based) ============
 // Pure plumbing. Defines:
 //   - Tournament window: 11 June – 19 July 2026.
@@ -999,6 +1058,28 @@ const STUB_OPPONENTS = {
     peteLossLine: "My producer just out-pundited you. Have a long think about that overnight.",
     roundNumber: 2,
   },
+  pete: {
+    key: 'pete',
+    label: "PETE THE PUNDIT",
+    shortLabel: "PETE",
+    vibe: "World's #4 Pundit. Doctorate in football. Waiting for you.",
+    // Three picks by name. High-Legacy World Cup squad. Hard to beat without a sharp argument.
+    picks: ["Diego Maradona", "Pel\u00e9", "Zinedine Zidane"],
+    roundNumber: 3,
+    // Pre-written reactions on the result screen. Rotated by attempt count for variety.
+    winReactions: [
+      "Beat me. Once. Have your trophy. Don't get used to it.",
+      "Lucky day. Lounger needs a wash anyway.",
+      "Fine. You earned it. Tomorrow we go again.",
+      "Hmph. Decent argument. Don't expect a repeat.",
+    ],
+    lossReactions: [
+      "Knew it. Same time tomorrow. I'll be here. Lounger's comfy.",
+      "Predictable. The defence had no legs.",
+      "Off you trot. Have a think about those picks.",
+      "Twenty years in this game. You thought you'd just walk in?",
+    ],
+  },
 };
 
 // Deterministic attribute scoring stub.
@@ -1150,6 +1231,13 @@ export default function Kick3() {
   const [tournamentAttribute, setTournamentAttribute] = useState(null);
   const [tournamentQuestionText, setTournamentQuestionText] = useState('');
   const [tournamentVarResult, setTournamentVarResult] = useState(null);
+  // ---- Round 3 (Pete) specific state ----
+  const [r3PeteArgument, setR3PeteArgument] = useState(null);   // { argument, taunt } from AI
+  const [r3PlayerDefence, setR3PlayerDefence] = useState('');    // 300-char player response
+  const [r3VarVerdict, setR3VarVerdict] = useState(null);        // { winner, verdict, lineForCard } from AI
+  const [r3PeteReaction, setR3PeteReaction] = useState('');      // pre-written, picked on verdict
+  const [r3Loading, setR3Loading] = useState(false);
+  const [r3Error, setR3Error] = useState(null);
 
   // ============ STREAK LOGIC ============
   // Three values persisted to localStorage:
@@ -1550,8 +1638,133 @@ export default function Kick3() {
     setTournamentAttribute(null);
     setTournamentQuestionText('');
     setTournamentVarResult(null);
+    setR3PeteArgument(null);
+    setR3PlayerDefence('');
+    setR3VarVerdict(null);
+    setR3PeteReaction('');
+    setR3Error(null);
     setSquad([]);
     setScreen('tournament-home');
+  };
+
+  // ============ ROUND 3 / PETE FINAL ============
+  // Entry point: player has just won Round 2 and clicks CONTINUE TO ROUND 3.
+  // Generates Pete's AI argument and routes to the R3 intro screen.
+  const startTournamentRound3 = async () => {
+    const opponent = STUB_OPPONENTS.pete;
+    // R3 question is always Legacy.
+    const attribute = 'Legacy';
+    const questionText = stubTournamentQuestion(3, 'Legacy');
+
+    setTournamentRound(3);
+    setTournamentOpponent(opponent);
+    setTournamentAttribute(attribute);
+    setTournamentQuestionText(questionText);
+    setR3PeteArgument(null);
+    setR3VarVerdict(null);
+    setR3PlayerDefence('');
+    setR3PeteReaction('');
+    setR3Error(null);
+    setR3Loading(true);
+    setScreen('tournament-r3-intro');
+
+    // Generate Pete's argument via AI.
+    try {
+      const userMessage = `The question: "${questionText}"
+
+Pete's three picks: ${opponent.picks.join(', ')}.
+
+Write Pete's confident argument defending these three picks against the question. End with a sarcastic one-line taunt to the player. Return JSON only.`;
+
+      const response = await fetch("/api/verdict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemPrompt: PETE_ARGUMENT_PROMPT,
+          userMessage: userMessage
+        })
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      const data = await response.json();
+      const text = (data.text || "").trim();
+      const cleaned = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(cleaned);
+      setR3PeteArgument(parsed);
+    } catch (e) {
+      console.error('Pete argument generation failed:', e);
+      // Fallback: hardcoded Pete argument so the game can continue even if API is down.
+      setR3PeteArgument({
+        argument: `${opponent.picks[0]}, ${opponent.picks[1]}, ${opponent.picks[2]}. Three names. World Cup royalty, every one of them. Moments people still talk about. The question was clear and so is the answer. Beat that.`,
+        taunt: "Beat this. If you can be bothered."
+      });
+      setR3Error('Pete\u2019s argument used a fallback (API was unreachable).');
+    } finally {
+      setR3Loading(false);
+    }
+  };
+
+  // Submit player's R3 defence to VAR for comparative judgement.
+  const submitR3Defence = async () => {
+    if (r3Loading) return;
+    setR3Loading(true);
+    setR3Error(null);
+    try {
+      const opponentPicks = resolveOpponentPicks(tournamentOpponent);
+      const userMessage = `The question: "${tournamentQuestionText}"
+
+PETE'S three picks: ${opponentPicks.map(p => p.name).join(', ')}.
+PETE'S argument: "${r3PeteArgument?.argument || ''}"
+
+PLAYER'S three picks: ${squad.map(p => p.name).join(', ')}.
+PLAYER'S defence: "${r3PlayerDefence || '(The player did not write a defence.)'}"
+
+Judge between Pete and the player. Return JSON only.`;
+
+      const response = await fetch("/api/verdict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemPrompt: VAR_JUDGE_PROMPT,
+          userMessage: userMessage
+        })
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      const data = await response.json();
+      const text = (data.text || "").trim();
+      const cleaned = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(cleaned);
+
+      // Defensive: ensure winner is one of the two valid values.
+      const winner = parsed.winner === 'player' ? 'player' : 'pete';
+      const playerWon = winner === 'player';
+
+      // Pick a pre-written Pete reaction based on outcome and a rotating index.
+      const state = readTournamentState();
+      const reactionIndex = (state.tournamentsAttempted || 0) % 4;
+      const reactionPool = playerWon
+        ? STUB_OPPONENTS.pete.winReactions
+        : STUB_OPPONENTS.pete.lossReactions;
+      const reaction = reactionPool[reactionIndex] || reactionPool[0];
+
+      setR3VarVerdict({ ...parsed, winner, playerWon });
+      setR3PeteReaction(reaction);
+
+      // Write tournament state (trophy on win, attempt completion either way).
+      writeTournamentState({
+        ...state,
+        lastPlayedDate: todayDateString(),
+        lastAttemptResult: playerWon ? 'won-r3' : 'lost-r3',
+        tournamentsCompleted: (state.tournamentsCompleted || 0) + 1,
+        trophyCount: (state.trophyCount || 0) + (playerWon ? 1 : 0),
+      });
+
+      setScreen('tournament-r3-verdict');
+    } catch (e) {
+      console.error('VAR judgement failed:', e);
+      setR3Error('VAR\u2019s connection dropped. Try again.');
+    } finally {
+      setR3Loading(false);
+    }
   };
 
   const startH2H = () => {
@@ -1589,8 +1802,14 @@ export default function Kick3() {
     } else {
       // Done drafting
       if (mode === 'tournament') {
-        // Tournament: skip the defence screen, route straight to VAR verdict.
-        computeTournamentVar(newSquad);
+        // Round 3 (Pete) has a defence screen; Rounds 1 and 2 do not.
+        if (tournamentRound === 3) {
+          setSentence('');
+          setR3PlayerDefence('');
+          setScreen('tournament-r3-defend');
+        } else {
+          computeTournamentVar(newSquad);
+        }
       } else if (mode === 'solo') {
         setScreen('defend');
       } else {
@@ -5484,7 +5703,7 @@ Deliver your verdict as JSON.`;
             )}
             {r.won && isFinalRound && (
               <button
-                onClick={() => setScreen('tournament-r3-placeholder')}
+                onClick={startTournamentRound3}
                 style={{
                   width: '100%',
                   padding: '16px 20px',
@@ -5532,34 +5751,426 @@ Deliver your verdict as JSON.`;
   }
 
   // ---------- TOURNAMENT R3 PLACEHOLDER (Task 6 will replace this) ----------
-  if (screen === 'tournament-r3-placeholder') {
+  // ---------- TOURNAMENT R3 INTRO SCREEN ----------
+  // Earns the moment. Pete-on-the-lounger banner, Pete's three picks visible,
+  // Pete's AI-generated argument shown, then the player drafts.
+  if (screen === 'tournament-r3-intro' && tournamentOpponent) {
+    const petePicks = resolveOpponentPicks(tournamentOpponent);
     return (
       <>
         <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
-        <div style={{
-          minHeight: '100vh', width: '100%', background: colours.bg, color: colours.text,
-          padding: '40px 24px', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: '20px', textAlign: 'center'
-        }}>
-          <div style={{ ...displayFont, fontSize: 'clamp(28px, 6vw, 40px)', fontWeight: 800, color: '#5fb04a', letterSpacing: '0.06em' }}>
-            ROUND 3
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '640px' }}>
+
+            {/* Pete on the lounger banner */}
+            <div style={{
+              position: 'relative',
+              marginBottom: '24px',
+              borderRadius: '10px',
+              overflow: 'hidden',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.45)',
+              background: '#1a2840'
+            }}>
+              <picture>
+                <source srcSet="/pete-tournament.webp" type="image/webp" />
+                <img src="/pete-tournament.jpg" alt="Pete on the lounger" style={{ display: 'block', width: '100%', height: 'auto' }} />
+              </picture>
+            </div>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: '#5fb04a', marginBottom: '8px', fontWeight: 700 }}>
+                ROUND 3 \u2014 THE FINAL
+              </div>
+              <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 9vw, 52px)', fontWeight: 800, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                PETE THE PUNDIT
+              </h1>
+              <p style={{ ...condFont, fontStyle: 'italic', fontSize: '14px', color: colours.cream, marginTop: '14px', marginBottom: 0, opacity: 0.9 }}>
+                &ldquo;Oh. You\u2019re still here. Sit down.&rdquo;
+              </p>
+            </div>
+
+            {/* Question */}
+            <div style={{ marginBottom: '20px', padding: '14px 18px', background: 'rgba(212,175,55,0.06)', borderLeft: `2px solid ${colours.gold}` }}>
+              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.3em', color: colours.gold, marginBottom: '4px' }}>
+                THE QUESTION
+              </div>
+              <p style={{ ...displayFont, fontSize: '18px', margin: 0, lineHeight: '1.2' }}>
+                {tournamentQuestionText}
+              </p>
+            </div>
+
+            {/* Pete's three picks */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: colours.muted, marginBottom: '8px', fontWeight: 700 }}>
+                PETE\u2019S THREE
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {petePicks.map((p, i) => (
+                  <div key={i} style={{
+                    padding: '8px 12px',
+                    background: 'rgba(0,0,0,0.30)',
+                    border: `1px solid ${TIER_COLOURS[p.tier] || '#888'}66`,
+                    fontSize: '14px',
+                    ...condFont,
+                    fontWeight: 600,
+                    color: colours.cream,
+                    borderRadius: '5px'
+                  }}>
+                    <span style={{ color: TIER_COLOURS[p.tier] || '#888', marginRight: '6px' }}>
+                      {TIER_SYMBOLS[p.tier] || '\u2022'}
+                    </span>
+                    {p.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Pete's argument */}
+            <div style={{
+              background: 'rgba(95,176,74,0.06)',
+              border: '1px solid rgba(95,176,74,0.30)',
+              padding: '18px 20px',
+              marginBottom: '24px',
+              borderRadius: '8px'
+            }}>
+              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: '#5fb04a', marginBottom: '12px', fontWeight: 700 }}>
+                PETE\u2019S ARGUMENT
+              </div>
+              {r3Loading && !r3PeteArgument ? (
+                <p style={{ ...condFont, fontStyle: 'italic', color: colours.muted, margin: 0, fontSize: '14px' }}>
+                  Pete is sharpening his case\u2026
+                </p>
+              ) : r3PeteArgument ? (
+                <>
+                  <p style={{ ...condFont, fontSize: '15px', color: colours.cream, margin: '0 0 12px 0', lineHeight: 1.5 }}>
+                    {r3PeteArgument.argument}
+                  </p>
+                  <p style={{ ...condFont, fontStyle: 'italic', fontSize: '14px', color: colours.gold, margin: 0, lineHeight: 1.4 }}>
+                    &ldquo;{r3PeteArgument.taunt}&rdquo;
+                  </p>
+                </>
+              ) : (
+                <p style={{ ...condFont, color: colours.accent, margin: 0, fontSize: '14px' }}>
+                  Couldn\u2019t reach Pete. Try again in a moment.
+                </p>
+              )}
+              {r3Error && (
+                <p style={{ ...condFont, fontSize: '11px', color: colours.muted, marginTop: '10px', marginBottom: 0, fontStyle: 'italic' }}>
+                  {r3Error}
+                </p>
+              )}
+            </div>
+
+            {/* Action button — draft your three */}
+            <button
+              onClick={() => {
+                // Begin drafting for R3.
+                setDraftRounds(generateDraft(squad.map(p => p.name)));
+                setCurrentRound(0);
+                setSquad([]);
+                setScreen('draft');
+              }}
+              disabled={r3Loading || !r3PeteArgument}
+              style={{
+                width: '100%',
+                padding: '18px 20px',
+                background: (!r3Loading && r3PeteArgument) ? colours.gold : '#3a3a44',
+                color: (!r3Loading && r3PeteArgument) ? '#000' : colours.muted,
+                border: 'none',
+                borderRadius: '10px',
+                ...displayFont,
+                fontSize: 'clamp(18px, 5vw, 22px)',
+                fontWeight: 800,
+                letterSpacing: '0.08em',
+                cursor: (!r3Loading && r3PeteArgument) ? 'pointer' : 'not-allowed',
+                marginBottom: '12px',
+                boxShadow: (!r3Loading && r3PeteArgument) ? '0 4px 0 rgba(0,0,0,0.25)' : 'none',
+                opacity: (!r3Loading && r3PeteArgument) ? 1 : 0.6
+              }}
+            >
+              {r3Loading && !r3PeteArgument ? 'PETE IS THINKING\u2026' : 'DRAFT YOUR THREE \u2192'}
+            </button>
+
+            {/* Subtle back/forfeit */}
+            <button
+              onClick={() => endTournamentAttempt('forfeited-r3')}
+              style={{
+                width: '100%', padding: '10px 20px',
+                background: 'transparent', color: colours.muted,
+                border: `1px solid ${colours.muted}`, borderRadius: '8px',
+                ...condFont, fontSize: '11px', fontWeight: 600, letterSpacing: '0.22em',
+                cursor: 'pointer'
+              }}
+            >
+              FORFEIT \u2014 BACK TO TOURNAMENT
+            </button>
           </div>
-          <div style={{ ...condFont, fontSize: '14px', letterSpacing: '0.2em', color: colours.cream, fontWeight: 600 }}>
-            PETE THE PUNDIT
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT R3 DEFENCE SCREEN ----------
+  // Player writes a 300-char response to Pete's argument.
+  if (screen === 'tournament-r3-defend' && tournamentOpponent) {
+    const petePicks = resolveOpponentPicks(tournamentOpponent);
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '640px' }}>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', marginBottom: '20px', paddingTop: '8px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: '#5fb04a', marginBottom: '6px', fontWeight: 700 }}>
+                ROUND 3 \u2014 YOUR DEFENCE
+              </div>
+              <h1 style={{ ...displayFont, fontSize: 'clamp(28px, 7vw, 38px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                SEND IT TO PETE
+              </h1>
+            </div>
+
+            {/* Recap of both sides */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '8px',
+              marginBottom: '16px'
+            }}>
+              <div style={{ background: colours.surface, padding: '10px 8px' }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.gold, marginBottom: '6px', textAlign: 'center', fontWeight: 700 }}>
+                  YOUR THREE
+                </div>
+                {squad.map((p, i) => (
+                  <div key={i} style={{ ...condFont, fontSize: '11px', color: colours.cream, padding: '2px 0', textAlign: 'center', fontWeight: 600 }}>
+                    {p.name}
+                  </div>
+                ))}
+              </div>
+              <div style={{ background: colours.surface, padding: '10px 8px' }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.muted, marginBottom: '6px', textAlign: 'center', fontWeight: 700 }}>
+                  PETE\u2019S THREE
+                </div>
+                {petePicks.map((p, i) => (
+                  <div key={i} style={{ ...condFont, fontSize: '11px', color: colours.cream, padding: '2px 0', textAlign: 'center', fontWeight: 600 }}>
+                    {p.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Pete's argument (recap) */}
+            {r3PeteArgument && (
+              <div style={{
+                background: 'rgba(95,176,74,0.06)',
+                border: '1px solid rgba(95,176,74,0.20)',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                borderRadius: '6px'
+              }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: '#5fb04a', marginBottom: '8px', fontWeight: 700 }}>
+                  PETE SAID
+                </div>
+                <p style={{ ...condFont, fontSize: '13px', color: colours.cream, margin: 0, lineHeight: 1.45 }}>
+                  {r3PeteArgument.argument}
+                </p>
+                <p style={{ ...condFont, fontStyle: 'italic', fontSize: '12px', color: colours.gold, margin: '8px 0 0 0' }}>
+                  &ldquo;{r3PeteArgument.taunt}&rdquo;
+                </p>
+              </div>
+            )}
+
+            {/* Instruction */}
+            <div style={{ ...condFont, fontSize: '13px', color: colours.cream, marginBottom: '12px', lineHeight: 1.5 }}>
+              Pete\u2019s made his case. Now make yours. Argue for your three. Dismantle his. VAR is listening.
+            </div>
+
+            {/* Textarea */}
+            <textarea
+              value={r3PlayerDefence}
+              onChange={(e) => setR3PlayerDefence(e.target.value.slice(0, 300))}
+              placeholder="Argue your case in 300 characters. Be specific. Engage with Pete\u2019s argument."
+              style={{
+                width: '100%',
+                minHeight: '120px',
+                padding: '14px',
+                background: colours.surface,
+                border: `1px solid rgba(255,255,255,0.12)`,
+                color: colours.cream,
+                ...condFont,
+                fontSize: '14px',
+                lineHeight: 1.5,
+                borderRadius: '6px',
+                resize: 'vertical',
+                boxSizing: 'border-box',
+                marginBottom: '6px'
+              }}
+            />
+            <div style={{ ...condFont, fontSize: '11px', color: colours.muted, marginBottom: '20px', textAlign: 'right' }}>
+              {r3PlayerDefence.length} / 300
+            </div>
+
+            {r3Error && (
+              <div style={{
+                ...condFont, fontSize: '12px', color: colours.accent,
+                marginBottom: '12px', padding: '8px 12px',
+                background: 'rgba(232,52,74,0.10)', border: '1px solid rgba(232,52,74,0.30)',
+                borderRadius: '4px'
+              }}>
+                {r3Error}
+              </div>
+            )}
+
+            {/* Send to Pete */}
+            <button
+              onClick={submitR3Defence}
+              disabled={r3Loading || r3PlayerDefence.trim().length === 0}
+              style={{
+                width: '100%',
+                padding: '18px 20px',
+                background: (!r3Loading && r3PlayerDefence.trim().length > 0) ? colours.gold : '#3a3a44',
+                color: (!r3Loading && r3PlayerDefence.trim().length > 0) ? '#000' : colours.muted,
+                border: 'none',
+                borderRadius: '10px',
+                ...displayFont,
+                fontSize: 'clamp(18px, 5vw, 22px)',
+                fontWeight: 800,
+                letterSpacing: '0.08em',
+                cursor: (!r3Loading && r3PlayerDefence.trim().length > 0) ? 'pointer' : 'not-allowed',
+                marginBottom: '10px',
+                boxShadow: (!r3Loading && r3PlayerDefence.trim().length > 0) ? '0 4px 0 rgba(0,0,0,0.25)' : 'none',
+                opacity: (!r3Loading && r3PlayerDefence.trim().length > 0) ? 1 : 0.6
+              }}
+            >
+              {r3Loading ? 'VAR REVIEWING\u2026' : 'SEND IT TO PETE'}
+            </button>
           </div>
-          <div style={{ ...condFont, fontSize: '14px', color: colours.muted, maxWidth: '420px', lineHeight: 1.6, marginTop: '8px' }}>
-            You’ve beaten Pete’s producer. Round 3 vs Pete the Pundit is being built in Task 6 — the AI defence screen, Pete’s reveal, the trophy on the line. Coming next.
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT R3 VERDICT SCREEN ----------
+  // VAR delivers the comparative verdict. Pete reacts. Trophy awarded on win.
+  if (screen === 'tournament-r3-verdict' && r3VarVerdict && tournamentOpponent) {
+    const playerWon = r3VarVerdict.playerWon;
+    const petePicks = resolveOpponentPicks(tournamentOpponent);
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '640px' }}>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', paddingTop: '8px', marginBottom: '20px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px', fontWeight: 600 }}>
+                VAR DECISION \u2014 ROUND 3
+              </div>
+              {playerWon ? (
+                <>
+                  <div style={{ fontSize: '52px', lineHeight: 1, marginBottom: '6px' }} aria-hidden="true">\ud83c\udfc6</div>
+                  <h1 style={{ ...displayFont, fontSize: 'clamp(38px, 10vw, 56px)', fontWeight: 800, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                    YOU BEAT PETE
+                  </h1>
+                  <div style={{ ...condFont, fontSize: '13px', letterSpacing: '0.22em', color: '#5fb04a', marginTop: '12px', fontWeight: 700 }}>
+                    +1 TROPHY
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h1 style={{ ...displayFont, fontSize: 'clamp(38px, 10vw, 56px)', fontWeight: 800, color: colours.accent, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                    PETE WINS
+                  </h1>
+                  <div style={{ ...condFont, fontSize: '13px', letterSpacing: '0.22em', color: colours.muted, marginTop: '12px', fontWeight: 600 }}>
+                    NO TROPHY TODAY
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* VAR verdict */}
+            <div style={{
+              background: 'rgba(0,0,0,0.30)',
+              borderLeft: `2px solid ${colours.muted}`,
+              padding: '14px 18px',
+              marginBottom: '14px'
+            }}>
+              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px', fontWeight: 700 }}>
+                VAR REVIEW
+              </div>
+              <p style={{ ...condFont, fontSize: '14px', color: colours.cream, margin: 0, lineHeight: 1.55, letterSpacing: '0.02em' }}>
+                {r3VarVerdict.verdict}
+              </p>
+            </div>
+
+            {/* Pete's reaction */}
+            <div style={{
+              background: playerWon ? 'rgba(212,175,55,0.08)' : 'rgba(232,52,74,0.08)',
+              border: `1px solid ${playerWon ? 'rgba(212,175,55,0.30)' : 'rgba(232,52,74,0.30)'}`,
+              padding: '14px 18px',
+              marginBottom: '20px',
+              borderRadius: '6px'
+            }}>
+              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: playerWon ? colours.gold : colours.accent, marginBottom: '8px', fontWeight: 700 }}>
+                PETE\u2019S TAKE
+              </div>
+              <p style={{ ...condFont, fontStyle: 'italic', fontSize: '15px', color: colours.cream, margin: 0, lineHeight: 1.45 }}>
+                &ldquo;{r3PeteReaction}&rdquo;
+              </p>
+            </div>
+
+            {/* Recap — both sides */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '8px',
+              marginBottom: '20px'
+            }}>
+              <div style={{ background: colours.surface, padding: '10px 8px', borderTop: `2px solid ${playerWon ? colours.gold : colours.muted}` }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: playerWon ? colours.gold : colours.muted, marginBottom: '6px', textAlign: 'center', fontWeight: 700 }}>
+                  YOU
+                </div>
+                {squad.map((p, i) => (
+                  <div key={i} style={{ ...condFont, fontSize: '11px', color: colours.cream, padding: '2px 0', textAlign: 'center', fontWeight: 600 }}>
+                    {p.name}
+                  </div>
+                ))}
+              </div>
+              <div style={{ background: colours.surface, padding: '10px 8px', borderTop: `2px solid ${!playerWon ? colours.accent : colours.muted}` }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: !playerWon ? colours.accent : colours.muted, marginBottom: '6px', textAlign: 'center', fontWeight: 700 }}>
+                  PETE
+                </div>
+                {petePicks.map((p, i) => (
+                  <div key={i} style={{ ...condFont, fontSize: '11px', color: colours.cream, padding: '2px 0', textAlign: 'center', fontWeight: 600 }}>
+                    {p.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Back to tournament */}
+            <button
+              onClick={() => endTournamentAttempt(playerWon ? 'won-r3' : 'lost-r3')}
+              style={{
+                width: '100%', padding: '14px 20px',
+                background: playerWon ? colours.gold : 'transparent',
+                color: playerWon ? '#000' : colours.gold,
+                border: playerWon ? 'none' : `2px solid ${colours.gold}`,
+                borderRadius: '10px',
+                ...displayFont, fontSize: '16px', fontWeight: 700, letterSpacing: '0.12em',
+                cursor: 'pointer',
+                boxShadow: playerWon ? '0 4px 0 rgba(0,0,0,0.25)' : 'none'
+              }}
+            >
+              \u2190 BACK TO TOURNAMENT
+            </button>
           </div>
-          <button
-            onClick={() => endTournamentAttempt('reached-r3')}
-            style={{
-              marginTop: '12px', padding: '14px 28px', background: 'transparent',
-              color: colours.gold, border: `2px solid ${colours.gold}`, borderRadius: '8px',
-              ...displayFont, fontSize: '15px', fontWeight: 700, letterSpacing: '0.12em', cursor: 'pointer'
-            }}
-          >
-            ← BACK TO TOURNAMENT
-          </button>
         </div>
         <Analytics />
       </>
