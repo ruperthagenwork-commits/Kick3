@@ -5750,7 +5750,6 @@ Deliver your verdict as JSON.`;
     );
   }
 
-  // ---------- TOURNAMENT R3 PLACEHOLDER (Task 6 will replace this) ----------
   // ---------- TOURNAMENT R3 INTRO SCREEN ----------
   // Earns the moment. Pete-on-the-lounger banner, Pete's three picks visible,
   // Pete's AI-generated argument shown, then the player drafts.
@@ -5781,13 +5780,13 @@ Deliver your verdict as JSON.`;
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
               <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: '#5fb04a', marginBottom: '8px', fontWeight: 700 }}>
-                ROUND 3 \u2014 THE FINAL
+                ROUND 3 — THE FINAL
               </div>
               <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 9vw, 52px)', fontWeight: 800, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
                 PETE THE PUNDIT
               </h1>
               <p style={{ ...condFont, fontStyle: 'italic', fontSize: '14px', color: colours.cream, marginTop: '14px', marginBottom: 0, opacity: 0.9 }}>
-                &ldquo;Oh. You\u2019re still here. Sit down.&rdquo;
+                &ldquo;Oh. You’re still here. Sit down.&rdquo;
               </p>
             </div>
 
@@ -5804,7 +5803,7 @@ Deliver your verdict as JSON.`;
             {/* Pete's three picks */}
             <div style={{ marginBottom: '20px' }}>
               <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: colours.muted, marginBottom: '8px', fontWeight: 700 }}>
-                PETE\u2019S THREE
+                PETE’S THREE
               </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {petePicks.map((p, i) => (
@@ -5836,11 +5835,11 @@ Deliver your verdict as JSON.`;
               borderRadius: '8px'
             }}>
               <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: '#5fb04a', marginBottom: '12px', fontWeight: 700 }}>
-                PETE\u2019S ARGUMENT
+                PETE’S ARGUMENT
               </div>
               {r3Loading && !r3PeteArgument ? (
                 <p style={{ ...condFont, fontStyle: 'italic', color: colours.muted, margin: 0, fontSize: '14px' }}>
-                  Pete is sharpening his case\u2026
+                  Pete is sharpening his case…
                 </p>
               ) : r3PeteArgument ? (
                 <>
@@ -5853,7 +5852,7 @@ Deliver your verdict as JSON.`;
                 </>
               ) : (
                 <p style={{ ...condFont, color: colours.accent, margin: 0, fontSize: '14px' }}>
-                  Couldn\u2019t reach Pete. Try again in a moment.
+                  Couldn’t reach Pete. Try again in a moment.
                 </p>
               )}
               {r3Error && (
@@ -5890,7 +5889,7 @@ Deliver your verdict as JSON.`;
                 opacity: (!r3Loading && r3PeteArgument) ? 1 : 0.6
               }}
             >
-              {r3Loading && !r3PeteArgument ? 'PETE IS THINKING\u2026' : 'DRAFT YOUR THREE \u2192'}
+              {r3Loading && !r3PeteArgument ? 'PETE IS THINKING…' : 'DRAFT YOUR THREE →'}
             </button>
 
             {/* Subtle back/forfeit */}
@@ -5904,7 +5903,7 @@ Deliver your verdict as JSON.`;
                 cursor: 'pointer'
               }}
             >
-              FORFEIT \u2014 BACK TO TOURNAMENT
+              FORFEIT — BACK TO TOURNAMENT
             </button>
           </div>
         </div>
@@ -5927,7 +5926,7 @@ Deliver your verdict as JSON.`;
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: '20px', paddingTop: '8px' }}>
               <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: '#5fb04a', marginBottom: '6px', fontWeight: 700 }}>
-                ROUND 3 \u2014 YOUR DEFENCE
+                ROUND 3 — YOUR DEFENCE
               </div>
               <h1 style={{ ...displayFont, fontSize: 'clamp(28px, 7vw, 38px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
                 SEND IT TO PETE
@@ -5953,7 +5952,7 @@ Deliver your verdict as JSON.`;
               </div>
               <div style={{ background: colours.surface, padding: '10px 8px' }}>
                 <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.muted, marginBottom: '6px', textAlign: 'center', fontWeight: 700 }}>
-                  PETE\u2019S THREE
+                  PETE’S THREE
                 </div>
                 {petePicks.map((p, i) => (
                   <div key={i} style={{ ...condFont, fontSize: '11px', color: colours.cream, padding: '2px 0', textAlign: 'center', fontWeight: 600 }}>
@@ -5986,7 +5985,7 @@ Deliver your verdict as JSON.`;
 
             {/* Instruction */}
             <div style={{ ...condFont, fontSize: '13px', color: colours.cream, marginBottom: '12px', lineHeight: 1.5 }}>
-              Pete\u2019s made his case. Now make yours. Argue for your three. Dismantle his. VAR is listening.
+              Pete’s made his case. Now make yours. Argue for your three. Dismantle his. VAR is listening.
             </div>
 
             {/* Textarea */}
@@ -6046,7 +6045,7 @@ Deliver your verdict as JSON.`;
                 opacity: (!r3Loading && r3PlayerDefence.trim().length > 0) ? 1 : 0.6
               }}
             >
-              {r3Loading ? 'VAR REVIEWING\u2026' : 'SEND IT TO PETE'}
+              {r3Loading ? 'VAR REVIEWING…' : 'SEND IT TO PETE'}
             </button>
           </div>
         </div>
@@ -6070,7 +6069,7 @@ Deliver your verdict as JSON.`;
             {/* Header */}
             <div style={{ textAlign: 'center', paddingTop: '8px', marginBottom: '20px' }}>
               <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px', fontWeight: 600 }}>
-                VAR DECISION \u2014 ROUND 3
+                VAR DECISION — ROUND 3
               </div>
               {playerWon ? (
                 <>
@@ -6118,7 +6117,7 @@ Deliver your verdict as JSON.`;
               borderRadius: '6px'
             }}>
               <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: playerWon ? colours.gold : colours.accent, marginBottom: '8px', fontWeight: 700 }}>
-                PETE\u2019S TAKE
+                PETE’S TAKE
               </div>
               <p style={{ ...condFont, fontStyle: 'italic', fontSize: '15px', color: colours.cream, margin: 0, lineHeight: 1.45 }}>
                 &ldquo;{r3PeteReaction}&rdquo;
