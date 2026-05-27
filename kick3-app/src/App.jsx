@@ -972,6 +972,128 @@ const hasPlayedTournamentToday = (state, date = new Date()) => {
   return state.lastPlayedDate === todayDateString(date);
 };
 
+// ============ TOURNAMENT MODE — STUB CONTENT ============
+// Placeholder content for Task 5 build. Real content lands in Phase 2.
+// Each opponent has: name, vibe (descriptor), three picks (by name), and a loss-message
+// delivered by Pete when the player loses to them.
+
+const STUB_OPPONENTS = {
+  pubmate: {
+    key: 'pubmate',
+    label: "PETE'S PUB MATE",
+    shortLabel: "PUB MATE",
+    vibe: "Loud, emotional, picks the obvious legends.",
+    // Three picks by name — must match names in PLAYER_POOL. Mid-low totals = beatable.
+    picks: ["Diego Maradona", "Pel\u00e9", "Ronaldinho"],
+    // Pete's reaction when the player loses to him.
+    peteLossLine: "You couldn\u2019t beat my pub mate. My PUB MATE. Off you trot.",
+    roundNumber: 1,
+  },
+  producer: {
+    key: 'producer',
+    label: "PETE'S PRODUCER",
+    shortLabel: "PRODUCER",
+    vibe: "Data-driven, dry, all numbers and no soul.",
+    // Three picks by name. Mid-high totals = harder.
+    picks: ["Luka Modri\u0107", "N'Golo Kant\u00e9", "Robert Lewandowski"],
+    peteLossLine: "My producer just out-pundited you. Have a long think about that overnight.",
+    roundNumber: 2,
+  },
+};
+
+// Deterministic attribute scoring stub.
+// Real Phase 2 will replace this with hand-authored scores per player.
+// For testing now: a small hash of the player name produces 5 attribute scores (1-10).
+// Same name → same scores every time. Predictable, comparable across draws.
+const stubAttributeScores = (playerName) => {
+  // Simple deterministic hash. Don't use this for anything important.
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < playerName.length; i++) {
+    h ^= playerName.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  // Five attribute scores in 1-10 range, derived from the hash.
+  const scoreFrom = (seed) => 1 + (seed % 10);
+  return {
+    'One-Off':     scoreFrom(h),
+    'Season-Long': scoreFrom(h >>> 3),
+    'Style':       scoreFrom(h >>> 7),
+    'Character':   scoreFrom(h >>> 11),
+    'Chaos':       scoreFrom(h >>> 17),
+    'Legacy':      scoreFrom(h >>> 23),
+  };
+};
+
+// Total a team's attribute score against a category.
+const scoreTeamOnAttribute = (players, attribute) => {
+  return players.reduce((sum, p) => {
+    const scores = stubAttributeScores(p.name || p);
+    return sum + (scores[attribute] || 0);
+  }, 0);
+};
+
+// Resolve opponent picks (by name) against PLAYER_POOL. Returns full player objects.
+// If a name doesn't exist in the pool (Phase 2 will use the World Cup pool, not the daily pool),
+// returns a minimal placeholder so the UI still renders.
+const resolveOpponentPicks = (opponent) => {
+  return opponent.picks.map((name) => {
+    const found = PLAYER_POOL.find(p => p.name === name);
+    if (found) return found;
+    return { name, tier: 'Star', position: 'MID', flag: '\u2691' };
+  });
+};
+
+// Pick a random attribute category for a tournament round.
+// Deterministic per (round, date) so the same trio gives the same attribute for 3 days.
+const pickTournamentAttribute = (roundNumber, date = new Date()) => {
+  const attrs = ['One-Off', 'Season-Long', 'Style', 'Character', 'Chaos'];
+  const start = parseTournamentDate(TOURNAMENT_CONFIG.startDate);
+  const dayAnchor = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0));
+  const offset = Math.max(0, daysBetween(start, dayAnchor));
+  const trioIndex = Math.floor(offset / TOURNAMENT_CONFIG.daysPerTrio);
+  // Different attribute per round but stable per trio.
+  return attrs[(trioIndex * 3 + roundNumber - 1) % attrs.length];
+};
+
+// Stub question text for a tournament round. Real questions land in Phase 2.
+const stubTournamentQuestion = (roundNumber, attribute) => {
+  const opener = roundNumber === 1
+    ? "Round 1"
+    : roundNumber === 2
+      ? "Round 2"
+      : "Round 3";
+  const map = {
+    'One-Off':     `${opener}: pick three for a one-off cup tie you have to win.`,
+    'Season-Long': `${opener}: pick three to grind out a full season title.`,
+    'Style':       `${opener}: pick three you'd pay to watch.`,
+    'Character':   `${opener}: pick three to lead a dressing room.`,
+    'Chaos':       `${opener}: pick three to cause the most chaos on the pitch.`,
+  };
+  return map[attribute] || `${opener}: pick three.`;
+};
+
+// VAR voice — dry procedural phrases for Round 1/2 outcomes.
+// Phase 2 expands to 12-15; Task 5 gets a small set for testing the flow.
+const VAR_PHRASES = {
+  winDominant:  "After review: decisive. You advance.",
+  winNarrow:    "After review: marginal. You advance.",
+  winLegacy:    "Tied on attribute. Legacy tiebreak in your favour. You advance.",
+  lossDominant: "After review: comprehensive defeat. No advance.",
+  lossNarrow:   "After review: marginal defeat. No advance.",
+};
+
+const pickVarPhrase = (playerTotal, opponentTotal, viaLegacy) => {
+  if (playerTotal > opponentTotal) {
+    return (playerTotal - opponentTotal) >= 5 ? VAR_PHRASES.winDominant : VAR_PHRASES.winNarrow;
+  }
+  if (playerTotal === opponentTotal && viaLegacy) {
+    return VAR_PHRASES.winLegacy;
+  }
+  return (opponentTotal - playerTotal) >= 5 ? VAR_PHRASES.lossDominant : VAR_PHRASES.lossNarrow;
+};
+
+// ============ END TOURNAMENT MODE — STUB CONTENT ============
+
 // ============ END TOURNAMENT MODE — FOUNDATIONS ============
 
 export default function Kick3() {
@@ -1015,6 +1137,19 @@ export default function Kick3() {
   const [tournamentBetaActive] = useState(() => {
     try { return isTournamentBetaActive(); } catch { return false; }
   });
+
+  // ============ TOURNAMENT MODE — IN-PLAY STATE ============
+  // Tracks state while a tournament attempt is in progress.
+  //   tournamentRound:        1, 2, or 3 — which round is being played right now
+  //   tournamentOpponent:     full opponent object from STUB_OPPONENTS (or null)
+  //   tournamentAttribute:    string attribute name for the current round's scoring
+  //   tournamentQuestionText: the round's question (stub for now, real in Phase 2)
+  //   tournamentVarResult:    { playerTotal, opponentTotal, viaLegacy, won, phrase } after VAR computes
+  const [tournamentRound, setTournamentRound] = useState(0);
+  const [tournamentOpponent, setTournamentOpponent] = useState(null);
+  const [tournamentAttribute, setTournamentAttribute] = useState(null);
+  const [tournamentQuestionText, setTournamentQuestionText] = useState('');
+  const [tournamentVarResult, setTournamentVarResult] = useState(null);
 
   // ============ STREAK LOGIC ============
   // Three values persisted to localStorage:
@@ -1331,6 +1466,94 @@ export default function Kick3() {
     setScreen('draft');
   };
 
+  // ============ TOURNAMENT — round entry helpers ============
+  // Start a tournament attempt at Round 1 (called by PLAY NOW on tournament home).
+  // Increments tournamentsAttempted in localStorage.
+  const startTournament = () => {
+    const opponent = STUB_OPPONENTS.pubmate;
+    const attribute = pickTournamentAttribute(1);
+    const questionText = stubTournamentQuestion(1, attribute);
+
+    // Mark this as a fresh attempt in state.
+    const state = readTournamentState();
+    writeTournamentState({
+      ...state,
+      tournamentsAttempted: (state.tournamentsAttempted || 0) + 1,
+    });
+
+    setMode('tournament');
+    setDraftRounds(generateDraft());
+    setCurrentRound(0);
+    setSquad([]);
+    setSentence('');
+    setError(null);
+    setTournamentRound(1);
+    setTournamentOpponent(opponent);
+    setTournamentAttribute(attribute);
+    setTournamentQuestionText(questionText);
+    setTournamentVarResult(null);
+    setScreen('draft');
+  };
+
+  // Advance from a completed Round 1 to Round 2 vs Pete's Producer.
+  const advanceToRound2 = () => {
+    const opponent = STUB_OPPONENTS.producer;
+    const attribute = pickTournamentAttribute(2);
+    const questionText = stubTournamentQuestion(2, attribute);
+
+    setDraftRounds(generateDraft(squad.map(p => p.name)));
+    setCurrentRound(0);
+    setSquad([]);
+    setTournamentRound(2);
+    setTournamentOpponent(opponent);
+    setTournamentAttribute(attribute);
+    setTournamentQuestionText(questionText);
+    setTournamentVarResult(null);
+    setScreen('draft');
+  };
+
+  // Compute the VAR result for the current round and route to the verdict screen.
+  const computeTournamentVar = (finishedSquad) => {
+    const opponentPicks = resolveOpponentPicks(tournamentOpponent);
+    const playerTotal = scoreTeamOnAttribute(finishedSquad, tournamentAttribute);
+    const opponentTotal = scoreTeamOnAttribute(opponentPicks, tournamentAttribute);
+    let won;
+    let viaLegacy = false;
+    if (playerTotal > opponentTotal) {
+      won = true;
+    } else if (playerTotal === opponentTotal) {
+      // Tiebreak on Legacy. Player wins remaining ties.
+      const playerLegacy = scoreTeamOnAttribute(finishedSquad, 'Legacy');
+      const oppLegacy = scoreTeamOnAttribute(opponentPicks, 'Legacy');
+      won = playerLegacy >= oppLegacy;
+      viaLegacy = true;
+    } else {
+      won = false;
+    }
+    const phrase = pickVarPhrase(playerTotal, opponentTotal, viaLegacy);
+    setTournamentVarResult({ playerTotal, opponentTotal, viaLegacy, won, phrase });
+    setScreen('tournament-var');
+  };
+
+  // Called from the VAR screen on a loss (Round 1 or 2).
+  // Writes the end-of-attempt state and returns the player to the tournament home.
+  const endTournamentAttempt = (resultKey) => {
+    const state = readTournamentState();
+    writeTournamentState({
+      ...state,
+      lastPlayedDate: todayDateString(),
+      lastAttemptResult: resultKey,
+    });
+    // Reset tournament in-play state.
+    setTournamentRound(0);
+    setTournamentOpponent(null);
+    setTournamentAttribute(null);
+    setTournamentQuestionText('');
+    setTournamentVarResult(null);
+    setSquad([]);
+    setScreen('tournament-home');
+  };
+
   const startH2H = () => {
     if (h2hLocked) return; // Daily limit reached — button should be locked anyway
     setMode('h2h');
@@ -1365,7 +1588,10 @@ export default function Kick3() {
       setCurrentRound(currentRound + 1);
     } else {
       // Done drafting
-      if (mode === 'solo') {
+      if (mode === 'tournament') {
+        // Tournament: skip the defence screen, route straight to VAR verdict.
+        computeTournamentVar(newSquad);
+      } else if (mode === 'solo') {
         setScreen('defend');
       } else {
         // h2h
@@ -2736,6 +2962,54 @@ Deliver your verdict as JSON.`;
               </div>
             )}
 
+            {/* Tournament round banner — shows opponent and their three picks */}
+            {mode === 'tournament' && tournamentOpponent && (
+              <div style={{
+                marginBottom: '20px',
+                padding: '12px 14px',
+                background: 'rgba(95,176,74,0.10)',
+                border: '1px solid rgba(95,176,74,0.40)',
+                borderRadius: '8px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: '#5fb04a', fontWeight: 700 }}>
+                    ROUND {tournamentRound} OF 3
+                  </div>
+                  <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.24em', color: colours.muted }}>
+                    {tournamentAttribute && `\u2022 ${tournamentAttribute.toUpperCase()}`}
+                  </div>
+                </div>
+                <div style={{ ...displayFont, fontSize: '20px', fontWeight: 700, color: colours.cream, letterSpacing: '0.04em', marginBottom: '4px' }}>
+                  VS {tournamentOpponent.label}
+                </div>
+                <div style={{ ...condFont, fontStyle: 'italic', fontSize: '12px', color: colours.muted, marginBottom: '10px', lineHeight: 1.4 }}>
+                  {tournamentOpponent.vibe}
+                </div>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.muted, marginBottom: '6px' }}>
+                  THEIR THREE
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {resolveOpponentPicks(tournamentOpponent).map((p, i) => (
+                    <div key={i} style={{
+                      padding: '5px 9px',
+                      background: 'rgba(0,0,0,0.30)',
+                      border: `1px solid ${TIER_COLOURS[p.tier] || '#888'}66`,
+                      fontSize: '12px',
+                      ...condFont,
+                      fontWeight: 600,
+                      color: colours.cream,
+                      borderRadius: '4px'
+                    }}>
+                      <span style={{ color: TIER_COLOURS[p.tier] || '#888', marginRight: '4px' }}>
+                        {TIER_SYMBOLS[p.tier] || '\u2022'}
+                      </span>
+                      {p.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Top bar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', paddingTop: '8px' }}>
               <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.3em', color: colours.gold }}>
@@ -2757,7 +3031,7 @@ Deliver your verdict as JSON.`;
                 THE QUESTION
               </div>
               <p style={{ ...displayFont, fontSize: '18px', margin: 0, lineHeight: '1.2' }}>
-                {TODAYS_QUESTION.text}
+                {mode === 'tournament' ? tournamentQuestionText : TODAYS_QUESTION.text}
               </p>
             </div>
 
@@ -4610,7 +4884,7 @@ Deliver your verdict as JSON.`;
 
               {/* PLAY NOW — green */}
               <button
-                onClick={() => { /* Wired up in Task 5 */ }}
+                onClick={canPlay ? startTournament : undefined}
                 disabled={!canPlay}
                 style={{
                   width: '100%',
@@ -4758,7 +5032,7 @@ Deliver your verdict as JSON.`;
 
                 {/* PLAY NOW — green */}
                 <button
-                  onClick={() => { /* Wired up in Task 5 */ }}
+                  onClick={canPlay ? startTournament : undefined}
                   disabled={!canPlay}
                   className="kick3-tour-btn-play"
                   style={{
@@ -5019,6 +5293,266 @@ Deliver your verdict as JSON.`;
               ← BACK TO TOURNAMENT
             </button>
           </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT VAR VERDICT SCREEN ----------
+  // Shows after each Round 1 or Round 2 draft completes. Reveals both teams,
+  // attribute totals, VAR phrase, and routes onward (next round on win, end on loss).
+  if (screen === 'tournament-var' && tournamentVarResult && tournamentOpponent) {
+    const r = tournamentVarResult;
+    const opponentPicks = resolveOpponentPicks(tournamentOpponent);
+    const isFinalRound = tournamentRound >= 2; // Task 5 stops here; Task 6 wires R3.
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '640px' }}>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', paddingTop: '8px', marginBottom: '20px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: '#5fb04a', marginBottom: '6px', fontWeight: 600 }}>
+                ROUND {tournamentRound} \u2014 VS {tournamentOpponent.shortLabel}
+              </div>
+              <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: r.won ? '#5fb04a' : colours.accent, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                {r.won ? 'YOU ADVANCE' : 'YOU LOST'}
+              </h1>
+              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.3em', color: colours.muted, marginTop: '10px' }}>
+                VAR DECISION \u2022 {tournamentAttribute && tournamentAttribute.toUpperCase()}
+              </div>
+            </div>
+
+            {/* Score line — big and central */}
+            <div style={{
+              background: colours.surface,
+              padding: '22px 16px',
+              textAlign: 'center',
+              marginBottom: '14px',
+              borderTop: `2px solid ${r.won ? '#5fb04a' : colours.accent}`
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'baseline', gap: '24px' }}>
+                <div>
+                  <div style={{ ...displayFont, fontSize: '48px', fontWeight: 700, color: r.won ? '#5fb04a' : colours.cream, lineHeight: 1 }}>
+                    {r.playerTotal}
+                  </div>
+                  <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.24em', color: colours.muted, marginTop: '6px' }}>
+                    YOU
+                  </div>
+                </div>
+                <div style={{ ...condFont, fontSize: '14px', color: colours.muted, fontWeight: 600 }}>vs</div>
+                <div>
+                  <div style={{ ...displayFont, fontSize: '48px', fontWeight: 700, color: r.won ? colours.cream : colours.accent, lineHeight: 1 }}>
+                    {r.opponentTotal}
+                  </div>
+                  <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.24em', color: colours.muted, marginTop: '6px' }}>
+                    {tournamentOpponent.shortLabel}
+                  </div>
+                </div>
+              </div>
+              {r.viaLegacy && (
+                <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, marginTop: '12px', fontStyle: 'italic' }}>
+                  TIED ON {tournamentAttribute.toUpperCase()} \u2014 LEGACY TIEBREAK
+                </div>
+              )}
+            </div>
+
+            {/* VAR phrase — dry, procedural */}
+            <div style={{
+              ...condFont,
+              fontSize: '13px',
+              color: colours.cream,
+              textAlign: 'center',
+              padding: '14px 16px',
+              background: 'rgba(0,0,0,0.30)',
+              borderLeft: `2px solid ${colours.muted}`,
+              marginBottom: r.won ? '20px' : '14px',
+              lineHeight: 1.5,
+              letterSpacing: '0.04em'
+            }}>
+              {r.phrase}
+            </div>
+
+            {/* Pete's loss line — only on loss */}
+            {!r.won && (
+              <div style={{
+                background: 'rgba(232,52,74,0.08)',
+                border: '1px solid rgba(232,52,74,0.30)',
+                padding: '16px',
+                marginBottom: '20px',
+                borderRadius: '6px'
+              }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: colours.accent, marginBottom: '8px', fontWeight: 700 }}>
+                  PETE'S TAKE
+                </div>
+                <p style={{ ...condFont, fontStyle: 'italic', fontSize: '15px', color: colours.cream, margin: 0, lineHeight: 1.45 }}>
+                  &ldquo;{tournamentOpponent.peteLossLine}&rdquo;
+                </p>
+              </div>
+            )}
+
+            {/* Teams side-by-side */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '10px',
+              marginBottom: '24px'
+            }}>
+              {/* Player squad */}
+              <div style={{ background: colours.surface, padding: '12px 10px' }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.gold, marginBottom: '10px', textAlign: 'center', fontWeight: 700 }}>
+                  YOUR THREE
+                </div>
+                {squad.map((p, i) => {
+                  const sc = stubAttributeScores(p.name)[tournamentAttribute] || 0;
+                  return (
+                    <div key={i} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '6px 4px',
+                      borderBottom: i < 2 ? `1px solid rgba(255,255,255,0.05)` : 'none',
+                      ...condFont,
+                      fontSize: '12px'
+                    }}>
+                      <span style={{ color: colours.cream, fontWeight: 600 }}>{p.name}</span>
+                      <span style={{ color: colours.gold, fontWeight: 700, fontSize: '14px' }}>{sc}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Opponent squad */}
+              <div style={{ background: colours.surface, padding: '12px 10px' }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.muted, marginBottom: '10px', textAlign: 'center', fontWeight: 700 }}>
+                  THEIR THREE
+                </div>
+                {opponentPicks.map((p, i) => {
+                  const sc = stubAttributeScores(p.name)[tournamentAttribute] || 0;
+                  return (
+                    <div key={i} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '6px 4px',
+                      borderBottom: i < 2 ? `1px solid rgba(255,255,255,0.05)` : 'none',
+                      ...condFont,
+                      fontSize: '12px'
+                    }}>
+                      <span style={{ color: colours.cream, fontWeight: 600 }}>{p.name}</span>
+                      <span style={{ color: colours.muted, fontWeight: 700, fontSize: '14px' }}>{sc}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Action button — depends on outcome and round */}
+            {r.won && !isFinalRound && (
+              <button
+                onClick={advanceToRound2}
+                style={{
+                  width: '100%',
+                  padding: '16px 20px',
+                  background: '#5fb04a',
+                  color: '#0a1a08',
+                  border: 'none',
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(18px, 5vw, 22px)',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  cursor: 'pointer',
+                  marginBottom: '10px',
+                  boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                }}
+              >
+                <span>CONTINUE TO ROUND 2</span>
+                <span style={{ fontSize: '22px', lineHeight: 1 }}>\u2192</span>
+              </button>
+            )}
+            {r.won && isFinalRound && (
+              <button
+                onClick={() => setScreen('tournament-r3-placeholder')}
+                style={{
+                  width: '100%',
+                  padding: '16px 20px',
+                  background: '#5fb04a',
+                  color: '#0a1a08',
+                  border: 'none',
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(18px, 5vw, 22px)',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  cursor: 'pointer',
+                  marginBottom: '10px',
+                  boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                }}
+              >
+                <span>CONTINUE TO ROUND 3</span>
+                <span style={{ fontSize: '22px', lineHeight: 1 }}>\u2192</span>
+              </button>
+            )}
+            <button
+              onClick={() => endTournamentAttempt(r.won ? `won-r${tournamentRound}` : `lost-r${tournamentRound}`)}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                background: 'transparent',
+                color: colours.muted,
+                border: `1px solid ${colours.muted}`,
+                borderRadius: '8px',
+                ...condFont,
+                fontSize: '12px',
+                fontWeight: 600,
+                letterSpacing: '0.2em',
+                cursor: 'pointer'
+              }}
+            >
+              \u2190 BACK TO TOURNAMENT
+            </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT R3 PLACEHOLDER (Task 6 will replace this) ----------
+  if (screen === 'tournament-r3-placeholder') {
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={{
+          minHeight: '100vh', width: '100%', background: colours.bg, color: colours.text,
+          padding: '40px 24px', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: '20px', textAlign: 'center'
+        }}>
+          <div style={{ ...displayFont, fontSize: 'clamp(28px, 6vw, 40px)', fontWeight: 800, color: '#5fb04a', letterSpacing: '0.06em' }}>
+            ROUND 3
+          </div>
+          <div style={{ ...condFont, fontSize: '14px', letterSpacing: '0.2em', color: colours.cream, fontWeight: 600 }}>
+            PETE THE PUNDIT
+          </div>
+          <div style={{ ...condFont, fontSize: '14px', color: colours.muted, maxWidth: '420px', lineHeight: 1.6, marginTop: '8px' }}>
+            You\u2019ve beaten Pete\u2019s producer. Round 3 vs Pete the Pundit is being built in Task 6 \u2014 the AI defence screen, Pete\u2019s reveal, the trophy on the line. Coming next.
+          </div>
+          <button
+            onClick={() => endTournamentAttempt('reached-r3')}
+            style={{
+              marginTop: '12px', padding: '14px 28px', background: 'transparent',
+              color: colours.gold, border: `2px solid ${colours.gold}`, borderRadius: '8px',
+              ...displayFont, fontSize: '15px', fontWeight: 700, letterSpacing: '0.12em', cursor: 'pointer'
+            }}
+          >
+            \u2190 BACK TO TOURNAMENT
+          </button>
         </div>
         <Analytics />
       </>
