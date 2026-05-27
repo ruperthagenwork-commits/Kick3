@@ -1002,6 +1002,7 @@ export default function Kick3() {
   const soloCardRef = useRef(null);
   const h2hCardRef = useRef(null);
   const statsCardRef = useRef(null);
+  const recordCardRef = useRef(null);
 
   // Share state — shows feedback in the share button.
   const [shareState, setShareState] = useState('idle'); // 'idle' | 'working' | 'shared' | 'copied' | 'error'
@@ -1221,6 +1222,54 @@ export default function Kick3() {
         await navigator.share({
           files: [file],
           title: 'Kick 3 — My Stats',
+          text: shareText
+        });
+        setShareState('shared');
+      } else if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/jpeg': blob })
+        ]);
+        setShareState('copied');
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        setShareState('shared');
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        setShareState('idle');
+        return;
+      }
+      console.error('Share failed:', err);
+      setShareState('error');
+    } finally {
+      setTimeout(() => setShareState('idle'), 2500);
+    }
+  };
+
+  // SHARE TOURNAMENT RECORD — same pattern as shareStats, for the tournament RECORD screen.
+  const shareRecord = async () => {
+    setShareState('working');
+    try {
+      const blob = await renderCardToBlob(recordCardRef);
+      if (!blob) throw new Error('Render failed');
+
+      const filename = `kick3-tournament-record.jpg`;
+      const file = new File([blob], filename, { type: 'image/jpeg' });
+
+      const state = readTournamentState();
+      const shareText = state.trophyCount > 0
+        ? `${state.trophyCount} Kick 3 trophies. Beat Pete to win one — kick3.app`
+        : `Tournament mode on Kick 3 — kick3.app`;
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Kick 3 — Tournament Record',
           text: shareText
         });
         setShareState('shared');
@@ -4596,28 +4645,27 @@ Deliver your verdict as JSON.`;
                 )}
               </button>
 
-              {/* RECORD — gold outline, inactive in Task 3 */}
+              {/* RECORD — gold outline, active (opens tournament-record screen) */}
               <button
-                disabled
+                onClick={() => setScreen('tournament-record')}
                 style={{
                   width: '100%',
                   padding: '15px 20px',
                   background: 'transparent',
-                  color: colours.muted,
-                  border: `2px solid ${colours.muted}`,
+                  color: colours.gold,
+                  border: `2px solid ${colours.gold}`,
                   borderRadius: '10px',
                   ...displayFont,
                   fontSize: 'clamp(16px, 4.4vw, 19px)',
                   fontWeight: 700,
                   letterSpacing: '0.12em',
-                  cursor: 'not-allowed',
+                  cursor: 'pointer',
                   marginBottom: '24px',
-                  opacity: 0.6,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
                 }}
               >
                 <span style={{ fontSize: '16px' }} aria-hidden="true">🏆</span>
-                <span>RECORD (COMING SOON)</span>
+                <span>RECORD</span>
               </button>
 
               {/* Pete taunt */}
@@ -4746,28 +4794,27 @@ Deliver your verdict as JSON.`;
                   )}
                 </button>
 
-                {/* RECORD — gold outline, inactive */}
+                {/* RECORD — gold outline, active */}
                 <button
-                  disabled
+                  onClick={() => setScreen('tournament-record')}
                   style={{
                     width: '100%',
                     padding: '18px 24px',
                     background: 'transparent',
-                    color: colours.muted,
-                    border: `2px solid ${colours.muted}`,
+                    color: colours.gold,
+                    border: `2px solid ${colours.gold}`,
                     borderRadius: '12px',
                     ...displayFont,
                     fontSize: 'clamp(18px, 1.8vw, 22px)',
                     fontWeight: 700,
                     letterSpacing: '0.12em',
-                    cursor: 'not-allowed',
+                    cursor: 'pointer',
                     marginBottom: '28px',
-                    opacity: 0.6,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
                   }}
                 >
                   <span style={{ fontSize: '18px' }} aria-hidden="true">🏆</span>
-                  <span>RECORD (COMING SOON)</span>
+                  <span>RECORD</span>
                 </button>
 
                 {/* Pete taunt */}
@@ -4789,6 +4836,189 @@ Deliver your verdict as JSON.`;
             </div>
           </div>
 
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT RECORD SCREEN ----------
+  // Shows lifetime tournament stats: trophies, attempts, win rate against Pete.
+  // Shareable via the existing share-card mechanism.
+  if (screen === 'tournament-record') {
+    const recordState = readTournamentState();
+    const trophies = recordState.trophyCount || 0;
+    const attempts = recordState.tournamentsAttempted || 0;
+    const completed = recordState.tournamentsCompleted || 0;
+    // Win rate vs Pete = trophies / tournaments that reached Round 3.
+    const winRate = completed > 0
+      ? `${Math.round((trophies / completed) * 100)}% (${trophies} of ${completed})`
+      : '—';
+    const isEmpty = attempts === 0;
+
+    // Pete's read on the record — quick flavour line.
+    const peteRead = (() => {
+      if (isEmpty) return "Your record is empty. Time to fix that.";
+      if (trophies === 0 && completed > 0) return `${completed} attempt${completed === 1 ? '' : 's'} at me. Nought trophies. Have another go.`;
+      if (trophies === 1) return "One trophy. A start.";
+      if (trophies >= 5) return `${trophies} trophies. Beginning to think you might know football.`;
+      return `${trophies} trophies. Not bad.`;
+    })();
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '640px' }}>
+
+            {/* Capturable region — everything inside this ref becomes the share image. */}
+            <div ref={recordCardRef} style={{
+              background: colours.bg,
+              padding: '20px 16px 24px',
+              marginBottom: '20px'
+            }}>
+              {/* Header */}
+              <div style={{ textAlign: 'center', paddingTop: '4px', marginBottom: '24px' }}>
+                <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: '#5fb04a', marginBottom: '8px', fontWeight: 600 }}>
+                  TOURNAMENT
+                </div>
+                <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                  MY RECORD
+                </h1>
+              </div>
+
+              {/* TROPHIES — hero stat */}
+              <div style={{
+                background: colours.surface,
+                padding: '28px 16px',
+                textAlign: 'center',
+                borderTop: `2px solid ${isEmpty ? colours.muted : colours.gold}`,
+                marginBottom: '12px'
+              }}>
+                <div style={{ fontSize: '40px', lineHeight: 1, marginBottom: '8px' }} aria-hidden="true">🏆</div>
+                <div style={{
+                  ...displayFont,
+                  fontSize: 'clamp(56px, 14vw, 80px)',
+                  fontWeight: 700,
+                  color: isEmpty ? colours.muted : colours.gold,
+                  lineHeight: 1
+                }}>
+                  {trophies}
+                </div>
+                <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.3em', color: colours.muted, marginTop: '10px' }}>
+                  {trophies === 1 ? 'TROPHY' : 'TROPHIES'}
+                </div>
+              </div>
+
+              {/* ATTEMPTS + WIN RATE — two-up grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '10px',
+                marginBottom: '24px'
+              }}>
+                <div style={{ background: colours.surface, padding: '16px 10px', textAlign: 'center', borderTop: `2px solid ${colours.cream}` }}>
+                  <div style={{ ...displayFont, fontSize: '32px', fontWeight: 700, color: isEmpty ? colours.muted : colours.cream, lineHeight: 1 }}>
+                    {attempts}
+                  </div>
+                  <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.22em', color: colours.muted, marginTop: '6px' }}>
+                    ATTEMPTED
+                  </div>
+                </div>
+                <div style={{ background: colours.surface, padding: '16px 10px', textAlign: 'center', borderTop: `2px solid #5fb04a` }}>
+                  <div style={{
+                    ...displayFont,
+                    fontSize: completed > 0 ? '24px' : '32px',
+                    fontWeight: 700,
+                    color: isEmpty ? colours.muted : colours.cream,
+                    lineHeight: 1
+                  }}>
+                    {winRate}
+                  </div>
+                  <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.22em', color: colours.muted, marginTop: '6px' }}>
+                    VS PETE
+                  </div>
+                </div>
+              </div>
+
+              {/* Pete's read */}
+              <p style={{
+                ...condFont,
+                fontStyle: 'italic',
+                color: colours.cream,
+                fontSize: '14px',
+                textAlign: 'center',
+                marginBottom: '8px',
+                marginTop: 0,
+                lineHeight: 1.45,
+                opacity: 0.9
+              }}>
+                &ldquo;{peteRead}&rdquo;
+              </p>
+
+              {/* Footer brand */}
+              <div style={{
+                ...condFont,
+                fontSize: '10px',
+                letterSpacing: '0.3em',
+                color: colours.muted,
+                textAlign: 'center',
+                marginTop: '20px',
+                opacity: 0.7
+              }}>
+                KICK3.APP
+              </div>
+            </div>
+
+            {/* Share button */}
+            <button
+              onClick={shareRecord}
+              disabled={shareState === 'working'}
+              style={{
+                width: '100%',
+                padding: '14px 20px',
+                background: colours.gold,
+                color: '#000',
+                border: 'none',
+                borderRadius: '8px',
+                ...displayFont,
+                fontSize: '16px',
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                cursor: shareState === 'working' ? 'wait' : 'pointer',
+                marginBottom: '12px',
+                boxShadow: '0 3px 0 rgba(0,0,0,0.25)',
+                opacity: shareState === 'working' ? 0.7 : 1
+              }}
+            >
+              {shareState === 'working' ? 'PREPARING...' :
+               shareState === 'shared'  ? '✓ SHARED' :
+               shareState === 'copied'  ? '✓ COPIED' :
+               shareState === 'error'   ? 'TRY AGAIN' :
+               'SHARE RECORD'}
+            </button>
+
+            {/* Back to tournament home */}
+            <button
+              onClick={() => setScreen('tournament-home')}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                background: 'transparent',
+                color: colours.muted,
+                border: `1px solid ${colours.muted}`,
+                borderRadius: '8px',
+                ...condFont,
+                fontSize: '12px',
+                fontWeight: 600,
+                letterSpacing: '0.2em',
+                cursor: 'pointer'
+              }}
+            >
+              ← BACK TO TOURNAMENT
+            </button>
+          </div>
         </div>
         <Analytics />
       </>
