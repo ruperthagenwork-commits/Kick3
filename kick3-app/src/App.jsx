@@ -1271,51 +1271,6 @@ export default function Kick3() {
   const [r3Loading, setR3Loading] = useState(false);
   const [r3Error, setR3Error] = useState(null);
 
-  // ============ STREAK LOGIC ============
-  // Three values persisted to localStorage:
-  //   kick3_streak_current — current consecutive-day streak
-  //   kick3_streak_best    — highest streak ever achieved
-  //   kick3_streak_last_day — TODAYS_QUESTION.number of the last completed verdict
-  // Streak only updates when a verdict is recorded (recordStreak() called).
-  const readStreakFromStorage = () => {
-    try {
-      return {
-        current: parseInt(localStorage.getItem('kick3_streak_current') || '0', 10) || 0,
-        best:    parseInt(localStorage.getItem('kick3_streak_best')    || '0', 10) || 0,
-        lastDay: parseInt(localStorage.getItem('kick3_streak_last_day')|| '0', 10) || 0,
-      };
-    } catch {
-      // localStorage can throw in private mode / disabled storage
-      return { current: 0, best: 0, lastDay: 0 };
-    }
-  };
-  const [streak, setStreak] = useState(readStreakFromStorage);
-  // Tracks whether the player just hit a new personal best on the most recent verdict.
-  // Stored separately so we only show "NEW PERSONAL BEST" once per verdict.
-  const [isPersonalBest, setIsPersonalBest] = useState(false);
-
-  // Call when a verdict (solo or h2h) is successfully delivered.
-  // Idempotent — calling multiple times for the same day's question is a no-op.
-  const recordStreak = () => {
-    try {
-      const today = TODAYS_QUESTION.number;
-      const prev = readStreakFromStorage();
-      // Already recorded today — no change.
-      if (prev.lastDay === today) return;
-      // Consecutive day → +1. Otherwise → reset to 1.
-      const newCurrent = (prev.lastDay === today - 1) ? prev.current + 1 : 1;
-      const newBest = Math.max(prev.best, newCurrent);
-      const beatBest = newCurrent > prev.best && prev.best > 0;
-      localStorage.setItem('kick3_streak_current', String(newCurrent));
-      localStorage.setItem('kick3_streak_best',    String(newBest));
-      localStorage.setItem('kick3_streak_last_day',String(today));
-      setStreak({ current: newCurrent, best: newBest, lastDay: today });
-      setIsPersonalBest(beatBest);
-    } catch {
-      // Storage unavailable — silently skip. Game still works.
-    }
-  };
-
   // ============ DAILY PLAY LIMIT (3 solo + 3 1v1 per day) ============
   // Counters reset automatically when TODAYS_QUESTION.number advances.
   // localStorage keys:
@@ -1582,7 +1537,6 @@ export default function Kick3() {
     setSentence('');
     setVerdict(null);
     setError(null);
-    setIsPersonalBest(false);
     setScreen('draft');
   };
 
@@ -1821,7 +1775,6 @@ Weigh the picks, their Legacy ratings, and both arguments together. Judge betwee
     setP2Sentence('');
     setH2hVerdict(null);
     setError(null);
-    setIsPersonalBest(false);
     setScreen('h2h-names');
   };
 
@@ -1922,7 +1875,6 @@ Score each /10, declare a winner, deliver verdict as JSON.`;
       const cleaned = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(cleaned);
       setH2hVerdict(parsed);
-      recordStreak();
       recordPlay('h2h');
       // For h2h the score is the higher of the two — that's what Pete reacted to
       recordScore(Math.max(parsed.p1Score || 0, parsed.p2Score || 0));
@@ -1963,7 +1915,6 @@ Deliver your verdict as JSON.`;
       const cleaned = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(cleaned);
       setVerdict(parsed);
-      recordStreak();
       recordPlay('solo');
       recordScore(parsed.score);
       setScreen('verdict');
@@ -2167,7 +2118,7 @@ Deliver your verdict as JSON.`;
               }}>
                 DAY {TODAYS_QUESTION.number}
               </div>
-              {/* Top-right stack: streak badge (if any) + STATS button (always) */}
+              {/* Top-right: STATS button */}
               <div style={{
                 position: 'absolute',
                 top: '14px',
@@ -2177,25 +2128,6 @@ Deliver your verdict as JSON.`;
                 alignItems: 'flex-end',
                 gap: '6px'
               }}>
-                {streak.current >= 1 && (
-                  <div style={{
-                    background: 'rgba(20,20,30,0.85)',
-                    color: colours.gold,
-                    ...condFont,
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    letterSpacing: '0.3em',
-                    padding: '6px 10px',
-                    borderRadius: '4px',
-                    border: `1px solid ${colours.gold}`,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
-                    <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
-                    <span>{streak.current} DAY STREAK</span>
-                  </div>
-                )}
                 <button
                   onClick={() => setScreen('stats')}
                   style={{
@@ -2683,7 +2615,7 @@ Deliver your verdict as JSON.`;
                 }}>
                   DAY {TODAYS_QUESTION.number}
                 </div>
-                {/* Top-right stack: streak badge (if any) + STATS button (always) */}
+                {/* Top-right: STATS button */}
                 <div style={{
                   position: 'absolute',
                   top: '18px',
@@ -2693,25 +2625,6 @@ Deliver your verdict as JSON.`;
                   alignItems: 'flex-end',
                   gap: '8px'
                 }}>
-                  {streak.current >= 1 && (
-                    <div style={{
-                      background: 'rgba(20,20,30,0.85)',
-                      color: colours.gold,
-                      ...condFont,
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      letterSpacing: '0.3em',
-                      padding: '8px 14px',
-                      borderRadius: '4px',
-                      border: `1px solid ${colours.gold}`,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}>
-                      <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
-                      <span>{streak.current} DAY STREAK</span>
-                    </div>
-                  )}
                   <button
                     onClick={() => setScreen('stats')}
                     style={{
@@ -3584,37 +3497,6 @@ Deliver your verdict as JSON.`;
                 </div>
               </div>
 
-              {/* Streak line — sits inside the shared card */}
-              {streak.current >= 1 && (
-                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    ...condFont,
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    letterSpacing: '0.25em',
-                    color: colours.gold
-                  }}>
-                    <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
-                    <span>{streak.current} DAY STREAK</span>
-                  </div>
-                  {isPersonalBest && (
-                    <div style={{
-                      marginTop: '6px',
-                      ...condFont,
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      letterSpacing: '0.25em',
-                      color: colours.cream
-                    }}>
-                      <span aria-hidden="true">🏆</span> NEW PERSONAL BEST
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* Question */}
               <div style={{ ...condFont, fontStyle: 'italic', color: colours.muted, fontSize: '13px', textAlign: 'center', marginBottom: '6px' }}>
                 THE QUESTION
@@ -4322,37 +4204,6 @@ Deliver your verdict as JSON.`;
                 </div>
               </div>
 
-              {/* Streak line — sits inside the shared card */}
-              {streak.current >= 1 && (
-                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    ...condFont,
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    letterSpacing: '0.25em',
-                    color: colours.gold
-                  }}>
-                    <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
-                    <span>{streak.current} DAY STREAK</span>
-                  </div>
-                  {isPersonalBest && (
-                    <div style={{
-                      marginTop: '4px',
-                      ...condFont,
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      letterSpacing: '0.25em',
-                      color: colours.cream
-                    }}>
-                      <span aria-hidden="true">🏆</span> NEW PERSONAL BEST
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* Question */}
               <div style={{ ...condFont, fontStyle: 'italic', color: colours.muted, fontSize: '12px', textAlign: 'center', marginBottom: '4px' }}>
                 THE QUESTION
@@ -4587,12 +4438,12 @@ Deliver your verdict as JSON.`;
       {
         n: 4,
         title: "PETE DELIVERS A VERDICT",
-        body: "Score out of 10. A grudging nod or an absolute roasting. Share the verdict card — your streak, your score, Pete's face."
+        body: "Score out of 10. A grudging nod or an absolute roasting. Share the verdict card — your score, Pete's face."
       },
       {
         n: 5,
         title: "3 SOLO + 3 1V1 PER DAY",
-        body: "Limited plays. Use them. Come back tomorrow. Keep the streak alive."
+        body: "Limited plays. Use them. Come back tomorrow for a fresh question."
       },
     ];
     return (
