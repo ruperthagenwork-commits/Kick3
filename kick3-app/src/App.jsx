@@ -883,7 +883,14 @@ YOUR JOB:
 Compare two cases against the same question. Each side has three player picks AND a short written argument. Decide who made the stronger overall case.
 
 JUDGEMENT MODEL (important):
-Consider BOTH the picks AND the arguments TOGETHER \u2014 they're not weighted separately, they're a unit. A strong argument can win Round 3 even with weaker picks. Weak picks weaken even a strong argument because the argument has less to stand on. Pete being Pete doesn't earn him bonus marks \u2014 you are neutral.
+Consider the picks, their ratings, AND the arguments TOGETHER as a single case. You will be given each pick's WORLD CUP LEGACY rating (0-10). Use the ratings as CONTEXT, not as the verdict:
+- A high-rated pick is easier to argue for \u2014 the player gets credit for picking strength, but must still make the case.
+- A low-rated pick needs a genuinely sharper argument to justify. Picking a weak name and barely defending it is the weakest possible case.
+- If one side's ratings are dramatically higher AND their argument is competent, that side should usually win. Names alone don't win \u2014 but strong, well-argued names are hard to beat.
+- When ratings are close, the ARGUMENT decides. This is where a sharp player beats Pete: out-argue him when the picks are comparable.
+- Do NOT simply add up the ratings and pick the higher total. That's not your job \u2014 you weigh the whole case. A lower-rated trio with a brilliant, specific argument that dismantles the opponent CAN win.
+
+A strong argument can win Round 3 even against slightly stronger picks. Weak picks weaken even a strong argument because the argument has less to stand on. Pete being Pete doesn't earn him bonus marks \u2014 you are neutral.
 
 What you're looking for:
 - Does the argument actually defend the picks against the question?
@@ -1738,15 +1745,23 @@ Write Pete's confident argument defending these three picks against the question
     setR3Error(null);
     try {
       const opponentPicks = resolveOpponentPicks(tournamentOpponent);
+      // Format each pick with its World Cup Legacy rating (0-10) so VAR can use ratings as context.
+      const fmtWithRating = (p) => {
+        const rating = stubAttributeScores(p.name)['Legacy'] || 0;
+        return `${p.name} (Legacy ${rating}/10)`;
+      };
+      const peteList = opponentPicks.map(fmtWithRating).join(', ');
+      const playerList = squad.map(fmtWithRating).join(', ');
       const userMessage = `The question: "${tournamentQuestionText}"
+This is the World Cup Legacy round. Each pick's Legacy rating (0-10) is shown.
 
-PETE'S three picks: ${opponentPicks.map(p => p.name).join(', ')}.
+PETE'S three picks: ${peteList}.
 PETE'S argument: "${r3PeteArgument?.argument || ''}"
 
-PLAYER'S three picks: ${squad.map(p => p.name).join(', ')}.
+PLAYER'S three picks: ${playerList}.
 PLAYER'S defence: "${r3PlayerDefence || '(The player did not write a defence.)'}"
 
-Judge between Pete and the player. Return JSON only.`;
+Weigh the picks, their Legacy ratings, and both arguments together. Judge between Pete and the player. Return JSON only.`;
 
       const response = await fetch("/api/verdict", {
         method: "POST",
