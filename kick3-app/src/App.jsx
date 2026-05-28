@@ -1161,14 +1161,15 @@ const VAR_PHRASES = {
   winLegacy:    "Tied on attribute. Legacy tiebreak in your favour. You advance.",
   lossDominant: "After review: comprehensive defeat. No advance.",
   lossNarrow:   "After review: marginal defeat. No advance.",
+  lossLegacy:   "Tied on attribute. Legacy tiebreak against you. No advance.",
 };
 
-const pickVarPhrase = (playerTotal, opponentTotal, viaLegacy) => {
+const pickVarPhrase = (playerTotal, opponentTotal, viaLegacy, won) => {
+  if (viaLegacy) {
+    return won ? VAR_PHRASES.winLegacy : VAR_PHRASES.lossLegacy;
+  }
   if (playerTotal > opponentTotal) {
     return (playerTotal - opponentTotal) >= 5 ? VAR_PHRASES.winDominant : VAR_PHRASES.winNarrow;
-  }
-  if (playerTotal === opponentTotal && viaLegacy) {
-    return VAR_PHRASES.winLegacy;
   }
   return (opponentTotal - playerTotal) >= 5 ? VAR_PHRASES.lossDominant : VAR_PHRASES.lossNarrow;
 };
@@ -1618,7 +1619,7 @@ export default function Kick3() {
     } else {
       won = false;
     }
-    const phrase = pickVarPhrase(playerTotal, opponentTotal, viaLegacy);
+    const phrase = pickVarPhrase(playerTotal, opponentTotal, viaLegacy, won);
     setTournamentVarResult({ playerTotal, opponentTotal, viaLegacy, won, phrase });
     setScreen('tournament-var');
   };
@@ -6073,7 +6074,7 @@ Deliver your verdict as JSON.`;
               </div>
               {playerWon ? (
                 <>
-                  <div style={{ fontSize: '52px', lineHeight: 1, marginBottom: '6px' }} aria-hidden="true">\ud83c\udfc6</div>
+                  <div style={{ fontSize: '52px', lineHeight: 1, marginBottom: '6px' }} aria-hidden="true">🏆</div>
                   <h1 style={{ ...displayFont, fontSize: 'clamp(38px, 10vw, 56px)', fontWeight: 800, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
                     YOU BEAT PETE
                   </h1>
@@ -6167,7 +6168,7 @@ Deliver your verdict as JSON.`;
                 boxShadow: playerWon ? '0 4px 0 rgba(0,0,0,0.25)' : 'none'
               }}
             >
-              \u2190 BACK TO TOURNAMENT
+              ← BACK TO TOURNAMENT
             </button>
           </div>
         </div>
