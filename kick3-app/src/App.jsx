@@ -1063,8 +1063,17 @@ const STUB_OPPONENTS = {
     label: "PETE THE PUNDIT",
     shortLabel: "PETE",
     vibe: "World's #4 Pundit. Doctorate in football. Waiting for you.",
-    // Three picks by name. High-Legacy World Cup squad. Hard to beat without a sharp argument.
-    picks: ["Diego Maradona", "Pel\u00e9", "Zinedine Zidane"],
+    // Pete draws 3 at random from this high-tier sub-pool each attempt (see drawPetePicks).
+    // STUB for testing — Phase 2 replaces this with a "Pete-eligible" flag on the real
+    // World Cup pool. Names must exist in PLAYER_POOL exactly.
+    subPool: [
+      "Diego Maradona", "Pelé", "Zinedine Zidane", "Lionel Messi",
+      "Johan Cruyff", "Franz Beckenbauer", "Ronaldinho", "Cristiano Ronaldo",
+      "Zico", "Roberto Baggio", "Paolo Maldini", "Romário",
+      "Garrincha", "Michel Platini", "Lothar Matthäus"
+    ],
+    // picks is set dynamically at R3 entry by drawPetePicks(). Left empty here.
+    picks: [],
     roundNumber: 3,
     // Pre-written reactions on the result screen. Rotated by attempt count for variety.
     winReactions: [
@@ -1080,6 +1089,21 @@ const STUB_OPPONENTS = {
       "Twenty years in this game. You thought you'd just walk in?",
     ],
   },
+};
+
+// Draw 3 random picks for Pete from his sub-pool. Returns an array of 3 names.
+// Filters to names that actually exist in PLAYER_POOL so the UI always renders.
+const drawPetePicks = () => {
+  const pete = STUB_OPPONENTS.pete;
+  const valid = pete.subPool.filter(n => PLAYER_POOL.some(p => p.name === n));
+  const source = valid.length >= 3 ? valid : pete.subPool;
+  // Fisher-Yates shuffle, take 3.
+  const arr = [...source];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, 3);
 };
 
 // Deterministic attribute scoring stub.
@@ -1652,7 +1676,10 @@ export default function Kick3() {
   // Entry point: player has just won Round 2 and clicks CONTINUE TO ROUND 3.
   // Generates Pete's AI argument and routes to the R3 intro screen.
   const startTournamentRound3 = async () => {
-    const opponent = STUB_OPPONENTS.pete;
+    // Draw Pete's three picks at random from his sub-pool, then build an opponent
+    // object carrying those picks so the rest of the flow works unchanged.
+    const petePicks = drawPetePicks();
+    const opponent = { ...STUB_OPPONENTS.pete, picks: petePicks };
     // R3 question is always Legacy.
     const attribute = 'Legacy';
     const questionText = stubTournamentQuestion(3, 'Legacy');
@@ -5866,8 +5893,9 @@ Deliver your verdict as JSON.`;
             {/* Action button — draft your three */}
             <button
               onClick={() => {
-                // Begin drafting for R3.
-                setDraftRounds(generateDraft(squad.map(p => p.name)));
+                // Begin drafting for R3. Exclude Pete's three picks so there's no clash.
+                const petePickNames = resolveOpponentPicks(tournamentOpponent).map(p => p.name);
+                setDraftRounds(generateDraft(petePickNames));
                 setCurrentRound(0);
                 setSquad([]);
                 setScreen('draft');
@@ -5992,8 +6020,8 @@ Deliver your verdict as JSON.`;
             {/* Textarea */}
             <textarea
               value={r3PlayerDefence}
-              onChange={(e) => setR3PlayerDefence(e.target.value.slice(0, 300))}
-              placeholder="Argue your case in 300 characters. Be specific. Engage with Pete\u2019s argument."
+              onChange={(e) => setR3PlayerDefence(e.target.value.slice(0, 250))}
+              placeholder="Argue your case in 250 characters. Be specific. Engage with Pete’s argument."
               style={{
                 width: '100%',
                 minHeight: '120px',
@@ -6011,7 +6039,7 @@ Deliver your verdict as JSON.`;
               }}
             />
             <div style={{ ...condFont, fontSize: '11px', color: colours.muted, marginBottom: '20px', textAlign: 'right' }}>
-              {r3PlayerDefence.length} / 300
+              {r3PlayerDefence.length} / 250
             </div>
 
             {r3Error && (
