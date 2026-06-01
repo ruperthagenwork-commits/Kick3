@@ -6591,6 +6591,31 @@ Deliver your verdict as JSON.`;
     const continueButtonLabel = nextRound === 2 ? "FACE THE PRODUCER" : "FACE PETE";
     const continueAction = nextRound === 2 ? advanceToRound2 : startTournamentRound3;
 
+    // Phase 2, Deploy 5 / Stage 4: confetti.
+    // 40 falling particles, brand-palette colours, randomised motion.
+    // Computed once on mount (no state changes inside this screen mean no re-renders
+    // will regenerate them). Each particle is a small rectangle with:
+    //  - random horizontal start (0-100% across viewport)
+    //  - random fall duration (2.4-3.6s)
+    //  - random delay (0-400ms) for staggered onset
+    //  - random sway angle (the keyframe is fixed; rotation/transform gives variety)
+    //  - random colour from the celebratory palette
+    //  - random size (4-8px wide, 8-14px tall)
+    // Container fades out at 3s via opacity transition; particles unmount at screen exit.
+    const CONFETTI_COLOURS = ['#D4AF37', '#5fb04a', '#e8e8e0', '#c9302c', '#f5a623'];
+    const confettiParticles = Array.from({ length: 40 }, (_, i) => {
+      const left = Math.random() * 100;
+      const duration = 2.4 + Math.random() * 1.2;
+      const delay = Math.random() * 0.4;
+      const rotateStart = Math.random() * 360;
+      const rotateEnd = rotateStart + (Math.random() * 720 - 360);
+      const sway = (Math.random() - 0.5) * 80; // px horizontal drift
+      const colour = CONFETTI_COLOURS[i % CONFETTI_COLOURS.length];
+      const width = 4 + Math.random() * 4;
+      const height = 8 + Math.random() * 6;
+      return { i, left, duration, delay, rotateStart, rotateEnd, sway, colour, width, height };
+    });
+
     return (
       <>
         <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -6603,7 +6628,57 @@ Deliver your verdict as JSON.`;
             from { opacity: 0; transform: translateY(12px); }
             to   { opacity: 1; transform: translateY(0); }
           }
+          @keyframes kick3-confetti-fall {
+            0% {
+              transform: translate3d(0, -10vh, 0) rotate(var(--rs, 0deg));
+              opacity: 1;
+            }
+            85% {
+              opacity: 1;
+            }
+            100% {
+              transform: translate3d(var(--sway, 0px), 110vh, 0) rotate(var(--re, 360deg));
+              opacity: 0;
+            }
+          }
+          @keyframes kick3-confetti-container-fade {
+            0%, 85% { opacity: 1; }
+            100%    { opacity: 0; }
+          }
         `}</style>
+
+        {/* Confetti overlay — pointer-events:none so the continue button is still clickable. */}
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          pointerEvents: 'none',
+          overflow: 'hidden',
+          zIndex: 9999,
+          animation: 'kick3-confetti-container-fade 4s ease-out forwards'
+        }}>
+          {confettiParticles.map(p => (
+            <div
+              key={p.i}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: `${p.left}%`,
+                width: `${p.width}px`,
+                height: `${p.height}px`,
+                background: p.colour,
+                borderRadius: '1px',
+                animation: `kick3-confetti-fall ${p.duration}s ease-in ${p.delay}s forwards`,
+                ['--rs']: `${p.rotateStart}deg`,
+                ['--re']: `${p.rotateEnd}deg`,
+                ['--sway']: `${p.sway}px`,
+              }}
+            />
+          ))}
+        </div>
+
         <div style={bgStyle}>
           <div style={pitchOverlay} />
           <div style={{ ...container, maxWidth: '560px' }}>
