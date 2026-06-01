@@ -1400,9 +1400,17 @@ const stubAttributeScores = (playerName) => {
 };
 
 // Total a team's attribute score against a category.
+// Routes per player: World Cup pool players get real authored scores;
+// daily-pool players (R1/R2 still) fall through to the hash stub.
+// The flag `isWorldCup` is set by generateR3Draft and resolveOpponentPicks (for Pete).
+// In R1/R2 the player squad comes from daily PLAYER_POOL — those don't have the
+// flag, so they correctly fall through to stubAttributeScores.
 const scoreTeamOnAttribute = (players, attribute) => {
   return players.reduce((sum, p) => {
-    const scores = stubAttributeScores(p.name || p);
+    const name = p.name || p;
+    const scores = p && p.isWorldCup
+      ? worldCupAttributeScores(name)
+      : stubAttributeScores(name);
     return sum + (scores[attribute] || 0);
   }, 0);
 };
@@ -1475,8 +1483,10 @@ const stubTournamentQuestion = (roundNumber, attribute) => {
 };
 
 // VAR voice — dry procedural phrases for Round 1/2 outcomes.
-// Phase 2 expands to 12-15; Task 5 gets a small set for testing the flow.
-const VAR_PHRASES = {
+// Renamed to *_STUB in Phase 2 Deploy 1 / Stage 5 — Deploy 3 will wire in the
+// 15 authored VAR phrases under the new name VAR_PHRASES (the production set).
+// Kept for now because pickVarPhrase still uses these six R1/R2 verdict strings.
+const VAR_PHRASES_STUB = {
   winDominant:  "After review: decisive. You advance.",
   winNarrow:    "After review: marginal. You advance.",
   winLegacy:    "Tied on attribute. Legacy tiebreak in your favour. You advance.",
@@ -1487,12 +1497,12 @@ const VAR_PHRASES = {
 
 const pickVarPhrase = (playerTotal, opponentTotal, viaLegacy, won) => {
   if (viaLegacy) {
-    return won ? VAR_PHRASES.winLegacy : VAR_PHRASES.lossLegacy;
+    return won ? VAR_PHRASES_STUB.winLegacy : VAR_PHRASES_STUB.lossLegacy;
   }
   if (playerTotal > opponentTotal) {
-    return (playerTotal - opponentTotal) >= 5 ? VAR_PHRASES.winDominant : VAR_PHRASES.winNarrow;
+    return (playerTotal - opponentTotal) >= 5 ? VAR_PHRASES_STUB.winDominant : VAR_PHRASES_STUB.winNarrow;
   }
-  return (opponentTotal - playerTotal) >= 5 ? VAR_PHRASES.lossDominant : VAR_PHRASES.lossNarrow;
+  return (opponentTotal - playerTotal) >= 5 ? VAR_PHRASES_STUB.lossDominant : VAR_PHRASES_STUB.lossNarrow;
 };
 
 // ============ END TOURNAMENT MODE — STUB CONTENT ============
@@ -1990,8 +2000,14 @@ Write Pete's confident argument defending these three picks against the question
     try {
       const opponentPicks = resolveOpponentPicks(tournamentOpponent);
       // Format each pick with its World Cup Legacy rating (0-10) so VAR can use ratings as context.
+      // R3 picks are all World Cup pool players (both Pete's and the player's), so we
+      // read real authored Legacy scores via worldCupAttributeScores. Falls through to
+      // stubAttributeScores for safety on any name not in the World Cup pool.
       const fmtWithRating = (p) => {
-        const rating = stubAttributeScores(p.name)['Legacy'] || 0;
+        const scores = (p && p.isWorldCup)
+          ? worldCupAttributeScores(p.name)
+          : stubAttributeScores(p.name);
+        const rating = scores['Legacy'] || 0;
         return `${p.name} (Legacy ${rating}/10)`;
       };
       const peteList = opponentPicks.map(fmtWithRating).join(', ');
@@ -5859,7 +5875,10 @@ Deliver your verdict as JSON.`;
                   YOUR THREE
                 </div>
                 {squad.map((p, i) => {
-                  const sc = stubAttributeScores(p.name)[tournamentAttribute] || 0;
+                  const scoresMap = p && p.isWorldCup
+                    ? worldCupAttributeScores(p.name)
+                    : stubAttributeScores(p.name);
+                  const sc = scoresMap[tournamentAttribute] || 0;
                   return (
                     <div key={i} style={{
                       display: 'flex',
@@ -5882,7 +5901,10 @@ Deliver your verdict as JSON.`;
                   THEIR THREE
                 </div>
                 {opponentPicks.map((p, i) => {
-                  const sc = stubAttributeScores(p.name)[tournamentAttribute] || 0;
+                  const scoresMap = p && p.isWorldCup
+                    ? worldCupAttributeScores(p.name)
+                    : stubAttributeScores(p.name);
+                  const sc = scoresMap[tournamentAttribute] || 0;
                   return (
                     <div key={i} style={{
                       display: 'flex',
