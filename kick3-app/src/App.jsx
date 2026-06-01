@@ -842,7 +842,7 @@ Return ONLY valid JSON, no markdown fences:
 
 Be specific. Mention players by name. Use both player names in the verdict. Make the verdict feel like a referee's judgement after watching both arguments.`;
 
-const PETE_ARGUMENT_PROMPT = `You are PETE THE PUNDIT writing your OWN argument for a tournament round of Kick 3. Today you're not the judge \u2014 you're a contestant. A neutral VAR will judge between you and the player.
+const PETE_ARGUMENT_PROMPT = `You are PETE THE PUNDIT writing your OWN argument for the World Cup tournament final round of Kick 3. Today you're not the judge \u2014 you're a contestant. A neutral VAR will judge between you and the player on the question of World Cup LEGACY.
 
 YOUR VOICE:
 - Same Pete as ever: opinionated, knowing, grumpy old pundit. World's #4 Pundit. Doctorate in football.
@@ -851,16 +851,20 @@ YOUR VOICE:
 - Football-literate, dry humour, no emojis, no modern slang.
 - You are SARCASTIC and CONFIDENT. You've been on the lounger waiting for this player. You think they're punching above their weight.
 
+THE STAKES:
+- This is the World Cup. The question is about World Cup Legacy specifically \u2014 names sewn into football history through World Cup moments. Not Champions League legacy. Not Premier League legacy. WORLD CUP legacy.
+- Your three picks have been randomly selected from a tightly curated pool of World Cup-elite players. They're strong names. Sound confident in that fact.
+
 FACTUAL HUMILITY:
 - Describe REPUTATION, not exact stats you might be wrong about. "Maradona \u2014 cup-final dragger" not "Maradona scored 34 World Cup goals".
-- Iconic moments fine. Specific stats you're unsure of, no.
+- Iconic World Cup moments are fine ("Hand of God", "Zidane headbutt", "Klose's six tournaments"). Specific stats you're unsure of, no.
 
 YOUR JOB:
-You will be given a question and three players you've picked. Write a SHORT, CONFIDENT argument defending those three picks against the question. End with a sarcastic "beat this" line that taunts the player.
+You will be given the question and three players you've been dealt. Write a SHORT, CONFIDENT argument defending those three picks against the question. End with a sarcastic "beat this" line that taunts the player.
 
 CONSTRAINTS:
 - 60-90 words total. Punchy. Not a lecture.
-- Mention each of your three picks by name with a single reason.
+- Mention each of your three picks by name with a single World Cup-specific reason.
 - End with a one-line sarcastic taunt to the player.
 - Don't reference attribute scores or the game's mechanics. Talk like a pundit.
 
@@ -871,7 +875,7 @@ Return ONLY valid JSON, no markdown fences:
   "taunt": "<one short sarcastic closing line, max 14 words>"
 }`;
 
-const VAR_JUDGE_PROMPT = `You are VAR \u2014 the neutral video assistant referee judging a Kick 3 tournament Round 3 between PETE THE PUNDIT and a human player.
+const VAR_JUDGE_PROMPT = `You are VAR \u2014 the neutral video assistant referee judging Round 3 of the Kick 3 World Cup tournament. PETE THE PUNDIT versus a human player. The question is about World Cup LEGACY.
 
 YOUR VOICE:
 - Dry. Procedural. Monotone. Like a real VAR official reading a decision.
@@ -880,25 +884,26 @@ YOUR VOICE:
 - No first-person opinions ("I think"). State the finding.
 
 YOUR JOB:
-Compare two cases against the same question. Each side has three player picks AND a short written argument. Decide who made the stronger overall case.
+Compare two cases against the same World Cup Legacy question. Each side has three player picks AND a short written argument. Decide who made the stronger overall case.
 
-JUDGEMENT MODEL (important):
-Consider the picks, their ratings, AND the arguments TOGETHER as a single case. You will be given each pick's WORLD CUP LEGACY rating (0-10). Use the ratings as CONTEXT, not as the verdict:
-- A high-rated pick is easier to argue for \u2014 the player gets credit for picking strength, but must still make the case.
-- A low-rated pick needs a genuinely sharper argument to justify. Picking a weak name and barely defending it is the weakest possible case.
-- If one side's ratings are dramatically higher AND their argument is competent, that side should usually win. Names alone don't win \u2014 but strong, well-argued names are hard to beat.
-- When ratings are close, the ARGUMENT decides. This is where a sharp player beats Pete: out-argue him when the picks are comparable.
-- Do NOT simply add up the ratings and pick the higher total. That's not your job \u2014 you weigh the whole case. A lower-rated trio with a brilliant, specific argument that dismantles the opponent CAN win.
+WHAT YOU'RE GIVEN:
+- Each pick comes with a WORLD CUP LEGACY rating on a 0-10 scale. These are authored values: 10 = generational World Cup figure (Pel\u00e9, Maradona, Messi), 9 = unmistakable World Cup legend (Cruyff, Beckenbauer, Zidane), 8 = major World Cup name, 7 = strong World Cup CV, 6 = solid, 5 and below = present but unremarkable on the world stage.
+- Pete's three picks come from a tightly curated pool of World Cup-elite players. His Legacy ratings will usually be high (7-10). The player drafts from the same curated pool, so their ratings will also be high \u2014 the picks-vs-picks gap is usually modest. The argument is often the difference.
 
-A strong argument can win Round 3 even against slightly stronger picks. Weak picks weaken even a strong argument because the argument has less to stand on. Pete being Pete doesn't earn him bonus marks \u2014 you are neutral.
+JUDGEMENT MODEL:
+Weigh picks, Legacy ratings, AND arguments together as a single case. NOT a simple total of ratings.
+- A high-rated pick is easier to argue for, but the player still needs to make the case.
+- A lower-rated pick needs a sharper argument to justify it. Picking a weak name and barely defending it is the weakest possible case.
+- If one side's ratings are markedly higher AND their argument is competent, that side should usually win.
+- When ratings are close (within 2-3 points total), the ARGUMENT decides. This is the player's clearest path to beating Pete.
+- A brilliant, specific argument that directly dismantles the opponent's case CAN win against slightly stronger picks.
+- Pete being Pete earns him no bonus. You are neutral.
 
-What you're looking for:
-- Does the argument actually defend the picks against the question?
-- Are the picks coherent with the argument they're attached to?
-- Specificity beats generality. "Cup-final dragger" beats "great player."
-- Original insight beats received wisdom.
-
-Pete is a confident, experienced pundit \u2014 his arguments will usually be sharp. To beat him, the player must engage with HIS case, not just present their own. A defence that ignores Pete's points entirely is weaker than one that dismantles them.
+WHAT MAKES A STRONG ARGUMENT:
+- Does it defend the picks specifically against the World Cup Legacy framing?
+- Are the picks coherent with the argument attached to them?
+- Specificity beats generality. "Cup-final dragger" beats "great player".
+- Engaging with the opponent's case beats ignoring it. A defence that dismantles Pete's argument is stronger than one that just presents its own.
 
 OUTPUT FORMAT (strictly):
 Return ONLY valid JSON, no markdown fences:
@@ -1801,6 +1806,111 @@ const getOpponentSquadForToday = (opponentType, date = new Date()) => {
 
 // ============ END TOURNAMENT MODE — OPPONENT SQUADS ============
 
+// ============ TOURNAMENT MODE — STOCK TEXT LINES (Phase 2, Deploy 3) ============
+// 51 authored lines across 5 categories. Drawn at random on each occurrence.
+// No state, no persistence — same player can see the same line twice.
+//
+// Pub Mate loss lines (10): Pete mocks Pub Mate via the voices (Dave, his dad,
+//   Twitter, TikTok, podcast). Drawn when player loses R1.
+// Producer loss lines (10): Pete sarcastically mocks the football scientist.
+//   Drawn when player loses R2.
+// Pete R3 win reactions (8): grudging→generous→self-deprecating→warm. Drawn
+//   when VAR finds for the player in R3 (player wins trophy).
+// Pete R3 loss reactions (8): dismissive→instructive→confident→warm-grumpy.
+//   Drawn when VAR finds for Pete in R3.
+// VAR phrases (15): currently used for R1/R2 verdicts. Sub-categorised by
+//   Round opener / Pre-result hold / Player-win / Player-loss / R3 framing.
+//   The Player-win and Player-loss subsets replace the current VAR_PHRASES_STUB
+//   strings for R1/R2 final verdicts. Other categories surface in future polish.
+
+const PUBMATE_LOSS_LINES = [
+  "You lost to my pub mate. My PUB MATE. Off you trot.",
+  "His mate Dave picked it. Don't ask me why Lampard's in there. Beaten by Dave-by-proxy.",
+  "He asked his dad. His DAD. Did your dad pick yours? No? Maybe try that next time.",
+  "My pub mate read it on Twitter at 8am. He read three names and stopped scrolling. Three names. And you lost.",
+  "He asked the postman. Honestly. The POSTMAN.",
+  "His mate watches football on TikTok. He picked three players he'd seen in compilations. You lost to compilations.",
+  "My pub mate doesn't have an opinion. He has five mates with opinions. One of those mates beat you.",
+  "He told me the podcast suggested these three. He doesn't remember which podcast. You lost to a podcast he doesn't remember.",
+  "Even my pub mate could do it. Picked three names off the back of a cigarette packet. Have a long think.",
+  "You lost to a man who thinks Salah won the World Cup. Take that in. Properly.",
+];
+
+const PRODUCER_LOSS_LINES = [
+  "You lost to my producer. The man who calls goals 'positive outcomes.'",
+  "My producer's expected-goals model said you'd lose. So you did. Have a think.",
+  "He's never been moved by a football match in his life. Never. And you lost to him.",
+  "Beaten by the man who watches matches with the sound off because the commentary 'introduces bias.'",
+  "He cried once. Just once. When his spreadsheet auto-saved correctly. That man beat you.",
+  "My producer doesn't watch football. He watches graphs of football. And the graphs were right.",
+  "He optimised against you. Optimised. Like you're a delivery route. Off you trot.",
+  "You lost to a heat map. A literal heat map. Coloured squares beat you tonight.",
+  "My producer ran the numbers seventeen times to make sure he picked the dullest possible squad. And the dullest squad won. There's a lesson there. He doesn't get it either.",
+  "He's currently entering this result into his model to improve future predictions. He's enjoying it. As much as he enjoys anything.",
+];
+
+const PETE_R3_WIN_REACTIONS = [
+  "Hmm. Fine. You made the case. I don't have to like it.",
+  "I'll be honest — that was a better argument than I gave you credit for. Take the trophy. Don't make a habit of it.",
+  "Right. You got me. The producer's spreadsheet had me at 73% to win. So much for that.",
+  "Look at you. Beat the World's #4 Pundit. I'd be more impressed if I were #5.",
+  "The VAR found for you. I won't appeal. This time.",
+  "Trophy's yours. The drinks are still on me, though. House rules.",
+  "You spoke for your three like they were yours. That's the difference. Most people just list names. You picked.",
+  "Well played. Now go away. I need to read your defence again and work out where I went wrong.",
+];
+
+const PETE_R3_LOSS_REACTIONS = [
+  "That'll do. Trophy stays with me. Same time tomorrow?",
+  "You wrote a defence. I wrote a case. There's a difference. Have a think.",
+  "Three picks and four sentences. You needed five. Maybe six. Try again.",
+  "The VAR agreed with me. The VAR usually does. Off you go.",
+  "Look — I picked three players I've watched and argued about for thirty years. You picked three you'd heard of. That's why.",
+  "You started strong. Then you said 'in conclusion.' Never write 'in conclusion.' Take that one with you.",
+  "I'm not going to gloat. I'm going to make a cup of tea. Same outcome either way.",
+  "You'll get me one day. Probably not tomorrow. But one day.",
+];
+
+// VAR phrases organised by category. The final verdict line for R1/R2 outcomes
+// draws from VAR_PLAYER_WIN_LINES or VAR_PLAYER_LOSS_LINES. The existing
+// VAR_PHRASES_STUB (Legacy tiebreak verdicts) remains for tie cases.
+const VAR_ROUND_OPENER_LINES = [
+  "Checking the picks.",
+  "Running the numbers.",
+  "Reviewing the selections.",
+  "Confirming the totals.",
+  "Verifying the round.",
+];
+
+const VAR_PRE_RESULT_HOLD_LINES = [
+  "One moment.",
+  "Cross-referencing.",
+  "Standby.",
+];
+
+const VAR_PLAYER_WIN_LINES = [
+  "The player advances.",
+  "The score stands. Player progresses.",
+  "Reviewed and confirmed. The player wins this round.",
+];
+
+const VAR_PLAYER_LOSS_LINES = [
+  "The score is decisive. The player does not progress.",
+  "Reviewed and confirmed. The opponent wins this round.",
+  "The numbers are clear. Tournament over for today.",
+];
+
+const VAR_R3_FRAMING_LINES = [
+  "Argument reviewed. Picks weighed. Decision incoming.",
+];
+
+// Pick a random line from a pool. Returns null if the pool is empty (defensive).
+const pickRandomLine = (pool) => {
+  if (!pool || pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
+// ============ END TOURNAMENT MODE — STOCK TEXT LINES ============
 // Stub question text for a tournament round. Real questions land in Phase 2.
 const stubTournamentQuestion = (roundNumber, attribute) => {
   const opener = roundNumber === 1
@@ -1831,14 +1941,22 @@ const VAR_PHRASES_STUB = {
   lossLegacy:   "Tied on attribute. Legacy tiebreak against you. No advance.",
 };
 
+// Phase 2, Deploy 3: VAR final verdict line for R1/R2.
+// Win/loss outcomes now draw randomly from the authored 3-line pools (was 2 static
+// strings each: dominant/narrow). The dominant-vs-narrow gap is no longer signalled
+// in text — the score totals are visible above the phrase so the player can see
+// for themselves. Legacy tiebreak still uses the stub strings (they carry essential
+// context the authored lines don't).
 const pickVarPhrase = (playerTotal, opponentTotal, viaLegacy, won) => {
   if (viaLegacy) {
     return won ? VAR_PHRASES_STUB.winLegacy : VAR_PHRASES_STUB.lossLegacy;
   }
-  if (playerTotal > opponentTotal) {
-    return (playerTotal - opponentTotal) >= 5 ? VAR_PHRASES_STUB.winDominant : VAR_PHRASES_STUB.winNarrow;
+  if (won) {
+    return pickRandomLine(VAR_PLAYER_WIN_LINES)
+      || VAR_PHRASES_STUB.winDominant;
   }
-  return (opponentTotal - playerTotal) >= 5 ? VAR_PHRASES_STUB.lossDominant : VAR_PHRASES_STUB.lossNarrow;
+  return pickRandomLine(VAR_PLAYER_LOSS_LINES)
+    || VAR_PHRASES_STUB.lossDominant;
 };
 
 // ============ END TOURNAMENT MODE — STUB CONTENT ============
@@ -2180,13 +2298,16 @@ export default function Kick3() {
   // Start a tournament attempt at Round 1 (called by PLAY NOW on tournament home).
   // Increments tournamentsAttempted in localStorage.
   const startTournament = () => {
-    // Phase 2, Deploy 2 / Stage 3: opponent squad now from authored 78 (was static stub).
-    // STUB_OPPONENTS still provides label/vibe/peteLossLine; only picks rotate by date.
+    // Phase 2, Deploy 2 / Stage 3: opponent squad from authored 78.
+    // Phase 2, Deploy 3: peteLossLine now random-drawn from the 10-line pool per attempt
+    // (was a single static line). The voice line from the authored squad is preserved
+    // alongside as a future polish hook (not yet displayed).
     const squadForToday = getOpponentSquadForToday('pubmate');
     const opponent = {
       ...STUB_OPPONENTS.pubmate,
       picks: squadForToday.picks,
       voice: squadForToday.voice,
+      peteLossLine: pickRandomLine(PUBMATE_LOSS_LINES) || STUB_OPPONENTS.pubmate.peteLossLine,
     };
     // Phase 2, Deploy 2 / Stage 1: real questions wired. Question selects the
     // attribute for the round (category drives scoring).
@@ -2218,12 +2339,14 @@ export default function Kick3() {
 
   // Advance from a completed Round 1 to Round 2 vs Pete's Producer.
   const advanceToRound2 = () => {
-    // Phase 2, Deploy 2 / Stage 3: opponent squad now from authored 78 (was static stub).
+    // Phase 2, Deploy 2 / Stage 3: opponent squad from authored 78.
+    // Phase 2, Deploy 3: peteLossLine now random-drawn from the 10-line pool per attempt.
     const squadForToday = getOpponentSquadForToday('producer');
     const opponent = {
       ...STUB_OPPONENTS.producer,
       picks: squadForToday.picks,
       voice: squadForToday.voice,
+      peteLossLine: pickRandomLine(PRODUCER_LOSS_LINES) || STUB_OPPONENTS.producer.peteLossLine,
     };
     // Phase 2, Deploy 2 / Stage 1: real R2 question and its category attribute.
     const q = getTournamentQuestion(2);
@@ -2399,13 +2522,16 @@ Weigh the picks, their Legacy ratings, and both arguments together. Judge betwee
       const winner = parsed.winner === 'player' ? 'player' : 'pete';
       const playerWon = winner === 'player';
 
-      // Pick a pre-written Pete reaction based on outcome and a rotating index.
-      const state = readTournamentState();
-      const reactionIndex = (state.tournamentsAttempted || 0) % 4;
+      // Phase 2, Deploy 3: Pete reactions now from the authored 8-line pools (was 4-item
+      // rotation by attempt index). Random selection — variety beats deterministic rotation.
       const reactionPool = playerWon
-        ? STUB_OPPONENTS.pete.winReactions
-        : STUB_OPPONENTS.pete.lossReactions;
-      const reaction = reactionPool[reactionIndex] || reactionPool[0];
+        ? PETE_R3_WIN_REACTIONS
+        : PETE_R3_LOSS_REACTIONS;
+      const reaction = pickRandomLine(reactionPool) || (playerWon
+        ? STUB_OPPONENTS.pete.winReactions[0]
+        : STUB_OPPONENTS.pete.lossReactions[0]);
+
+      const state = readTournamentState();
 
       setR3VarVerdict({ ...parsed, winner, playerWon });
       setR3PeteReaction(reaction);
