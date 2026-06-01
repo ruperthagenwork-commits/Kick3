@@ -2989,10 +2989,10 @@ Deliver your verdict as JSON.`;
              Slow 3.6s breathing cycle. Glow is gold-tinted to read as trophy / prize. */
           @keyframes kick3-pulse-gold-kf {
             0%, 100% {
-              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.08), 0 0 22px 3px rgba(255,255,255,0.14);
+              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 1px rgba(95,176,74,0.18), 0 0 24px 4px rgba(95,176,74,0.28);
             }
             50% {
-              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 5px rgba(255,255,255,0.25), 0 0 38px 10px rgba(255,255,255,0.40);
+              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 6px rgba(95,176,74,0.45), 0 0 42px 12px rgba(95,176,74,0.65);
             }
           }
           .kick3-pulse-gold {
@@ -5955,10 +5955,10 @@ Deliver your verdict as JSON.`;
 
           @keyframes kick3-pulse-gold-kf {
             0%, 100% {
-              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.08), 0 0 22px 3px rgba(255,255,255,0.14);
+              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 1px rgba(95,176,74,0.18), 0 0 24px 4px rgba(95,176,74,0.28);
             }
             50% {
-              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 5px rgba(255,255,255,0.25), 0 0 38px 10px rgba(255,255,255,0.40);
+              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 6px rgba(95,176,74,0.45), 0 0 42px 12px rgba(95,176,74,0.65);
             }
           }
           .kick3-pulse-gold {
