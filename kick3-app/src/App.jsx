@@ -1884,6 +1884,25 @@ const PETE_R3_LOSS_REACTIONS = [
   "You'll get me one day. Probably not tomorrow. But one day.",
 ];
 
+// Phase 2, Deploy 5 / Stage 2: Pete reactions on R1/R2 wins, shown on the
+// congratulations screen between rounds. Each line celebrates the player
+// while setting up the next opponent's threat.
+const PETE_R1_WIN_REACTIONS = [
+  "Right. Pub mate's seen off. Don't get cocky — the producer doesn't have opinions, he has spreadsheets. Different beast.",
+  "Beat my pub mate. Bigger people have. Producer's up next, and he's already optimised against you.",
+  "Pub mate handled. Decent. Now I bring in the man who watches matches with a clipboard. Brace yourself.",
+  "Good. The easy one's done. Producer next — he doesn't care that you won. He's already running the numbers on round two.",
+  "One down. The producer's been watching from the wings. He's got data on you now.",
+];
+
+const PETE_R2_WIN_REACTIONS = [
+  "You beat the spreadsheet. Surprised. Now you face me. I've been on this lounger waiting.",
+  "Producer's down. Models broken, charts in tatters. Right — my turn.",
+  "Two down. You've earned a chair across from me. Don't waste it.",
+  "Beat my producer. Decent showing. Now I'm getting up off this lounger. You won't enjoy it.",
+  "The data man fell over. Good. Now the football brain steps in. Sit down.",
+];
+
 // VAR phrases organised by category. The final verdict line for R1/R2 outcomes
 // draws from VAR_PLAYER_WIN_LINES or VAR_PLAYER_LOSS_LINES. The existing
 // VAR_PHRASES_STUB (Legacy tiebreak verdicts) remains for tie cases.
@@ -2037,6 +2056,10 @@ export default function Kick3() {
   const [r3PeteReaction, setR3PeteReaction] = useState('');      // pre-written, picked on verdict
   const [r3Loading, setR3Loading] = useState(false);
   const [r3Error, setR3Error] = useState(null);
+  // Phase 2, Deploy 5 / Stage 2: Pete's reaction shown on the round-won congrats
+  // screen between R1→R2 and R2→R3. Picked once when the player wins, stable
+  // across re-renders. Reset on each tournament attempt start.
+  const [roundWinReaction, setRoundWinReaction] = useState('');
 
   // ============ VAR-CHECKING SCREEN STATE (Phase 2, Deploy 5 / Stage 1) ============
   // The VAR screen cycles through three status lines (1s each) before routing to
@@ -6547,6 +6570,275 @@ Deliver your verdict as JSON.`;
     );
   }
 
+  // ---------- TOURNAMENT ROUND WON SCREEN ----------
+  // Phase 2, Deploy 5 / Stage 2. Celebratory beat between R1→R2 and R2→R3.
+  // Shows the player's three, Pete's reaction (in his voice), and the call to
+  // continue. R3 win bypasses this — that's handled by the trophy verdict screen.
+  if (screen === 'tournament-round-won' && tournamentVarResult && tournamentOpponent) {
+    const r = tournamentVarResult;
+    const opponentPicks = resolveOpponentPicks(tournamentOpponent);
+    const nextRound = tournamentRound + 1;
+    const nextOpponentLabel = nextRound === 2 ? "PETE'S PRODUCER" : "PETE THE PUNDIT";
+    const continueButtonLabel = nextRound === 2 ? "FACE THE PRODUCER" : "FACE PETE";
+    const continueAction = nextRound === 2 ? advanceToRound2 : startTournamentRound3;
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <style>{`
+          @keyframes kick3-trophy-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50%      { transform: scale(1.04); opacity: 0.92; }
+          }
+          @keyframes kick3-won-slidein {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '560px' }}>
+
+            {/* Top label */}
+            <div style={{
+              textAlign: 'center',
+              ...condFont,
+              fontSize: '11px',
+              letterSpacing: '0.4em',
+              color: '#5fb04a',
+              fontWeight: 700,
+              marginBottom: '10px',
+              animation: 'kick3-won-slidein 0.4s ease-out'
+            }}>
+              ROUND {tournamentRound} COMPLETE
+            </div>
+
+            {/* Big celebratory headline */}
+            <h1 style={{
+              ...displayFont,
+              fontSize: 'clamp(40px, 12vw, 64px)',
+              fontWeight: 800,
+              color: colours.gold,
+              margin: '0 0 8px 0',
+              textAlign: 'center',
+              letterSpacing: '0.02em',
+              lineHeight: 1,
+              animation: 'kick3-won-slidein 0.5s ease-out',
+              textShadow: '0 4px 24px rgba(212,175,55,0.35)'
+            }}>
+              ROUND {tournamentRound} WON
+            </h1>
+
+            {/* Subhead — opponent beaten */}
+            <div style={{
+              ...condFont,
+              fontSize: '14px',
+              letterSpacing: '0.2em',
+              color: colours.cream,
+              fontWeight: 600,
+              textAlign: 'center',
+              marginBottom: '28px',
+              opacity: 0.85,
+              animation: 'kick3-won-slidein 0.6s ease-out'
+            }}>
+              {tournamentOpponent.label} — DEFEATED
+            </div>
+
+            {/* Pete's reaction — quote block in his voice */}
+            <div style={{
+              background: 'rgba(212,175,55,0.06)',
+              border: '1px solid rgba(212,175,55,0.25)',
+              borderLeft: `3px solid ${colours.gold}`,
+              padding: '18px 22px',
+              borderRadius: '6px',
+              marginBottom: '28px',
+              animation: 'kick3-won-slidein 0.7s ease-out'
+            }}>
+              <div style={{
+                ...condFont,
+                fontSize: '10px',
+                letterSpacing: '0.3em',
+                color: colours.gold,
+                marginBottom: '8px',
+                fontWeight: 700
+              }}>
+                PETE
+              </div>
+              <p style={{
+                ...displayFont,
+                fontSize: 'clamp(17px, 4.5vw, 20px)',
+                fontStyle: 'italic',
+                color: colours.cream,
+                margin: 0,
+                lineHeight: 1.4
+              }}>
+                &ldquo;{roundWinReaction}&rdquo;
+              </p>
+            </div>
+
+            {/* Score recap — your three vs their three */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '12px',
+              marginBottom: '28px',
+              animation: 'kick3-won-slidein 0.8s ease-out'
+            }}>
+              {/* Player squad */}
+              <div style={{ background: colours.surface, padding: '12px 10px', borderRadius: '6px' }}>
+                <div style={{
+                  ...condFont,
+                  fontSize: '10px',
+                  letterSpacing: '0.22em',
+                  color: colours.gold,
+                  marginBottom: '8px',
+                  textAlign: 'center',
+                  fontWeight: 700
+                }}>
+                  YOUR THREE
+                </div>
+                {squad.map((p, i) => (
+                  <div key={i} style={{
+                    ...condFont,
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: colours.cream,
+                    padding: '4px 0',
+                    borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none'
+                  }}>
+                    {p.name}
+                  </div>
+                ))}
+                <div style={{
+                  marginTop: '8px',
+                  paddingTop: '8px',
+                  borderTop: '1px solid rgba(212,175,55,0.2)',
+                  ...condFont,
+                  fontSize: '11px',
+                  color: colours.gold,
+                  letterSpacing: '0.15em',
+                  textAlign: 'center'
+                }}>
+                  {tournamentAttribute}: <span style={{ fontWeight: 800, fontSize: '14px' }}>{r.playerTotal}</span>
+                </div>
+              </div>
+
+              {/* Opponent squad */}
+              <div style={{ background: colours.surface, padding: '12px 10px', borderRadius: '6px' }}>
+                <div style={{
+                  ...condFont,
+                  fontSize: '10px',
+                  letterSpacing: '0.22em',
+                  color: colours.muted,
+                  marginBottom: '8px',
+                  textAlign: 'center',
+                  fontWeight: 700
+                }}>
+                  THEIR THREE
+                </div>
+                {opponentPicks.map((p, i) => (
+                  <div key={i} style={{
+                    ...condFont,
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: colours.muted,
+                    padding: '4px 0',
+                    borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none'
+                  }}>
+                    {p.name}
+                  </div>
+                ))}
+                <div style={{
+                  marginTop: '8px',
+                  paddingTop: '8px',
+                  borderTop: '1px solid rgba(255,255,255,0.1)',
+                  ...condFont,
+                  fontSize: '11px',
+                  color: colours.muted,
+                  letterSpacing: '0.15em',
+                  textAlign: 'center'
+                }}>
+                  {tournamentAttribute}: <span style={{ fontWeight: 800, fontSize: '14px' }}>{r.opponentTotal}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* "What's next" label */}
+            <div style={{
+              textAlign: 'center',
+              ...condFont,
+              fontSize: '11px',
+              letterSpacing: '0.3em',
+              color: colours.muted,
+              fontWeight: 700,
+              marginBottom: '6px',
+              animation: 'kick3-won-slidein 0.9s ease-out'
+            }}>
+              NEXT — ROUND {nextRound}
+            </div>
+            <div style={{
+              textAlign: 'center',
+              ...displayFont,
+              fontSize: 'clamp(20px, 6vw, 26px)',
+              fontWeight: 700,
+              color: colours.cream,
+              marginBottom: '20px',
+              animation: 'kick3-won-slidein 1.0s ease-out'
+            }}>
+              {nextOpponentLabel}
+            </div>
+
+            {/* Continue button */}
+            <button
+              onClick={continueAction}
+              style={{
+                width: '100%',
+                padding: '16px 20px',
+                background: '#5fb04a',
+                color: '#0a1a08',
+                border: 'none',
+                borderRadius: '10px',
+                ...displayFont,
+                fontSize: 'clamp(18px, 5vw, 22px)',
+                fontWeight: 800,
+                letterSpacing: '0.08em',
+                cursor: 'pointer',
+                marginBottom: '10px',
+                boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                animation: 'kick3-won-slidein 1.1s ease-out'
+              }}
+            >
+              <span>{continueButtonLabel}</span>
+              <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
+            </button>
+
+            {/* Stop-for-today option */}
+            <button
+              onClick={() => endTournamentAttempt(`won-r${tournamentRound}`)}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                background: 'transparent',
+                color: colours.muted,
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '8px',
+                ...condFont,
+                fontSize: '13px',
+                fontWeight: 600,
+                letterSpacing: '0.15em',
+                cursor: 'pointer'
+              }}
+            >
+              STOP HERE FOR TODAY
+            </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
   // ---------- TOURNAMENT VAR VERDICT SCREEN ----------
   // Shows after each Round 1 or Round 2 draft completes. Reveals both teams,
   // attribute totals, VAR phrase, and routes onward (next round on win, end on loss).
@@ -6704,10 +6996,18 @@ Deliver your verdict as JSON.`;
               </div>
             </div>
 
-            {/* Action button — depends on outcome and round */}
+            {/* Action button — depends on outcome and round.
+                Phase 2, Deploy 5 / Stage 2: on a win, route to the round-won
+                congrats screen instead of advancing directly. Pick the Pete
+                reaction here so it's stable across re-renders. */}
             {r.won && !isFinalRound && (
               <button
-                onClick={advanceToRound2}
+                onClick={() => {
+                  const reaction = pickRandomLine(PETE_R1_WIN_REACTIONS)
+                    || PETE_R1_WIN_REACTIONS[0];
+                  setRoundWinReaction(reaction);
+                  setScreen('tournament-round-won');
+                }}
                 style={{
                   width: '100%',
                   padding: '16px 20px',
@@ -6731,7 +7031,12 @@ Deliver your verdict as JSON.`;
             )}
             {r.won && isFinalRound && (
               <button
-                onClick={startTournamentRound3}
+                onClick={() => {
+                  const reaction = pickRandomLine(PETE_R2_WIN_REACTIONS)
+                    || PETE_R2_WIN_REACTIONS[0];
+                  setRoundWinReaction(reaction);
+                  setScreen('tournament-round-won');
+                }}
                 style={{
                   width: '100%',
                   padding: '16px 20px',
