@@ -678,13 +678,26 @@ const TIER_SYMBOLS = {
   Wildcard: "✦"
 };
 
-// Category colours (from original Kick 5 spec)
+// Category colours (from original Kick 5 spec). Legacy added for tournament R3.
 const CATEGORY_COLOURS = {
   "One-Off": "#5DADE2",       // light blue
   "Season-Long": "#58D68D",   // green
   "Style": "#A569BD",         // purple
   "Character": "#F0B27A",     // amber
-  "Chaos": "#95A5A6"          // grey
+  "Chaos": "#95A5A6",         // grey
+  "Legacy": "#D4AF37"         // gold (R3 only)
+};
+
+// Per-category hint lines shown under the question on the draft screen.
+// Phase 2, Deploy 4: coaching nudges in Pete's voice. One line per category,
+// styled italic and muted under the question text.
+const CATEGORY_HINTS = {
+  "One-Off":     "Find someone you'd back to deliver in a single big moment.",
+  "Season-Long": "Look for the players who don't fade. Forty games. Cold Tuesdays.",
+  "Style":       "Pick the ones you'd pay to watch. Beauty over function.",
+  "Character":   "Find the voices. The ones who don't shrink when the cameras come on.",
+  "Chaos":       "Look for players who thrive when the game gets unrecognisable.",
+  "Legacy":      "World Cup history weighs heavy. Find the names sewn into it."
 };
 
 // Shuffle helper
@@ -3880,36 +3893,29 @@ Deliver your verdict as JSON.`;
   // ---------- DRAFT SCREEN ----------
   if (screen === 'draft') {
     let cards = draftRounds[currentRound] || [];
-    // Safety: if the player already has a GK AND both cards in this round are GKs,
-    // they'd be stuck with nothing to pick. Swap one of the GKs for a non-GK
-    // fallback. Single-GK rounds are left alone — the GK card is shown disabled
-    // with an "Already got a keeper" hint so the rule is visible to the player.
+    // GK rule: max 1 goalkeeper per squad of 3.
+    // If the player has already picked a GK and any card in this round is also a GK,
+    // swap that GK card for a fresh non-GK pick. Phase 2, Deploy 4: was previously
+    // showing the GK card disabled with "ALREADY GOT A KEEPER" — better UX is to
+    // give the player two genuine choices instead.
+    // Source pool depends on context: R3 uses the Pete-eligible 108 (preserves card
+    // shape + ratings); R1/R2 uses the World Cup 180; daily/h2h use PLAYER_POOL.
     const hasGkInSquad = squad.some(sq => sq.position === "GK");
     const gkCardCount = cards.filter(c => c && c.position === "GK").length;
-    if (hasGkInSquad && gkCardCount === cards.filter(Boolean).length && gkCardCount > 0) {
-      // All cards are GKs and player already has one — swap all but one for non-GKs.
-      // Source pool depends on context: R3 uses the Pete-eligible 108 (preserves
-      // card shape + ratings); R1/R2/solo/h2h use the daily PLAYER_POOL.
+    if (hasGkInSquad && gkCardCount > 0) {
       const usedNames = new Set([
         ...squad.map(p => p.name),
         ...draftRounds.flat().filter(Boolean).map(p => p.name)
       ]);
-      const isR3WorldCupDraft = cards.some(c => c && c.isWorldCup);
+      const isWorldCupDraft = cards.some(c => c && c.isWorldCup);
       let replacements;
-      if (isR3WorldCupDraft) {
-        // R3: enrich Pete-eligible non-GKs into card-shaped objects.
+      if (isWorldCupDraft) {
+        // Tournament R1/R2 (full 180) or R3 (Pete-eligible 108).
+        // Use the same pool the round was drafted from for visual consistency.
+        const sourcePool = tournamentRound === 3 ? getPeteEligiblePool() : WORLD_CUP_POOL;
         replacements = shuffle(
-          getPeteEligiblePool().filter(p => p.position !== "GK" && !usedNames.has(p.name))
-        ).map(p => ({
-          name: p.name,
-          tier: p.overall >= 8.5 ? 'Legend' : p.overall >= 7.5 ? 'Star' : p.overall >= 6.5 ? 'Cult' : 'Wildcard',
-          position: 'MID',
-          flag: '⚽',
-          note: `${p.country} — ${p.era}`,
-          overall: p.overall,
-          peteEligible: p.peteEligible,
-          isWorldCup: true,
-        }));
+          sourcePool.filter(p => p.position !== "GK" && !usedNames.has(p.name))
+        ).map(enrichWorldCupCard);
       } else {
         replacements = shuffle(
           PLAYER_POOL.filter(p => p.position !== "GK" && !usedNames.has(p.name))
@@ -4010,15 +4016,53 @@ Deliver your verdict as JSON.`;
               </div>
             </div>
 
-            {/* Question reminder */}
-            <div style={{ marginBottom: '24px', padding: '14px 18px', background: 'rgba(212,175,55,0.06)', borderLeft: `2px solid ${colours.gold}` }}>
-              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.3em', color: colours.gold, marginBottom: '4px' }}>
-                THE QUESTION
-              </div>
-              <p style={{ ...displayFont, fontSize: '18px', margin: 0, lineHeight: '1.2' }}>
-                {mode === 'tournament' ? tournamentQuestionText : TODAYS_QUESTION.text}
-              </p>
-            </div>
+            {/* Question reminder — Phase 2, Deploy 4: category badge + hint line added */}
+            {(() => {
+              const activeCategory = mode === 'tournament'
+                ? (tournamentAttribute || 'Legacy')
+                : TODAYS_QUESTION.category;
+              const categoryColour = CATEGORY_COLOURS[activeCategory] || colours.gold;
+              const hintLine = CATEGORY_HINTS[activeCategory] || '';
+              return (
+                <div style={{ marginBottom: '24px', padding: '14px 18px', background: 'rgba(212,175,55,0.06)', borderLeft: `2px solid ${colours.gold}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.3em', color: colours.gold }}>
+                      THE QUESTION
+                    </div>
+                    {/* Category badge */}
+                    <div style={{
+                      ...condFont,
+                      fontSize: '10px',
+                      letterSpacing: '0.18em',
+                      fontWeight: 700,
+                      padding: '3px 9px',
+                      borderRadius: '3px',
+                      background: `${categoryColour}22`,
+                      border: `1px solid ${categoryColour}66`,
+                      color: categoryColour
+                    }}>
+                      ● {activeCategory.toUpperCase()}
+                    </div>
+                  </div>
+                  <p style={{ ...displayFont, fontSize: '18px', margin: '0 0 8px 0', lineHeight: '1.2' }}>
+                    {mode === 'tournament' ? tournamentQuestionText : TODAYS_QUESTION.text}
+                  </p>
+                  {hintLine && (
+                    <p style={{
+                      ...condFont,
+                      fontStyle: 'italic',
+                      fontSize: '12px',
+                      color: colours.muted,
+                      margin: 0,
+                      lineHeight: 1.4,
+                      opacity: 0.85
+                    }}>
+                      {hintLine}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Squad so far */}
             {squad.length > 0 && (
@@ -4052,10 +4096,12 @@ Deliver your verdict as JSON.`;
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {cards.map((p, i) => {
                 if (!p) return null;
-                // GK rule: max 1 goalkeeper per squad of 3.
-                // If the player has already picked a GK, any further GK cards are blocked.
-                const hasGkAlready = squad.some(sq => sq.position === "GK");
-                const isBlocked = p.position === "GK" && hasGkAlready;
+                // GK rule is now enforced upstream by the auto-swap logic at the top
+                // of this screen — if the player has a keeper and a GK card appears,
+                // it gets swapped for a non-GK pick before render. So isBlocked is
+                // always false here. The styling branches kept in place defensively.
+                // Phase 2, Deploy 4: was "ALREADY GOT A KEEPER" disabled card.
+                const isBlocked = false;
                 return (
                 <button
                   key={i}
@@ -4121,18 +4167,6 @@ Deliver your verdict as JSON.`;
                   <div style={{ ...condFont, fontStyle: 'italic', color: colours.muted, fontSize: '14px' }}>
                     {p.note}
                   </div>
-                  {isBlocked && (
-                    <div style={{
-                      marginTop: '8px',
-                      ...condFont,
-                      fontSize: '11px',
-                      letterSpacing: '0.2em',
-                      color: colours.accent,
-                      fontWeight: 600
-                    }}>
-                      ALREADY GOT A KEEPER
-                    </div>
-                  )}
                 </button>
                 );
               })}
