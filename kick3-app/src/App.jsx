@@ -2971,6 +2971,60 @@ Deliver your verdict as JSON.`;
             filter: brightness(1.1);
           }
 
+          /* ============ Phase 2, Deploy 5 / Stage 5 — button animations ============ */
+          /* Shared tactile hover scale + glow. Applied to every interactive button on the home screens. */
+          .kick3-button-hover {
+            transition: transform 0.18s ease-out, box-shadow 0.18s ease-out, filter 0.18s ease-out;
+          }
+          .kick3-button-hover:hover:not(:disabled) {
+            transform: translateY(-2px);
+            filter: brightness(1.08);
+          }
+          .kick3-button-hover:active:not(:disabled) {
+            transform: translateY(0);
+            filter: brightness(0.96);
+          }
+
+          /* Pulsing gold glow — applied to the flagship tournament buttons only.
+             Slow 3.6s breathing cycle. Glow is gold-tinted to read as trophy / prize. */
+          @keyframes kick3-pulse-gold-kf {
+            0%, 100% {
+              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 0 rgba(212,175,55,0.0), 0 0 18px 2px rgba(212,175,55,0.10);
+            }
+            50% {
+              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 4px rgba(212,175,55,0.18), 0 0 28px 6px rgba(212,175,55,0.32);
+            }
+          }
+          .kick3-pulse-gold {
+            animation: kick3-pulse-gold-kf 3.6s ease-in-out infinite;
+          }
+          .kick3-pulse-gold:disabled {
+            animation: none;
+          }
+
+          /* Shimmer sweep — diagonal highlight sliding across the button.
+             5s cycle: ~0.9s sweep, ~4.1s pause. For the RECORD button. */
+          @keyframes kick3-shimmer-gold-kf {
+            0%   { transform: translateX(-110%) skewX(-18deg); }
+            18%  { transform: translateX(110%)  skewX(-18deg); }
+            100% { transform: translateX(110%)  skewX(-18deg); }
+          }
+          .kick3-shimmer-gold {
+            position: relative;
+            overflow: hidden;
+          }
+          .kick3-shimmer-gold::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 40%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.35) 50%, transparent 100%);
+            animation: kick3-shimmer-gold-kf 5s ease-in-out infinite;
+            pointer-events: none;
+          }
+
         `}</style>
 
         <div className="kick3-home-root">
@@ -3151,6 +3205,7 @@ Deliver your verdict as JSON.`;
               {tournamentBetaActive && (
                 <button
                   onClick={() => setScreen('tournament-home')}
+                  className="kick3-button-hover kick3-pulse-gold"
                   style={{
                     width: '100%',
                     padding: '18px 20px',
@@ -3192,6 +3247,7 @@ Deliver your verdict as JSON.`;
               <button
                 onClick={startGame}
                 disabled={soloLocked}
+                className="kick3-button-hover"
                 style={{
                   width: '100%',
                   padding: '18px 20px',
@@ -3255,6 +3311,7 @@ Deliver your verdict as JSON.`;
               <button
                 onClick={startH2H}
                 disabled={h2hLocked}
+                className="kick3-button-hover"
                 style={{
                   width: '100%',
                   padding: '15px 20px',
@@ -3647,7 +3704,7 @@ Deliver your verdict as JSON.`;
                 {tournamentBetaActive && (
                   <button
                     onClick={() => setScreen('tournament-home')}
-                    className="kick3-desktop-btn-tournament"
+                    className="kick3-desktop-btn-tournament kick3-pulse-gold"
                     style={{
                       width: '100%',
                       padding: '22px 24px',
@@ -3689,6 +3746,7 @@ Deliver your verdict as JSON.`;
                 <button
                   onClick={startGame}
                   disabled={soloLocked}
+                  className="kick3-button-hover"
                   style={{
                     width: '100%',
                     padding: '22px 24px',
@@ -3752,6 +3810,7 @@ Deliver your verdict as JSON.`;
                 <button
                   onClick={startH2H}
                   disabled={h2hLocked}
+                  className="kick3-button-hover"
                   style={{
                     width: '100%',
                     padding: '18px 24px',
@@ -5878,6 +5937,57 @@ Deliver your verdict as JSON.`;
             transform: scale(1.03);
             filter: brightness(1.1);
           }
+
+          /* ============ Phase 2, Deploy 5 / Stage 5 — button animations ============ */
+          /* Same shared classes as the home screen. Tournament-home <style> block is
+             scoped to this screen only so we duplicate the definitions here. */
+          .kick3-button-hover {
+            transition: transform 0.18s ease-out, box-shadow 0.18s ease-out, filter 0.18s ease-out;
+          }
+          .kick3-button-hover:hover:not(:disabled) {
+            transform: translateY(-2px);
+            filter: brightness(1.08);
+          }
+          .kick3-button-hover:active:not(:disabled) {
+            transform: translateY(0);
+            filter: brightness(0.96);
+          }
+
+          @keyframes kick3-pulse-gold-kf {
+            0%, 100% {
+              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 0 rgba(212,175,55,0.0), 0 0 18px 2px rgba(212,175,55,0.10);
+            }
+            50% {
+              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 4px rgba(212,175,55,0.18), 0 0 28px 6px rgba(212,175,55,0.32);
+            }
+          }
+          .kick3-pulse-gold {
+            animation: kick3-pulse-gold-kf 3.6s ease-in-out infinite;
+          }
+          .kick3-pulse-gold:disabled {
+            animation: none;
+          }
+
+          @keyframes kick3-shimmer-gold-kf {
+            0%   { transform: translateX(-110%) skewX(-18deg); }
+            18%  { transform: translateX(110%)  skewX(-18deg); }
+            100% { transform: translateX(110%)  skewX(-18deg); }
+          }
+          .kick3-shimmer-gold {
+            position: relative;
+            overflow: hidden;
+          }
+          .kick3-shimmer-gold::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 40%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.35) 50%, transparent 100%);
+            animation: kick3-shimmer-gold-kf 5s ease-in-out infinite;
+            pointer-events: none;
+          }
         `}</style>
 
         <div className="kick3-tour-root">
@@ -5956,6 +6066,7 @@ Deliver your verdict as JSON.`;
               <button
                 onClick={canPlay ? startTournament : undefined}
                 disabled={!canPlay}
+                className="kick3-button-hover kick3-pulse-gold"
                 style={{
                   width: '100%',
                   padding: '18px 20px',
@@ -5992,6 +6103,7 @@ Deliver your verdict as JSON.`;
               {/* RECORD — gold outline, active (opens tournament-record screen) */}
               <button
                 onClick={() => setScreen('tournament-record')}
+                className="kick3-button-hover kick3-shimmer-gold"
                 style={{
                   width: '100%',
                   padding: '15px 20px',
@@ -6104,7 +6216,7 @@ Deliver your verdict as JSON.`;
                 <button
                   onClick={canPlay ? startTournament : undefined}
                   disabled={!canPlay}
-                  className="kick3-tour-btn-play"
+                  className="kick3-tour-btn-play kick3-pulse-gold"
                   style={{
                     width: '100%',
                     padding: '22px 24px',
@@ -6141,6 +6253,7 @@ Deliver your verdict as JSON.`;
                 {/* RECORD — gold outline, active */}
                 <button
                   onClick={() => setScreen('tournament-record')}
+                  className="kick3-button-hover kick3-shimmer-gold"
                   style={{
                     width: '100%',
                     padding: '18px 24px',
