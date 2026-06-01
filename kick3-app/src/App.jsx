@@ -3388,13 +3388,33 @@ Deliver your verdict as JSON.`;
     const gkCardCount = cards.filter(c => c && c.position === "GK").length;
     if (hasGkInSquad && gkCardCount === cards.filter(Boolean).length && gkCardCount > 0) {
       // All cards are GKs and player already has one — swap all but one for non-GKs.
+      // Source pool depends on context: R3 uses the Pete-eligible 108 (preserves
+      // card shape + ratings); R1/R2/solo/h2h use the daily PLAYER_POOL.
       const usedNames = new Set([
         ...squad.map(p => p.name),
         ...draftRounds.flat().filter(Boolean).map(p => p.name)
       ]);
-      const replacements = shuffle(
-        PLAYER_POOL.filter(p => p.position !== "GK" && !usedNames.has(p.name))
-      );
+      const isR3WorldCupDraft = cards.some(c => c && c.isWorldCup);
+      let replacements;
+      if (isR3WorldCupDraft) {
+        // R3: enrich Pete-eligible non-GKs into card-shaped objects.
+        replacements = shuffle(
+          getPeteEligiblePool().filter(p => p.position !== "GK" && !usedNames.has(p.name))
+        ).map(p => ({
+          name: p.name,
+          tier: p.overall >= 8.5 ? 'Legend' : p.overall >= 7.5 ? 'Star' : p.overall >= 6.5 ? 'Cult' : 'Wildcard',
+          position: 'MID',
+          flag: '⚽',
+          note: `${p.country} — ${p.era}`,
+          overall: p.overall,
+          peteEligible: p.peteEligible,
+          isWorldCup: true,
+        }));
+      } else {
+        replacements = shuffle(
+          PLAYER_POOL.filter(p => p.position !== "GK" && !usedNames.has(p.name))
+        );
+      }
       let ri = 0;
       cards = cards.map(c => {
         if (c && c.position === "GK" && ri < replacements.length) {
@@ -6049,9 +6069,11 @@ Deliver your verdict as JSON.`;
             {/* Action button — draft your three */}
             <button
               onClick={() => {
-                // Begin drafting for R3. Exclude Pete's three picks so there's no clash.
+                // Begin drafting for R3. Player drafts from the Pete-eligible 108
+                // (Phase 2, Deploy 1 / Stage 3) — was generateDraft from the daily pool.
+                // Excludes Pete's three picks so there's no clash.
                 const petePickNames = resolveOpponentPicks(tournamentOpponent).map(p => p.name);
-                setDraftRounds(generateDraft(petePickNames));
+                setDraftRounds(generateR3Draft(petePickNames));
                 setCurrentRound(0);
                 setSquad([]);
                 setScreen('draft');
