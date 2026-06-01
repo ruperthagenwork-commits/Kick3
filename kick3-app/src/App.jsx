@@ -2073,6 +2073,10 @@ export default function Kick3() {
 
   // Drive the phase cycler whenever we're on the VAR-checking screen.
   // Resets when leaving the screen so the next attempt starts at phase 0.
+  // Phase 2, Deploy 5 / Stage 3: at the 3s mark, route based on win/loss:
+  //   Win + R1/R2 → tournament-round-won (the congrats screen IS the verdict)
+  //   Loss + R1/R2 → tournament-var (the existing loss verdict screen)
+  //   R3 (any outcome) → submitR3Defence handles routing itself
   useEffect(() => {
     if (screen !== 'tournament-var-checking') {
       // Reset to phase 0 for next attempt; do nothing else.
@@ -2082,12 +2086,17 @@ export default function Kick3() {
     // Phase 0 is the initial state set on entry. Advance to 1 at 1s, 2 at 2s.
     const t1 = setTimeout(() => setVarCheckPhase(1), 1000);
     const t2 = setTimeout(() => setVarCheckPhase(2), 2000);
-    // Auto-route to verdict screen at 3s for R1/R2 (R3 handles its own routing).
-    // We check tournamentRound at fire-time, not declaration time, by capturing it in the closure.
+    // Auto-route at 3s for R1/R2.
     const t3 = setTimeout(() => {
-      // Only auto-route for R1/R2. R3's submitR3Defence drives its own routing
-      // after the API resolves, so we leave the screen up for R3.
-      if (tournamentRound === 1 || tournamentRound === 2) {
+      if (tournamentRound !== 1 && tournamentRound !== 2) return;
+      const playerWon = tournamentVarResult && tournamentVarResult.won;
+      if (playerWon) {
+        // Pre-pick Pete's reaction here so it's stable for the congrats screen.
+        const pool = tournamentRound === 1 ? PETE_R1_WIN_REACTIONS : PETE_R2_WIN_REACTIONS;
+        const reaction = pickRandomLine(pool) || pool[0];
+        setRoundWinReaction(reaction);
+        setScreen('tournament-round-won');
+      } else {
         setScreen('tournament-var');
       }
     }, 3000);
@@ -2096,7 +2105,7 @@ export default function Kick3() {
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [screen, tournamentRound]);
+  }, [screen, tournamentRound, tournamentVarResult]);
 
   // ============ DAILY PLAY LIMIT (3 solo + 3 1v1 per day) ============
   // Counters reset automatically when TODAYS_QUESTION.number advances.
@@ -6644,6 +6653,23 @@ Deliver your verdict as JSON.`;
               {tournamentOpponent.label} — DEFEATED
             </div>
 
+            {/* VAR verdict phrase. Phase 2, Deploy 5 / Stage 3: was on the
+                old verdict screen; lifted here as the congrats screen IS the win path. */}
+            <div style={{
+              textAlign: 'center',
+              ...condFont,
+              fontSize: '13px',
+              letterSpacing: '0.18em',
+              color: colours.muted,
+              fontStyle: 'italic',
+              marginBottom: '24px',
+              padding: '0 12px',
+              lineHeight: 1.4,
+              animation: 'kick3-won-slidein 0.65s ease-out'
+            }}>
+              {r.phrase}
+            </div>
+
             {/* Pete's reaction — quote block in his voice */}
             <div style={{
               background: 'rgba(212,175,55,0.06)',
@@ -6676,7 +6702,10 @@ Deliver your verdict as JSON.`;
               </p>
             </div>
 
-            {/* Score recap — your three vs their three */}
+            {/* Score recap — your three vs their three.
+                Phase 2, Deploy 5 / Stage 3: per-player attribute scores added
+                so the player sees how the win was earned (parity with the
+                old verdict screen). */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
@@ -6697,18 +6726,26 @@ Deliver your verdict as JSON.`;
                 }}>
                   YOUR THREE
                 </div>
-                {squad.map((p, i) => (
-                  <div key={i} style={{
-                    ...condFont,
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: colours.cream,
-                    padding: '4px 0',
-                    borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none'
-                  }}>
-                    {p.name}
-                  </div>
-                ))}
+                {squad.map((p, i) => {
+                  const scoresMap = p && p.isWorldCup
+                    ? worldCupAttributeScores(p.name)
+                    : stubAttributeScores(p.name);
+                  const sc = scoresMap[tournamentAttribute] || 0;
+                  return (
+                    <div key={i} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '4px 0',
+                      borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                      ...condFont,
+                      fontSize: '12px'
+                    }}>
+                      <span style={{ color: colours.cream, fontWeight: 600 }}>{p.name}</span>
+                      <span style={{ color: colours.gold, fontWeight: 700, fontSize: '14px' }}>{sc}</span>
+                    </div>
+                  );
+                })}
                 <div style={{
                   marginTop: '8px',
                   paddingTop: '8px',
@@ -6736,18 +6773,26 @@ Deliver your verdict as JSON.`;
                 }}>
                   THEIR THREE
                 </div>
-                {opponentPicks.map((p, i) => (
-                  <div key={i} style={{
-                    ...condFont,
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: colours.muted,
-                    padding: '4px 0',
-                    borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none'
-                  }}>
-                    {p.name}
-                  </div>
-                ))}
+                {opponentPicks.map((p, i) => {
+                  const scoresMap = p && p.isWorldCup
+                    ? worldCupAttributeScores(p.name)
+                    : stubAttributeScores(p.name);
+                  const sc = scoresMap[tournamentAttribute] || 0;
+                  return (
+                    <div key={i} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '4px 0',
+                      borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                      ...condFont,
+                      fontSize: '12px'
+                    }}>
+                      <span style={{ color: colours.cream, fontWeight: 600 }}>{p.name}</span>
+                      <span style={{ color: colours.muted, fontWeight: 700, fontSize: '14px' }}>{sc}</span>
+                    </div>
+                  );
+                })}
                 <div style={{
                   marginTop: '8px',
                   paddingTop: '8px',
