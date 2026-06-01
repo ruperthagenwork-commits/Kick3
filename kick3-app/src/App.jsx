@@ -678,6 +678,18 @@ const TIER_SYMBOLS = {
   Wildcard: "✦"
 };
 
+// Phase 2, Deploy 5 / Stage 9: helpers that render tournament (World Cup) cards
+// with a consistent Pete-green border and no tier symbol/label. Tiers were authored
+// for the daily 384-player pool and synthesised onto World Cup players via Overall
+// brackets — for those, the labels would make authorial claims the data doesn't
+// support, so we suppress them. Daily-game cards fall through to TIER_COLOURS /
+// TIER_SYMBOLS unchanged.
+const TOURNAMENT_BORDER_COLOUR = '#5fb04a';
+const tierColourFor = (p) => (p && p.isWorldCup)
+  ? TOURNAMENT_BORDER_COLOUR
+  : (TIER_COLOURS[p && p.tier] || '#888');
+const showTierBadge = (p) => !(p && p.isWorldCup);
+
 // Category colours (from original Kick 5 spec). Legacy added for tournament R3.
 const CATEGORY_COLOURS = {
   "One-Off": "#5DADE2",       // light blue
@@ -3301,7 +3313,7 @@ Deliver your verdict as JSON.`;
                   </>
                 ) : (
                   <>
-                    <span>PLAY TODAY</span>
+                    <span>SOLO MODE</span>
                     <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
                   </>
                 )}
@@ -3364,7 +3376,7 @@ Deliver your verdict as JSON.`;
                     <span>1V1 LIMIT REACHED</span>
                   </>
                 ) : (
-                  <span>1V1 MODE</span>
+                  <span>2 PLAYER MODE</span>
                 )}
               </button>
 
@@ -3800,7 +3812,7 @@ Deliver your verdict as JSON.`;
                     </>
                   ) : (
                     <>
-                      <span>PLAY TODAY</span>
+                      <span>SOLO MODE</span>
                       <span style={{ fontSize: '26px', lineHeight: 1 }}>→</span>
                     </>
                   )}
@@ -3863,7 +3875,7 @@ Deliver your verdict as JSON.`;
                       <span>1V1 LIMIT REACHED</span>
                     </>
                   ) : (
-                    <span>1V1 MODE</span>
+                    <span>2 PLAYER MODE</span>
                   )}
                 </button>
 
@@ -4128,16 +4140,18 @@ Deliver your verdict as JSON.`;
                     <div key={i} style={{
                       padding: '5px 9px',
                       background: 'rgba(0,0,0,0.30)',
-                      border: `1px solid ${TIER_COLOURS[p.tier] || '#888'}66`,
+                      border: `1px solid ${tierColourFor(p)}66`,
                       fontSize: '12px',
                       ...condFont,
                       fontWeight: 600,
                       color: colours.cream,
                       borderRadius: '4px'
                     }}>
-                      <span style={{ color: TIER_COLOURS[p.tier] || '#888', marginRight: '4px' }}>
-                        {TIER_SYMBOLS[p.tier] || '\u2022'}
-                      </span>
+                      {showTierBadge(p) && (
+                        <span style={{ color: tierColourFor(p), marginRight: '4px' }}>
+                          {TIER_SYMBOLS[p.tier] || '\u2022'}
+                        </span>
+                      )}
                       {p.name}
                     </div>
                   ))}
@@ -4219,12 +4233,12 @@ Deliver your verdict as JSON.`;
                     <div key={i} style={{
                       padding: '6px 10px',
                       background: colours.surface,
-                      border: `1px solid ${TIER_COLOURS[p.tier]}55`,
+                      border: `1px solid ${tierColourFor(p)}55`,
                       fontSize: '13px',
                       ...condFont,
                       fontWeight: 600
                     }}>
-                      <span style={{ color: TIER_COLOURS[p.tier], marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>
+                      {showTierBadge(p) && <span style={{ color: tierColourFor(p), marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>}
                       {p.name}
                     </div>
                   ))}
@@ -4253,7 +4267,7 @@ Deliver your verdict as JSON.`;
                   disabled={isBlocked}
                   style={{
                     background: colours.surface,
-                    border: `1px solid ${isBlocked ? `${colours.muted}33` : `${TIER_COLOURS[p.tier]}66`}`,
+                    border: `1px solid ${isBlocked ? `${colours.muted}33` : `${tierColourFor(p)}66`}`,
                     borderRadius: '4px',
                     padding: '20px',
                     textAlign: 'left',
@@ -4267,20 +4281,24 @@ Deliver your verdict as JSON.`;
                   onMouseOver={e => {
                     if (isBlocked) return;
                     e.currentTarget.style.background = colours.surfaceHover;
-                    e.currentTarget.style.borderColor = TIER_COLOURS[p.tier];
+                    e.currentTarget.style.borderColor = tierColourFor(p);
                   }}
                   onMouseOut={e => {
                     if (isBlocked) return;
                     e.currentTarget.style.background = colours.surface;
-                    e.currentTarget.style.borderColor = `${TIER_COLOURS[p.tier]}66`;
+                    e.currentTarget.style.borderColor = `${tierColourFor(p)}66`;
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ color: TIER_COLOURS[p.tier], fontSize: '16px' }}>{TIER_SYMBOLS[p.tier]}</span>
-                      <span style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: TIER_COLOURS[p.tier] }}>
-                        {p.tier.toUpperCase()}
-                      </span>
+                      {showTierBadge(p) && (
+                        <>
+                          <span style={{ color: tierColourFor(p), fontSize: '16px' }}>{TIER_SYMBOLS[p.tier]}</span>
+                          <span style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: tierColourFor(p) }}>
+                            {p.tier.toUpperCase()}
+                          </span>
+                        </>
+                      )}
                     </div>
                     {p.isWorldCup ? (
                       // R3 World Cup cards: show Overall rating as a gold badge top-right.
@@ -4341,16 +4359,18 @@ Deliver your verdict as JSON.`;
                   padding: '12px 16px',
                   marginBottom: '8px',
                   background: colours.surface,
-                  borderLeft: `3px solid ${TIER_COLOURS[p.tier]}`,
+                  borderLeft: `3px solid ${tierColourFor(p)}`,
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
                   <div>
                     <div style={{ ...displayFont, fontSize: '20px', fontWeight: 500 }}>{p.name}</div>
-                    <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: TIER_COLOURS[p.tier] }}>
-                      {TIER_SYMBOLS[p.tier]} {p.tier.toUpperCase()}
-                    </div>
+                    {showTierBadge(p) && (
+                      <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: tierColourFor(p) }}>
+                        {TIER_SYMBOLS[p.tier]} {p.tier.toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   <span style={{ fontSize: '22px' }}>{p.flag}</span>
                 </div>
@@ -4519,14 +4539,14 @@ Deliver your verdict as JSON.`;
                 {squad.map((p, i) => (
                   <div key={i} style={{
                     padding: '8px 12px',
-                    borderLeft: `2px solid ${TIER_COLOURS[p.tier]}`,
+                    borderLeft: `2px solid ${tierColourFor(p)}`,
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     fontSize: '15px'
                   }}>
                     <span style={{ ...condFont, fontWeight: 600, letterSpacing: '0.02em' }}>
-                      <span style={{ color: TIER_COLOURS[p.tier], marginRight: '8px' }}>{TIER_SYMBOLS[p.tier]}</span>
+                      {showTierBadge(p) && <span style={{ color: tierColourFor(p), marginRight: '8px' }}>{TIER_SYMBOLS[p.tier]}</span>}
                       {p.name}
                     </span>
                     <span>{p.flag}</span>
@@ -4919,7 +4939,7 @@ Deliver your verdict as JSON.`;
             borderBottom: i < 2 ? `1px solid ${colour}22` : 'none'
           }}>
             <div style={{ ...displayFont, fontSize: '15px', fontWeight: 500, lineHeight: '1.1', marginBottom: '2px' }}>
-              <span style={{ color: TIER_COLOURS[p.tier], marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>
+              {showTierBadge(p) && <span style={{ color: tierColourFor(p), marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>}
               {p.name}
             </div>
             <div style={{ ...condFont, fontSize: '11px', color: colours.muted, fontStyle: 'italic' }}>
@@ -5037,9 +5057,9 @@ Deliver your verdict as JSON.`;
                     fontWeight: 600,
                     padding: '3px 8px',
                     background: 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${TIER_COLOURS[p.tier]}55`
+                    border: `1px solid ${tierColourFor(p)}55`
                   }}>
-                    <span style={{ color: TIER_COLOURS[p.tier], marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>
+                    {showTierBadge(p) && <span style={{ color: tierColourFor(p), marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>}
                     {p.name}
                   </span>
                 ))}
@@ -5064,9 +5084,9 @@ Deliver your verdict as JSON.`;
                     fontWeight: 600,
                     padding: '4px 8px',
                     background: 'rgba(255,255,255,0.06)',
-                    border: `1px solid ${TIER_COLOURS[p.tier]}88`
+                    border: `1px solid ${tierColourFor(p)}88`
                   }}>
-                    <span style={{ color: TIER_COLOURS[p.tier], marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>
+                    {showTierBadge(p) && <span style={{ color: tierColourFor(p), marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>}
                     {p.name}
                   </span>
                 ))}
@@ -5166,7 +5186,7 @@ Deliver your verdict as JSON.`;
         <div style={{ marginTop: '10px' }}>
           {squad.map((p, i) => (
             <div key={i} style={{ ...condFont, fontSize: '12px', fontWeight: 600, padding: '3px 0', textAlign: 'center' }}>
-              <span style={{ color: TIER_COLOURS[p.tier], marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>
+              {showTierBadge(p) && <span style={{ color: tierColourFor(p), marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>}
               {p.name}
             </div>
           ))}
@@ -5838,16 +5858,14 @@ Deliver your verdict as JSON.`;
 
     // Dynamic context line — three states.
     // Safe access: debug modes can flip insideWindow=true while tournamentStatus is still null
-    // (when real today is outside the window). Use sensible debug fallbacks for trio numbers.
-    const trioNumber = tournamentStatus?.trioNumber ?? 1;
-    const totalTrios = tournamentStatus?.totalTrios ?? 13;
+    // (when real today is outside the window). Used to build the context line below.
     let contextLine;
     if (!insideWindow) {
       contextLine = 'Tournament returns 11 June 2026. Beat Pete in Round 3 to win a trophy.';
     } else if (playedToday) {
-      contextLine = `You\u2019ve played today. Trio ${trioNumber} of ${totalTrios}. Come back tomorrow.`;
+      contextLine = `You\u2019ve played today. Come back tomorrow.`;
     } else {
-      contextLine = `Trio ${trioNumber} of ${totalTrios}. Three rounds, one sitting. Beat Pete to win a trophy.`;
+      contextLine = `One chance, three questions. Beat Pete in Round 3 and earn a trophy.`;
     }
 
     return (
@@ -7376,16 +7394,18 @@ Deliver your verdict as JSON.`;
                   <div key={i} style={{
                     padding: '8px 12px',
                     background: 'rgba(0,0,0,0.30)',
-                    border: `1px solid ${TIER_COLOURS[p.tier] || '#888'}66`,
+                    border: `1px solid ${tierColourFor(p)}66`,
                     fontSize: '14px',
                     ...condFont,
                     fontWeight: 600,
                     color: colours.cream,
                     borderRadius: '5px'
                   }}>
-                    <span style={{ color: TIER_COLOURS[p.tier] || '#888', marginRight: '6px' }}>
-                      {TIER_SYMBOLS[p.tier] || '\u2022'}
-                    </span>
+                    {showTierBadge(p) && (
+                      <span style={{ color: tierColourFor(p), marginRight: '6px' }}>
+                        {TIER_SYMBOLS[p.tier] || '\u2022'}
+                      </span>
+                    )}
                     {p.name}
                   </div>
                 ))}
