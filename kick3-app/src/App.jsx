@@ -3592,7 +3592,28 @@ Deliver your verdict as JSON.`;
                         {p.tier.toUpperCase()}
                       </span>
                     </div>
-                    <span style={{ fontSize: '20px' }}>{p.flag}</span>
+                    {p.isWorldCup ? (
+                      // R3 World Cup cards: show Overall rating as a gold badge top-right.
+                      // Phase 2, Deploy 1 / Stage 4. Per spec: Overall shown on the player's
+                      // six R3 draft cards only — never on opponents or Pete's three picks.
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'baseline',
+                        gap: '3px',
+                        padding: '4px 10px',
+                        background: colours.gold,
+                        color: '#0a0a14',
+                        borderRadius: '3px',
+                        ...displayFont,
+                        fontWeight: 700,
+                        lineHeight: 1
+                      }}>
+                        <span style={{ fontSize: '16px' }}>{Number(p.overall).toFixed(1)}</span>
+                        <span style={{ fontSize: '9px', letterSpacing: '0.18em', opacity: 0.75 }}>OVR</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '20px' }}>{p.flag}</span>
+                    )}
                   </div>
                   <div style={{ ...displayFont, fontSize: '26px', lineHeight: '1.1', fontWeight: 500, marginBottom: '4px' }}>
                     {p.name}
