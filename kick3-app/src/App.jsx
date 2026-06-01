@@ -2038,6 +2038,43 @@ export default function Kick3() {
   const [r3Loading, setR3Loading] = useState(false);
   const [r3Error, setR3Error] = useState(null);
 
+  // ============ VAR-CHECKING SCREEN STATE (Phase 2, Deploy 5 / Stage 1) ============
+  // The VAR screen cycles through three status lines (1s each) before routing to
+  // the verdict. R1/R2 use this for pure suspense; R3 uses it to mask API latency.
+  //
+  // varCheckPhase: 0, 1, or 2 — which status line is currently showing.
+  // For R1/R2 only: after phase 2 elapses (3 total seconds), auto-route to the
+  // verdict screen. R3's routing is handled inside submitR3Defence (it awaits a
+  // 3-second min-delay promise, then routes itself).
+  const [varCheckPhase, setVarCheckPhase] = useState(0);
+
+  // Drive the phase cycler whenever we're on the VAR-checking screen.
+  // Resets when leaving the screen so the next attempt starts at phase 0.
+  useEffect(() => {
+    if (screen !== 'tournament-var-checking') {
+      // Reset to phase 0 for next attempt; do nothing else.
+      if (varCheckPhase !== 0) setVarCheckPhase(0);
+      return;
+    }
+    // Phase 0 is the initial state set on entry. Advance to 1 at 1s, 2 at 2s.
+    const t1 = setTimeout(() => setVarCheckPhase(1), 1000);
+    const t2 = setTimeout(() => setVarCheckPhase(2), 2000);
+    // Auto-route to verdict screen at 3s for R1/R2 (R3 handles its own routing).
+    // We check tournamentRound at fire-time, not declaration time, by capturing it in the closure.
+    const t3 = setTimeout(() => {
+      // Only auto-route for R1/R2. R3's submitR3Defence drives its own routing
+      // after the API resolves, so we leave the screen up for R3.
+      if (tournamentRound === 1 || tournamentRound === 2) {
+        setScreen('tournament-var');
+      }
+    }, 3000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [screen, tournamentRound]);
+
   // ============ DAILY PLAY LIMIT (3 solo + 3 1v1 per day) ============
   // Counters reset automatically when TODAYS_QUESTION.number advances.
   // localStorage keys:
@@ -2380,6 +2417,8 @@ export default function Kick3() {
   };
 
   // Compute the VAR result for the current round and route to the verdict screen.
+  // Phase 2, Deploy 5 / Stage 1: route now goes through the VAR-checking screen
+  // for a 3-second suspense beat before revealing the verdict.
   const computeTournamentVar = (finishedSquad) => {
     const opponentPicks = resolveOpponentPicks(tournamentOpponent);
     const playerTotal = scoreTeamOnAttribute(finishedSquad, tournamentAttribute);
@@ -2398,8 +2437,10 @@ export default function Kick3() {
       won = false;
     }
     const phrase = pickVarPhrase(playerTotal, opponentTotal, viaLegacy, won);
+    // Pre-compute the result and stash it; the VAR-checking screen will reveal it
+    // after its 3-second animation completes.
     setTournamentVarResult({ playerTotal, opponentTotal, viaLegacy, won, phrase });
-    setScreen('tournament-var');
+    setScreen('tournament-var-checking');
   };
 
   // Called from the VAR screen on a loss (Round 1 or 2).
@@ -2491,6 +2532,11 @@ Write Pete's confident argument defending these three picks against the question
     if (r3Loading) return;
     setR3Loading(true);
     setR3Error(null);
+    // Phase 2, Deploy 5 / Stage 1: route through VAR-checking screen immediately.
+    // The API call runs in parallel with a 3s minimum animation delay; we wait for
+    // both before showing the verdict so the suspense beat is consistent.
+    setScreen('tournament-var-checking');
+    const minAnimationDelay = new Promise(resolve => setTimeout(resolve, 3000));
     try {
       const opponentPicks = resolveOpponentPicks(tournamentOpponent);
       // Format each pick with its World Cup Legacy rating (0-10) so VAR can use ratings as context.
@@ -2558,10 +2604,17 @@ Weigh the picks, their Legacy ratings, and both arguments together. Judge betwee
         trophyCount: (state.trophyCount || 0) + (playerWon ? 1 : 0),
       });
 
+      // Wait for the VAR animation to finish (3s) before revealing verdict.
+      // If the API took longer than 3s, this resolves instantly. Phase 2, Deploy 5 / Stage 1.
+      await minAnimationDelay;
       setScreen('tournament-r3-verdict');
     } catch (e) {
       console.error('VAR judgement failed:', e);
+      // On error, still respect the animation delay so the failure isn't jarring.
+      await minAnimationDelay;
       setR3Error('VAR\u2019s connection dropped. Try again.');
+      // Return to the defence screen so the player can retry.
+      setScreen('tournament-r3-defend');
     } finally {
       setR3Loading(false);
     }
@@ -6277,6 +6330,216 @@ Deliver your verdict as JSON.`;
             >
               ← BACK TO TOURNAMENT
             </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT VAR CHECKING SCREEN ----------
+  // Phase 2, Deploy 5 / Stage 1. Suspense beat between draft submit and verdict.
+  // TV-styled frame, three cycling status lines, ~3 seconds total.
+  // R1/R2: routes to 'tournament-var' on its own (via the useEffect above).
+  // R3: routes when submitR3Defence's await minAnimationDelay resolves.
+  if (screen === 'tournament-var-checking') {
+    // Pick one line from each of the three categories. The lines are stable for
+    // the duration of this screen (don't change on re-render) — we use the phase
+    // index to pick deterministically from the pool for this attempt.
+    // Lines are random across attempts (since varCheckPhase is reset).
+    const openerLine = VAR_ROUND_OPENER_LINES[
+      Math.floor((tournamentRound || 1) * 7919) % VAR_ROUND_OPENER_LINES.length
+    ];
+    const holdLine = VAR_PRE_RESULT_HOLD_LINES[
+      Math.floor((tournamentRound || 1) * 6271) % VAR_PRE_RESULT_HOLD_LINES.length
+    ];
+    const framingLine = tournamentRound === 3
+      ? VAR_R3_FRAMING_LINES[0]
+      : "Decision incoming.";
+    const lines = [openerLine, holdLine, framingLine];
+    const currentLine = lines[varCheckPhase] || lines[0];
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <style>{`
+          @keyframes kick3-var-scanline {
+            0%   { transform: translateY(-100%); opacity: 0.5; }
+            100% { transform: translateY(200%); opacity: 0.5; }
+          }
+          @keyframes kick3-var-blink {
+            0%, 50%   { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+          }
+          @keyframes kick3-var-fadein {
+            from { opacity: 0; transform: translateY(4px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+        <div style={{ ...bgStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '420px', textAlign: 'center' }}>
+
+            {/* Label above the screen */}
+            <div style={{
+              ...condFont,
+              fontSize: '11px',
+              letterSpacing: '0.4em',
+              color: colours.muted,
+              fontWeight: 700,
+              marginBottom: '18px',
+              opacity: 0.7
+            }}>
+              VIDEO ASSISTANT REFEREE
+            </div>
+
+            {/* TV frame */}
+            <div style={{
+              background: 'linear-gradient(160deg, #1f1f2a 0%, #0d0d14 100%)',
+              border: '4px solid #2a2a36',
+              borderRadius: '14px',
+              padding: '8px',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.6), inset 0 1px 2px rgba(255,255,255,0.08)',
+              position: 'relative',
+              marginBottom: '24px'
+            }}>
+              {/* Reflection highlight on top edge */}
+              <div style={{
+                position: 'absolute',
+                top: '2px',
+                left: '8%',
+                right: '8%',
+                height: '1px',
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)',
+                borderRadius: '50%'
+              }} />
+
+              {/* Inner screen */}
+              <div style={{
+                background: '#050810',
+                borderRadius: '6px',
+                padding: '32px 20px',
+                position: 'relative',
+                overflow: 'hidden',
+                minHeight: '120px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {/* Scan line — animated */}
+                <div style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  height: '40%',
+                  background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%)',
+                  animation: 'kick3-var-scanline 3.5s linear infinite',
+                  pointerEvents: 'none'
+                }} />
+
+                {/* Subtle CRT scan-line texture */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: 'repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px)',
+                  pointerEvents: 'none'
+                }} />
+
+                {/* VAR label in top-left corner */}
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  left: '10px',
+                  ...condFont,
+                  fontSize: '10px',
+                  letterSpacing: '0.3em',
+                  color: '#5fb04a',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: '#5fb04a',
+                    animation: 'kick3-var-blink 1s ease-in-out infinite',
+                    display: 'inline-block'
+                  }} />
+                  VAR · LIVE
+                </div>
+
+                {/* Round indicator top-right */}
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '10px',
+                  ...condFont,
+                  fontSize: '10px',
+                  letterSpacing: '0.3em',
+                  color: colours.muted,
+                  fontWeight: 600
+                }}>
+                  R{tournamentRound || '-'}
+                </div>
+
+                {/* Cycling status text */}
+                <div
+                  key={varCheckPhase}
+                  style={{
+                    ...displayFont,
+                    fontSize: 'clamp(20px, 6vw, 26px)',
+                    fontWeight: 600,
+                    color: '#e8e8e0',
+                    letterSpacing: '0.04em',
+                    textAlign: 'center',
+                    position: 'relative',
+                    animation: 'kick3-var-fadein 0.35s ease-out',
+                    padding: '0 12px',
+                    lineHeight: 1.3
+                  }}
+                >
+                  {currentLine}
+                </div>
+
+                {/* Phase dots */}
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  marginTop: '20px',
+                  position: 'relative'
+                }}>
+                  {[0, 1, 2].map(i => (
+                    <span key={i} style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: i <= varCheckPhase ? '#5fb04a' : 'rgba(255,255,255,0.15)',
+                      transition: 'background 0.3s ease'
+                    }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Stand at the bottom */}
+            <div style={{
+              width: '60%',
+              height: '6px',
+              background: 'linear-gradient(180deg, #2a2a36 0%, #1a1a22 100%)',
+              borderRadius: '0 0 4px 4px',
+              margin: '-20px auto 0',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+            }} />
+            <div style={{
+              width: '30%',
+              height: '4px',
+              background: '#1a1a22',
+              borderRadius: '0 0 8px 8px',
+              margin: '0 auto'
+            }} />
           </div>
         </div>
         <Analytics />
