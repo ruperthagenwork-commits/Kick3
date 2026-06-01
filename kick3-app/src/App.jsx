@@ -1465,6 +1465,113 @@ const pickTournamentAttribute = (roundNumber, date = new Date()) => {
   return attrs[(trioIndex * 3 + roundNumber - 1) % attrs.length];
 };
 
+// ============ TOURNAMENT MODE — REAL QUESTIONS (Phase 2, Deploy 2 Stage 1) ============
+// 13 trios x 3 rounds = 39 questions. Each trio's R3 is always Legacy.
+// Date-based rotation: same trio runs for 3 consecutive days, then advances.
+// 13 trios x 3 days = 39 days = the World Cup window (11 Jun – 19 Jul 2026).
+
+const TOURNAMENT_QUESTIONS = [
+  // Trio 1
+  {
+    r1: { text: "Pick three for a sudden-death knockout in 40-degree heat.", category: "One-Off" },
+    r2: { text: "Pick three to walk out into a hostile away crowd in the group stage.", category: "Character" },
+    r3: { text: "Pick three who'd want a World Cup final on the biggest stage.", category: "Legacy" },
+  },
+  // Trio 2
+  {
+    r1: { text: "Pick three for a sun-baked open game with the world watching.", category: "Style" },
+    r2: { text: "Pick three to drag a quarter-final into extra time and penalties.", category: "Chaos" },
+    r3: { text: "Pick three with their names sewn into World Cup history.", category: "Legacy" },
+  },
+  // Trio 3
+  {
+    r1: { text: "Pick three to grind through a full World Cup with the squad rotating around them.", category: "Season-Long" },
+    r2: { text: "Pick three for a last-16 shootout after 120 minutes of nothing.", category: "One-Off" },
+    r3: { text: "Pick three whose World Cup story doesn't need a footnote.", category: "Legacy" },
+  },
+  // Trio 4
+  {
+    r1: { text: "Pick three for a Brazilian-style 4-1 demolition in the round of 16.", category: "Style" },
+    r2: { text: "Pick three to take a penalty in front of 80,000 in a partisan stadium.", category: "Character" },
+    r3: { text: "Pick three Pete couldn't write off in a column on Monday morning.", category: "Legacy" },
+  },
+  // Trio 5
+  {
+    r1: { text: "Pick three to turn a dead group-stage game into something memorable.", category: "Chaos" },
+    r2: { text: "Pick three to peak in the second week when everyone else is fading.", category: "Season-Long" },
+    r3: { text: "Pick three the commentators reach for when the trophy lifts.", category: "Legacy" },
+  },
+  // Trio 6
+  {
+    r1: { text: "Pick three for a winner-takes-all final group game in a packed stadium.", category: "One-Off" },
+    r2: { text: "Pick three to play it on the grass when the pitch is dry and quick.", category: "Style" },
+    r3: { text: "Pick three who'd make Pete's shortlist before he'd admit it.", category: "Legacy" },
+  },
+  // Trio 7
+  {
+    r1: { text: "Pick three to captain a side that's lost its first game and needs to respond.", category: "Character" },
+    r2: { text: "Pick three to break the deadlock in a 0-0 quarter-final everyone has stopped watching.", category: "Chaos" },
+    r3: { text: "Pick three whose international shirt is heavier than their club one.", category: "Legacy" },
+  },
+  // Trio 8
+  {
+    r1: { text: "Pick three to play every minute of the group stage and arrive fresh at the knockouts.", category: "Season-Long" },
+    r2: { text: "Pick three to make a tactical, low-tempo last-16 game watchable.", category: "Style" },
+    r3: { text: "Pick three who'd belong in a museum, not a podcast.", category: "Legacy" },
+  },
+  // Trio 9
+  {
+    r1: { text: "Pick three to make a semi-final unrecognisable by the 70th minute.", category: "Chaos" },
+    r2: { text: "Pick three to take the armband when your captain limps off in the opening game.", category: "Character" },
+    r3: { text: "Pick three whose World Cup is the first chapter of any book about them.", category: "Legacy" },
+  },
+  // Trio 10
+  {
+    r1: { text: "Pick three for a final against a side you've never beaten.", category: "One-Off" },
+    r2: { text: "Pick three to start every game and never play a bad one.", category: "Season-Long" },
+    r3: { text: "Pick three Pete would queue in the sun to watch warm up.", category: "Legacy" },
+  },
+  // Trio 11
+  {
+    r1: { text: "Pick three to play their natural game in front of a billion people.", category: "Style" },
+    r2: { text: "Pick three to drag the host nation out of their own tournament.", category: "Chaos" },
+    r3: { text: "Pick three you'd want on the team-sheet read out before a final.", category: "Legacy" },
+  },
+  // Trio 12
+  {
+    r1: { text: "Pick three to take the field after the anthem brings half the squad to tears.", category: "Character" },
+    r2: { text: "Pick three for a final against the tournament's golden boot winner.", category: "One-Off" },
+    r3: { text: "Pick three who'd be remembered for one tournament if they'd done nothing else.", category: "Legacy" },
+  },
+  // Trio 13
+  {
+    r1: { text: "Pick three to be the last men standing when the squad has nothing left.", category: "Season-Long" },
+    r2: { text: "Pick three to play their best football when the cameras are everywhere.", category: "Style" },
+    r3: { text: "Pick three the World Cup needed more than they needed it.", category: "Legacy" },
+  },
+];
+
+// Return the trio index (0-12) for a given date.
+// Inside the window: floor((date - startDate) / 3 days).
+// Before the window or after the window: clamp to 0 (Trio 1) so debug-unlock
+// testing pre-launch always sees Trio 1 content.
+const getTrioIndexForDate = (date = new Date()) => {
+  const status = getTournamentStatus(date);
+  if (!status) return 0; // Outside window → clamp to Trio 1.
+  return Math.max(0, Math.min(TOURNAMENT_QUESTIONS.length - 1, status.trioNumber - 1));
+};
+
+// Look up the real question for a given round (1, 2, or 3) on a given date.
+// Returns { text, category }. category drives the round's attribute scoring.
+const getTournamentQuestion = (roundNumber, date = new Date()) => {
+  const trioIdx = getTrioIndexForDate(date);
+  const trio = TOURNAMENT_QUESTIONS[trioIdx];
+  const key = roundNumber === 1 ? 'r1' : roundNumber === 2 ? 'r2' : 'r3';
+  return trio[key];
+};
+
+// ============ END TOURNAMENT MODE — REAL QUESTIONS ============
+
 // Stub question text for a tournament round. Real questions land in Phase 2.
 const stubTournamentQuestion = (roundNumber, attribute) => {
   const opener = roundNumber === 1
@@ -1845,8 +1952,11 @@ export default function Kick3() {
   // Increments tournamentsAttempted in localStorage.
   const startTournament = () => {
     const opponent = STUB_OPPONENTS.pubmate;
-    const attribute = pickTournamentAttribute(1);
-    const questionText = stubTournamentQuestion(1, attribute);
+    // Phase 2, Deploy 2 / Stage 1: real questions wired. Question selects the
+    // attribute for the round (category drives scoring).
+    const q = getTournamentQuestion(1);
+    const attribute = q.category;
+    const questionText = q.text;
 
     // Mark this as a fresh attempt in state.
     const state = readTournamentState();
@@ -1872,8 +1982,10 @@ export default function Kick3() {
   // Advance from a completed Round 1 to Round 2 vs Pete's Producer.
   const advanceToRound2 = () => {
     const opponent = STUB_OPPONENTS.producer;
-    const attribute = pickTournamentAttribute(2);
-    const questionText = stubTournamentQuestion(2, attribute);
+    // Phase 2, Deploy 2 / Stage 1: real R2 question and its category attribute.
+    const q = getTournamentQuestion(2);
+    const attribute = q.category;
+    const questionText = q.text;
 
     setDraftRounds(generateDraft(squad.map(p => p.name)));
     setCurrentRound(0);
@@ -1941,9 +2053,10 @@ export default function Kick3() {
     // object carrying those picks so the rest of the flow works unchanged.
     const petePicks = drawPetePicks();
     const opponent = { ...STUB_OPPONENTS.pete, picks: petePicks };
-    // R3 question is always Legacy.
+    // R3 question is always Legacy. Phase 2, Deploy 2 / Stage 1: real R3 question.
+    const q = getTournamentQuestion(3);
     const attribute = 'Legacy';
-    const questionText = stubTournamentQuestion(3, 'Legacy');
+    const questionText = q.text;
 
     setTournamentRound(3);
     setTournamentOpponent(opponent);
