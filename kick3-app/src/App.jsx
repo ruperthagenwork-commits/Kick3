@@ -1362,19 +1362,18 @@ const STUB_OPPONENTS = {
   },
 };
 
-// Draw 3 random picks for Pete from his sub-pool. Returns an array of 3 names.
-// Filters to names that actually exist in PLAYER_POOL so the UI always renders.
+// Draw 3 random picks for Pete from the Pete-eligible 108 (Phase 2, Deploy 1 / Stage 2).
+// Returns an array of 3 names. Names will resolve via WORLD_CUP_POOL in
+// resolveOpponentPicks(), which now checks the World Cup pool first.
 const drawPetePicks = () => {
-  const pete = STUB_OPPONENTS.pete;
-  const valid = pete.subPool.filter(n => PLAYER_POOL.some(p => p.name === n));
-  const source = valid.length >= 3 ? valid : pete.subPool;
+  const eligible = getPeteEligiblePool();
   // Fisher-Yates shuffle, take 3.
-  const arr = [...source];
+  const arr = [...eligible];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-  return arr.slice(0, 3);
+  return arr.slice(0, 3).map(p => p.name);
 };
 
 // Deterministic attribute scoring stub.
@@ -1408,13 +1407,40 @@ const scoreTeamOnAttribute = (players, attribute) => {
   }, 0);
 };
 
-// Resolve opponent picks (by name) against PLAYER_POOL. Returns full player objects.
-// If a name doesn't exist in the pool (Phase 2 will use the World Cup pool, not the daily pool),
-// returns a minimal placeholder so the UI still renders.
+// Resolve opponent picks (by name) to renderable card objects.
+// Routing depends on which opponent it is:
+//   - Pete (R3): look up in WORLD_CUP_POOL — his picks are drawn from the 108.
+//   - Pub Mate / Producer (R1/R2): look up in PLAYER_POOL — they still use the
+//     daily pool with the existing flavour text. Deploy 2 replaces these with
+//     the 78 authored World Cup squads.
+//
+// World Cup players are enriched with synthesised tier/flag/note to match the
+// card UI's expected shape.
 const resolveOpponentPicks = (opponent) => {
+  const isPeteR3 = opponent && opponent.key === 'pete';
   return opponent.picks.map((name) => {
+    if (isPeteR3) {
+      const wc = findWorldCupPlayer(name);
+      if (wc) {
+        return {
+          name: wc.name,
+          tier: wc.overall >= 8.5 ? 'Legend'
+              : wc.overall >= 7.5 ? 'Star'
+              : wc.overall >= 6.5 ? 'Cult'
+              : 'Wildcard',
+          position: wc.position === 'GK' ? 'GK' : 'MID',
+          flag: '⚽',
+          note: `${wc.country} — ${wc.era}`,
+          overall: wc.overall,
+          peteEligible: wc.peteEligible,
+          isWorldCup: true,
+        };
+      }
+    }
+    // R1/R2 path, or Pete's name not in WC pool (shouldn't happen, but safe).
     const found = PLAYER_POOL.find(p => p.name === name);
     if (found) return found;
+    // Last-resort placeholder so the UI never breaks.
     return { name, tier: 'Star', position: 'MID', flag: '\u2691' };
   });
 };
