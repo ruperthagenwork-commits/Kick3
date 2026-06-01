@@ -1430,39 +1430,19 @@ const scoreTeamOnAttribute = (players, attribute) => {
 };
 
 // Resolve opponent picks (by name) to renderable card objects.
-// Routing depends on which opponent it is:
-//   - Pete (R3): look up in WORLD_CUP_POOL — his picks are drawn from the 108.
-//   - Pub Mate / Producer (R1/R2): look up in PLAYER_POOL — they still use the
-//     daily pool with the existing flavour text. Deploy 2 replaces these with
-//     the 78 authored World Cup squads.
+// Phase 2, Deploy 2 / Stage 3: all three tournament opponents (Pub Mate, Producer,
+// Pete) now have picks from the WORLD_CUP_POOL — Pub Mate and Producer via the
+// authored 78 squads, Pete via random draw from the Pete-eligible 108. So we
+// check WORLD_CUP_POOL first for any tournament-mode opponent.
 //
-// World Cup players are enriched with synthesised tier/flag/note to match the
-// card UI's expected shape.
+// Falls back to PLAYER_POOL for any unknown name (defensive — shouldn't fire).
 const resolveOpponentPicks = (opponent) => {
-  const isPeteR3 = opponent && opponent.key === 'pete';
   return opponent.picks.map((name) => {
-    if (isPeteR3) {
-      const wc = findWorldCupPlayer(name);
-      if (wc) {
-        return {
-          name: wc.name,
-          tier: wc.overall >= 8.5 ? 'Legend'
-              : wc.overall >= 7.5 ? 'Star'
-              : wc.overall >= 6.5 ? 'Cult'
-              : 'Wildcard',
-          position: wc.position === 'GK' ? 'GK' : 'MID',
-          flag: '⚽',
-          note: `${wc.country} — ${wc.era}`,
-          overall: wc.overall,
-          peteEligible: wc.peteEligible,
-          isWorldCup: true,
-        };
-      }
-    }
-    // R1/R2 path, or Pete's name not in WC pool (shouldn't happen, but safe).
+    const wc = findWorldCupPlayer(name);
+    if (wc) return enrichWorldCupCard(wc);
+    // Defensive fallback — daily pool then placeholder.
     const found = PLAYER_POOL.find(p => p.name === name);
     if (found) return found;
-    // Last-resort placeholder so the UI never breaks.
     return { name, tier: 'Star', position: 'MID', flag: '\u2691' };
   });
 };
@@ -1585,6 +1565,241 @@ const getTournamentQuestion = (roundNumber, date = new Date()) => {
 };
 
 // ============ END TOURNAMENT MODE — REAL QUESTIONS ============
+
+// ============ TOURNAMENT MODE — OPPONENT SQUADS (Phase 2, Deploy 2 Stage 3) ============
+// 78 authored squads: 13 trios × 3 days (A/B/C) × 2 opponents (Pub Mate + Producer).
+// Each opponent has three picks (names exist in WORLD_CUP_POOL) plus a "voice"
+// flavour line. Pub Mate voices: Mate Dave / asked his dad / Twitter / TikTok mate / podcast.
+// Producer voices: model variants the football scientist ran.
+//
+// Day rotation within a trio: A = day 1 of the trio (Monday in a Mon-Wed cycle),
+// B = day 2, C = day 3. Deterministic per date.
+//
+// Calibration targets: Pub Mate avg ~16-18 (R1 win rate ~85%). Producer avg
+// ~21-22 (R2 win rate ~50%). Authored to those targets.
+
+const OPPONENT_SQUADS = [
+  // Trio 1
+  {
+    A: {
+      pubmate: { picks: ["Frank Lampard", "John Terry", "Kléberson"], voice: "Mate Dave at the table" },
+      producer: { picks: ["N'Golo Kanté", "Luka Modrić", "Hristo Stoichkov"], voice: "The model said three" },
+    },
+    B: {
+      pubmate: { picks: ["Uwe Seeler", "Pep Guardiola", "Joaquín Correa"], voice: "Asked his dad" },
+      producer: { picks: ["Cafu", "Iker Casillas", "Romário"], voice: "Re-ran the model with different weights" },
+    },
+    C: {
+      pubmate: { picks: ["Bukayo Saka", "Phil Foden", "Hakim Ziyech"], voice: "Read on Twitter that morning" },
+      producer: { picks: ["Franz Beckenbauer", "Andoni Zubizarreta", "Luis Suárez"], voice: "Fresh academic paper said these three" },
+    },
+  },
+  // Trio 2
+  {
+    A: {
+      pubmate: { picks: ["John Terry", "Geoff Hurst", "Kléberson"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Luis Suárez", "Hristo Stoichkov", "Lothar Matthäus"], voice: "Variance optimisation model" },
+    },
+    B: {
+      pubmate: { picks: ["Phil Foden", "Pepe", "Tim Cahill"], voice: "His mate who watches football on TikTok" },
+      producer: { picks: ["Diego Maradona", "Rivelino", "Hugo Lloris"], voice: "Re-weighted for late-game scenarios" },
+    },
+    C: {
+      pubmate: { picks: ["John Terry", "Kléberson", "Hidetoshi Nakata"], voice: "Read it on a podcast" },
+      producer: { picks: ["Diego Maradona", "Garrincha", "Toni Kroos"], voice: "The 'unpredictability premium' paper" },
+    },
+  },
+  // Trio 3
+  {
+    A: {
+      pubmate: { picks: ["Joaquín Correa", "Mario Götze", "Kléberson"], voice: "Asked his dad" },
+      producer: { picks: ["Hugo Lloris", "N'Golo Kanté", "Hristo Stoichkov"], voice: "Penalty-conversion model" },
+    },
+    B: {
+      pubmate: { picks: ["Frank Lampard", "Wayne Rooney", "Phil Foden"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Miroslav Klose", "Toni Kroos", "Andoni Zubizarreta"], voice: "Re-weighted for tournament-stage variance" },
+    },
+    C: {
+      pubmate: { picks: ["Bukayo Saka", "Heung-min Son", "Phil Foden"], voice: "Saw it on Twitter" },
+      producer: { picks: ["Roberto Carlos", "Edgar Davids", "Miroslav Klose"], voice: "The 'clutch player' paper" },
+    },
+  },
+  // Trio 4
+  {
+    A: {
+      pubmate: { picks: ["John Terry", "Geoff Hurst", "Andoni Zubizarreta"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Andrea Pirlo", "Lothar Matthäus", "Luis Suárez"], voice: "Penalty-specific Character model" },
+    },
+    B: {
+      pubmate: { picks: ["Phil Foden", "Pepe", "El Hadji Diouf"], voice: "His mate who watches football on TikTok" },
+      producer: { picks: ["Hugo Lloris", "Roberto Baggio", "Wesley Sneijder"], voice: "Re-ran with hostile-crowd weighting" },
+    },
+    C: {
+      pubmate: { picks: ["Edgar Davids", "John Terry", "Geoff Hurst"], voice: "Read it on a podcast" },
+      producer: { picks: ["Steven Gerrard", "Frank Lampard", "David Beckham"], voice: "Penalty psychology paper" },
+    },
+  },
+  // Trio 5
+  {
+    A: {
+      pubmate: { picks: ["John Terry", "Wayne Rooney", "Steven Gerrard"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Carlos Tevez", "Mario Götze", "Hidetoshi Nakata"], voice: "Endurance optimisation model" },
+    },
+    B: {
+      pubmate: { picks: ["Bobby Charlton", "Paul Gascoigne", "Geoff Hurst"], voice: "Asked his dad" },
+      producer: { picks: ["Andoni Zubizarreta", "Riyad Mahrez", "Mario Götze"], voice: "Re-weighted for late-tournament fatigue" },
+    },
+    C: {
+      pubmate: { picks: ["Bukayo Saka", "Vinícius Júnior", "Neymar"], voice: "Saw it on Twitter" },
+      producer: { picks: ["Lothar Matthäus", "Frank Lampard", "Joaquín Correa"], voice: "Minutes-played per goal contribution paper" },
+    },
+  },
+  // Trio 6
+  {
+    A: {
+      pubmate: { picks: ["Phil Foden", "Rui Costa", "Edgar Davids"], voice: "Dave (anti-Pete shift)" },
+      producer: { picks: ["Bobby Moore", "Andoni Zubizarreta", "Mats Hummels"], voice: "Pass-completion-on-the-ground model" },
+    },
+    B: {
+      pubmate: { picks: ["Olivier Giroud", "Andoni Zubizarreta", "Phil Foden"], voice: "His missus" },
+      producer: { picks: ["Patrick Vieira", "Frank Lampard", "Andoni Zubizarreta"], voice: "Re-ran with possession-retention metric" },
+    },
+    C: {
+      pubmate: { picks: ["Hidetoshi Nakata", "John Terry", "Joaquín Correa"], voice: "Read it on a podcast" },
+      producer: { picks: ["Mats Hummels", "Edgar Davids", "Andoni Zubizarreta"], voice: "Pass network analysis paper" },
+    },
+  },
+  // Trio 7
+  {
+    A: {
+      pubmate: { picks: ["Wayne Rooney", "Edgar Davids", "Luis Suárez"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Paul Gascoigne", "El Hadji Diouf", "Bobby Moore"], voice: "Late-game deadlock-breaker model" },
+    },
+    B: {
+      pubmate: { picks: ["Pepe", "Carlos Tevez", "Vinícius Júnior"], voice: "His mate who watches football on TikTok" },
+      producer: { picks: ["Garrincha", "Pepe", "Patrick Vieira"], voice: "Re-ran with creativity-under-pressure metric" },
+    },
+    C: {
+      pubmate: { picks: ["Diego Maradona", "Tim Cahill", "Phil Foden"], voice: "Read it on a podcast" },
+      producer: { picks: ["Cristiano Ronaldo", "Hristo Stoichkov", "Ronaldinho"], voice: "Unpredictability index paper" },
+    },
+  },
+  // Trio 8
+  {
+    A: {
+      pubmate: { picks: ["Bukayo Saka", "Phil Foden", "Joaquín Correa"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Marcel Desailly", "Andoni Zubizarreta", "Patrick Vieira"], voice: "Defensive distribution model" },
+    },
+    B: {
+      pubmate: { picks: ["Joaquín Correa", "Mario Götze", "Pep Guardiola"], voice: "Asked his dad" },
+      producer: { picks: ["Mats Hummels", "Frank Lampard", "Andoni Zubizarreta"], voice: "Long-range completion metric" },
+    },
+    C: {
+      pubmate: { picks: ["Vinícius Júnior", "Phil Foden", "Tim Cahill"], voice: "His mate who watches football on TikTok" },
+      producer: { picks: ["Mats Hummels", "Andoni Zubizarreta", "Roberto Carlos"], voice: "Build-from-back paper recommendation" },
+    },
+  },
+  // Trio 9
+  {
+    A: {
+      pubmate: { picks: ["Wayne Rooney", "Edgar Davids", "Bukayo Saka"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Andrea Pirlo", "Marcel Desailly", "Hristo Stoichkov"], voice: "Composure-tournament index" },
+    },
+    B: {
+      pubmate: { picks: ["Neymar", "Vinícius Júnior", "Riyad Mahrez"], voice: "Saw it on Twitter" },
+      producer: { picks: ["Lothar Matthäus", "Hugo Lloris", "Romário"], voice: "Captain-coefficient model" },
+    },
+    C: {
+      pubmate: { picks: ["Paul Gascoigne", "Cristiano Ronaldo", "Mohamed Salah"], voice: "Read it on a podcast" },
+      producer: { picks: ["Franz Beckenbauer", "Wesley Sneijder", "Diego Maradona"], voice: "Iconic-captain dataset variance" },
+    },
+  },
+  // Trio 10
+  {
+    A: {
+      pubmate: { picks: ["Phil Foden", "Edgar Davids", "Joaquín Correa"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Carlos Tevez", "Luis Suárez", "Joaquín Correa"], voice: "Squad-rotation minutes model" },
+    },
+    B: {
+      pubmate: { picks: ["Tim Cahill", "Pepe", "Phil Foden"], voice: "His mate who watches football on TikTok" },
+      producer: { picks: ["Pepe", "Riyad Mahrez", "Mario Götze"], voice: "Minutes-played efficiency metric" },
+    },
+    C: {
+      pubmate: { picks: ["Hidetoshi Nakata", "Joaquín Correa", "Frank Lampard"], voice: "Read it on a podcast" },
+      producer: { picks: ["Jürgen Klinsmann", "Frank Rijkaard", "Mario Götze"], voice: "Multi-tournament veteran model" },
+    },
+  },
+  // Trio 11
+  {
+    A: {
+      pubmate: { picks: ["John Terry", "Tim Cahill", "Andoni Zubizarreta"], voice: "Dave (anti-Pete)" },
+      producer: { picks: ["Paul Gascoigne", "Emi Martínez", "Toni Kroos"], voice: "Late-game variance × calm-pivot" },
+    },
+    B: {
+      pubmate: { picks: ["Geoff Hurst", "Joaquín Correa", "Andoni Zubizarreta"], voice: "Asked his dad" },
+      producer: { picks: ["Diego Maradona", "Pepe", "Cafu"], voice: "Iconic-chaos + composure-anchor" },
+    },
+    C: {
+      pubmate: { picks: ["Hidetoshi Nakata", "Edgar Davids", "Tim Cahill"], voice: "Read it on a podcast" },
+      producer: { picks: ["Luis Suárez", "Wesley Sneijder", "Vinícius Júnior"], voice: "Disruption × modern-creative" },
+    },
+  },
+  // Trio 12
+  {
+    A: {
+      pubmate: { picks: ["Edgar Davids", "Hristo Stoichkov", "Wayne Rooney"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Bastian Schweinsteiger", "Andrea Pirlo", "N'Golo Kanté"], voice: "Composure × duels model" },
+    },
+    B: {
+      pubmate: { picks: ["Vinícius Júnior", "Riyad Mahrez", "Neymar"], voice: "Saw it on Twitter" },
+      producer: { picks: ["David Beckham", "Edgar Davids", "Patrick Vieira"], voice: "Premier-League-WC overlap" },
+    },
+    C: {
+      pubmate: { picks: ["Diego Maradona", "Tim Cahill", "David Beckham"], voice: "Read it on a podcast" },
+      producer: { picks: ["Fabio Cannavaro", "David Trezeguet", "Frank Lampard"], voice: "Late-2000s European delivery" },
+    },
+  },
+  // Trio 13
+  {
+    A: {
+      pubmate: { picks: ["Bukayo Saka", "Phil Foden", "Joaquín Correa"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Mats Hummels", "Marcel Desailly", "Andoni Zubizarreta"], voice: "Defensive build-from-back metric" },
+    },
+    B: {
+      pubmate: { picks: ["Vinícius Júnior", "Phil Foden", "Bukayo Saka"], voice: "His mate who watches football on TikTok" },
+      producer: { picks: ["Patrick Vieira", "Cafu", "Andoni Zubizarreta"], voice: "Defensive + distribution combined" },
+    },
+    C: {
+      pubmate: { picks: ["Vinícius Júnior", "Heung-min Son", "Bukayo Saka"], voice: "Saw it on Twitter" },
+      producer: { picks: ["Roberto Carlos", "Mats Hummels", "Andoni Zubizarreta"], voice: "Backline-creator paper" },
+    },
+  },
+];
+
+// Day letter for a given date inside the tournament window.
+// Returns "A", "B", or "C" — corresponds to days 1/2/3 of the active trio.
+// Outside the window, clamps to "A" so debug-unlock testing pre-launch is stable.
+const getDayLetterForDate = (date = new Date()) => {
+  const status = getTournamentStatus(date);
+  if (!status) return "A"; // Outside window → clamp to Day A.
+  return status.dayInTrio === 1 ? "A" : status.dayInTrio === 2 ? "B" : "C";
+};
+
+// Look up the right opponent squad for today.
+// opponentType: "pubmate" | "producer".
+// Returns { picks: [n1, n2, n3], voice: "..." } or a sensible fallback.
+const getOpponentSquadForToday = (opponentType, date = new Date()) => {
+  const trioIdx = getTrioIndexForDate(date);
+  const day = getDayLetterForDate(date);
+  const trio = OPPONENT_SQUADS[trioIdx];
+  if (!trio || !trio[day] || !trio[day][opponentType]) {
+    // Defensive fallback — shouldn't fire because the array is fully populated.
+    return { picks: ["Pelé", "Diego Maradona", "Lionel Messi"], voice: "" };
+  }
+  return trio[day][opponentType];
+};
+
+// ============ END TOURNAMENT MODE — OPPONENT SQUADS ============
 
 // Stub question text for a tournament round. Real questions land in Phase 2.
 const stubTournamentQuestion = (roundNumber, attribute) => {
@@ -1965,7 +2180,14 @@ export default function Kick3() {
   // Start a tournament attempt at Round 1 (called by PLAY NOW on tournament home).
   // Increments tournamentsAttempted in localStorage.
   const startTournament = () => {
-    const opponent = STUB_OPPONENTS.pubmate;
+    // Phase 2, Deploy 2 / Stage 3: opponent squad now from authored 78 (was static stub).
+    // STUB_OPPONENTS still provides label/vibe/peteLossLine; only picks rotate by date.
+    const squadForToday = getOpponentSquadForToday('pubmate');
+    const opponent = {
+      ...STUB_OPPONENTS.pubmate,
+      picks: squadForToday.picks,
+      voice: squadForToday.voice,
+    };
     // Phase 2, Deploy 2 / Stage 1: real questions wired. Question selects the
     // attribute for the round (category drives scoring).
     const q = getTournamentQuestion(1);
@@ -1996,7 +2218,13 @@ export default function Kick3() {
 
   // Advance from a completed Round 1 to Round 2 vs Pete's Producer.
   const advanceToRound2 = () => {
-    const opponent = STUB_OPPONENTS.producer;
+    // Phase 2, Deploy 2 / Stage 3: opponent squad now from authored 78 (was static stub).
+    const squadForToday = getOpponentSquadForToday('producer');
+    const opponent = {
+      ...STUB_OPPONENTS.producer,
+      picks: squadForToday.picks,
+      voice: squadForToday.voice,
+    };
     // Phase 2, Deploy 2 / Stage 1: real R2 question and its category attribute.
     const q = getTournamentQuestion(2);
     const attribute = q.category;
