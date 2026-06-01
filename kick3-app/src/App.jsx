@@ -1038,6 +1038,270 @@ const hasPlayedTournamentToday = (state, date = new Date()) => {
   return state.lastPlayedDate === todayDateString(date);
 };
 
+// ============ TOURNAMENT MODE — WORLD CUP POOL (Phase 2, Deploy 1) ============
+// 180 players authored for tournament mode only. Daily game and 1v1 still use
+// PLAYER_POOL (384). Six attributes per player on a 1-10 scale (0 never used,
+// 1 used rarely). Plus: overall (avg, one decimal), position (GK/OUT),
+// peteEligible ("Y"/"N").
+//
+// peteEligible = "Y" → in the pool Pete draws from in R3, AND the pool the
+// player drafts from in R3. 108 players currently flagged Y.
+// R1/R2 still use the daily PLAYER_POOL — Deploy 2 wires those.
+
+const WORLD_CUP_POOL = [
+  { name: "Pelé", country: "Brazil", era: "1950s–70s", position: "OUT", oneOff: 10, seasonLong: 10, style: 10, character: 9, chaos: 5, legacy: 10, overall: 9, peteEligible: "Y" },
+  { name: "Diego Maradona", country: "Argentina", era: "1980s–90s", position: "OUT", oneOff: 10, seasonLong: 9, style: 10, character: 4, chaos: 10, legacy: 10, overall: 8.8, peteEligible: "Y" },
+  { name: "Lionel Messi", country: "Argentina", era: "2000s–2020s", position: "OUT", oneOff: 10, seasonLong: 10, style: 10, character: 8, chaos: 4, legacy: 10, overall: 8.7, peteEligible: "Y" },
+  { name: "Zinedine Zidane", country: "France", era: "1990s–2000s", position: "OUT", oneOff: 9, seasonLong: 9, style: 10, character: 6, chaos: 8, legacy: 9, overall: 8.5, peteEligible: "Y" },
+  { name: "Johan Cruyff", country: "Netherlands", era: "1970s", position: "OUT", oneOff: 8, seasonLong: 10, style: 10, character: 7, chaos: 5, legacy: 9, overall: 8.2, peteEligible: "Y" },
+  { name: "Ronaldo (R9)", country: "Brazil", era: "1990s–2000s", position: "OUT", oneOff: 10, seasonLong: 6, style: 9, character: 5, chaos: 7, legacy: 9, overall: 7.7, peteEligible: "Y" },
+  { name: "Franz Beckenbauer", country: "Germany", era: "1960s–70s", position: "OUT", oneOff: 7, seasonLong: 10, style: 9, character: 10, chaos: 3, legacy: 9, overall: 8, peteEligible: "Y" },
+  { name: "Cristiano Ronaldo", country: "Portugal", era: "2000s–2020s", position: "OUT", oneOff: 10, seasonLong: 8, style: 9, character: 7, chaos: 6, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Gerd Müller", country: "Germany", era: "1970s", position: "OUT", oneOff: 10, seasonLong: 10, style: 7, character: 6, chaos: 4, legacy: 9, overall: 7.7, peteEligible: "Y" },
+  { name: "Eusébio", country: "Portugal", era: "1960s", position: "OUT", oneOff: 10, seasonLong: 9, style: 9, character: 7, chaos: 5, legacy: 8, overall: 8, peteEligible: "Y" },
+  { name: "Alfredo Di Stéfano", country: "Argentina/Spain", era: "1950s–60s", position: "OUT", oneOff: 3, seasonLong: 6, style: 10, character: 8, chaos: 4, legacy: 6, overall: 6.2, peteEligible: "N" },
+  { name: "Ferenc Puskás", country: "Hungary", era: "1950s", position: "OUT", oneOff: 8, seasonLong: 9, style: 10, character: 7, chaos: 6, legacy: 8, overall: 8, peteEligible: "Y" },
+  { name: "Bobby Charlton", country: "England", era: "1960s", position: "OUT", oneOff: 9, seasonLong: 9, style: 8, character: 9, chaos: 3, legacy: 9, overall: 7.8, peteEligible: "Y" },
+  { name: "Bobby Moore", country: "England", era: "1960s–70s", position: "OUT", oneOff: 9, seasonLong: 10, style: 8, character: 10, chaos: 2, legacy: 9, overall: 8, peteEligible: "Y" },
+  { name: "Roberto Baggio", country: "Italy", era: "1990s", position: "OUT", oneOff: 9, seasonLong: 9, style: 10, character: 6, chaos: 8, legacy: 8, overall: 8.3, peteEligible: "Y" },
+  { name: "Romário", country: "Brazil", era: "1990s", position: "OUT", oneOff: 10, seasonLong: 9, style: 9, character: 4, chaos: 8, legacy: 9, overall: 8.2, peteEligible: "Y" },
+  { name: "Ronaldinho", country: "Brazil", era: "2000s", position: "OUT", oneOff: 8, seasonLong: 7, style: 10, character: 7, chaos: 7, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Paolo Maldini", country: "Italy", era: "1990s–2000s", position: "OUT", oneOff: 6, seasonLong: 10, style: 9, character: 10, chaos: 1, legacy: 8, overall: 7.3, peteEligible: "Y" },
+  { name: "Zico", country: "Brazil", era: "1980s", position: "OUT", oneOff: 8, seasonLong: 9, style: 10, character: 7, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Michel Platini", country: "France", era: "1980s", position: "OUT", oneOff: 8, seasonLong: 9, style: 10, character: 7, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Garrincha", country: "Brazil", era: "1950s–60s", position: "OUT", oneOff: 10, seasonLong: 10, style: 10, character: 4, chaos: 9, legacy: 9, overall: 8.7, peteEligible: "Y" },
+  { name: "Lev Yashin", country: "Soviet Union", era: "1950s–60s", position: "GK", oneOff: 9, seasonLong: 10, style: 8, character: 9, chaos: 3, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Just Fontaine", country: "France", era: "1950s", position: "OUT", oneOff: 10, seasonLong: 10, style: 7, character: 6, chaos: 5, legacy: 8, overall: 7.7, peteEligible: "Y" },
+  { name: "Lothar Matthäus", country: "Germany", era: "1980s–2000s", position: "OUT", oneOff: 8, seasonLong: 9, style: 7, character: 9, chaos: 4, legacy: 8, overall: 7.5, peteEligible: "Y" },
+  { name: "Franco Baresi", country: "Italy", era: "1980s–90s", position: "OUT", oneOff: 7, seasonLong: 10, style: 8, character: 10, chaos: 2, legacy: 8, overall: 7.5, peteEligible: "Y" },
+  { name: "Andrés Iniesta", country: "Spain", era: "2000s–2010s", position: "OUT", oneOff: 10, seasonLong: 9, style: 10, character: 9, chaos: 2, legacy: 9, overall: 8.2, peteEligible: "Y" },
+  { name: "Xavi", country: "Spain", era: "2000s–2010s", position: "OUT", oneOff: 6, seasonLong: 10, style: 10, character: 9, chaos: 1, legacy: 8, overall: 7.3, peteEligible: "Y" },
+  { name: "Andrea Pirlo", country: "Italy", era: "2000s–2010s", position: "OUT", oneOff: 8, seasonLong: 9, style: 10, character: 8, chaos: 4, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Gianluigi Buffon", country: "Italy", era: "2000s–2010s", position: "GK", oneOff: 8, seasonLong: 10, style: 7, character: 9, chaos: 2, legacy: 8, overall: 7.3, peteEligible: "Y" },
+  { name: "Fabio Cannavaro", country: "Italy", era: "2000s", position: "OUT", oneOff: 9, seasonLong: 10, style: 7, character: 9, chaos: 3, legacy: 8, overall: 7.7, peteEligible: "Y" },
+  { name: "Cafu", country: "Brazil", era: "1990s–2000s", position: "OUT", oneOff: 6, seasonLong: 9, style: 8, character: 10, chaos: 3, legacy: 8, overall: 7.3, peteEligible: "Y" },
+  { name: "Carlos Alberto", country: "Brazil", era: "1970s", position: "OUT", oneOff: 10, seasonLong: 9, style: 9, character: 9, chaos: 4, legacy: 8, overall: 8.2, peteEligible: "Y" },
+  { name: "Jairzinho", country: "Brazil", era: "1970s", position: "OUT", oneOff: 10, seasonLong: 10, style: 8, character: 6, chaos: 6, legacy: 8, overall: 8, peteEligible: "Y" },
+  { name: "Tostão", country: "Brazil", era: "1970s", position: "OUT", oneOff: 8, seasonLong: 9, style: 9, character: 8, chaos: 4, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "Gerson", country: "Brazil", era: "1970s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 7, chaos: 4, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Rivelino", country: "Brazil", era: "1970s", position: "OUT", oneOff: 9, seasonLong: 9, style: 9, character: 6, chaos: 7, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Socrates", country: "Brazil", era: "1980s", position: "OUT", oneOff: 8, seasonLong: 9, style: 9, character: 9, chaos: 7, legacy: 7, overall: 8.2, peteEligible: "Y" },
+  { name: "Falcão", country: "Brazil", era: "1980s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 8, chaos: 5, legacy: 7, overall: 7.3, peteEligible: "Y" },
+  { name: "Hugo Sánchez", country: "Mexico", era: "1980s–90s", position: "OUT", oneOff: 7, seasonLong: 6, style: 9, character: 7, chaos: 6, legacy: 5, overall: 6.7, peteEligible: "N" },
+  { name: "Hristo Stoichkov", country: "Bulgaria", era: "1990s", position: "OUT", oneOff: 10, seasonLong: 9, style: 9, character: 3, chaos: 9, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Kylian Mbappé", country: "France", era: "2010s–2020s", position: "OUT", oneOff: 10, seasonLong: 9, style: 9, character: 6, chaos: 6, legacy: 8, overall: 8, peteEligible: "Y" },
+  { name: "Neymar", country: "Brazil", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 7, style: 10, character: 4, chaos: 8, legacy: 6, overall: 7.2, peteEligible: "N" },
+  { name: "Luka Modrić", country: "Croatia", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 10, style: 9, character: 9, chaos: 3, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Manuel Neuer", country: "Germany", era: "2010s–2020s", position: "GK", oneOff: 8, seasonLong: 10, style: 8, character: 9, chaos: 4, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Toni Kroos", country: "Germany", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 9, style: 9, character: 8, chaos: 2, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Thomas Müller", country: "Germany", era: "2010s–2020s", position: "OUT", oneOff: 9, seasonLong: 9, style: 6, character: 8, chaos: 5, legacy: 8, overall: 7.5, peteEligible: "Y" },
+  { name: "Sergio Ramos", country: "Spain", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 8, style: 7, character: 6, chaos: 8, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Sergio Busquets", country: "Spain", era: "2010s–2020s", position: "OUT", oneOff: 5, seasonLong: 10, style: 9, character: 8, chaos: 1, legacy: 7, overall: 6.7, peteEligible: "Y" },
+  { name: "David Villa", country: "Spain", era: "2010s", position: "OUT", oneOff: 9, seasonLong: 9, style: 8, character: 7, chaos: 4, legacy: 7, overall: 7.3, peteEligible: "Y" },
+  { name: "Iker Casillas", country: "Spain", era: "2000s–2010s", position: "GK", oneOff: 8, seasonLong: 9, style: 7, character: 9, chaos: 3, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Diego Forlán", country: "Uruguay", era: "2010s", position: "OUT", oneOff: 10, seasonLong: 10, style: 8, character: 7, chaos: 5, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Luis Suárez", country: "Uruguay", era: "2010s–2020s", position: "OUT", oneOff: 9, seasonLong: 8, style: 8, character: 3, chaos: 10, legacy: 6, overall: 7.3, peteEligible: "Y" },
+  { name: "Edinson Cavani", country: "Uruguay", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 8, style: 7, character: 8, chaos: 4, legacy: 6, overall: 6.7, peteEligible: "N" },
+  { name: "Arjen Robben", country: "Netherlands", era: "2010s", position: "OUT", oneOff: 9, seasonLong: 9, style: 9, character: 6, chaos: 7, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Wesley Sneijder", country: "Netherlands", era: "2010s", position: "OUT", oneOff: 9, seasonLong: 10, style: 8, character: 7, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "James Rodríguez", country: "Colombia", era: "2010s", position: "OUT", oneOff: 10, seasonLong: 9, style: 9, character: 6, chaos: 5, legacy: 6, overall: 7.5, peteEligible: "N" },
+  { name: "Eden Hazard", country: "Belgium", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 8, style: 9, character: 6, chaos: 4, legacy: 6, overall: 6.7, peteEligible: "N" },
+  { name: "Kevin De Bruyne", country: "Belgium", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 8, style: 9, character: 7, chaos: 3, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Romelu Lukaku", country: "Belgium", era: "2010s–2020s", position: "OUT", oneOff: 6, seasonLong: 7, style: 6, character: 6, chaos: 4, legacy: 5, overall: 5.7, peteEligible: "N" },
+  { name: "Harry Kane", country: "England", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 9, style: 7, character: 8, chaos: 3, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Marco van Basten", country: "Netherlands", era: "1980s–90s", position: "OUT", oneOff: 9, seasonLong: 7, style: 10, character: 6, chaos: 4, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Ruud Gullit", country: "Netherlands", era: "1980s–90s", position: "OUT", oneOff: 8, seasonLong: 8, style: 10, character: 8, chaos: 5, legacy: 6, overall: 7.5, peteEligible: "N" },
+  { name: "Frank Rijkaard", country: "Netherlands", era: "1980s–90s", position: "OUT", oneOff: 7, seasonLong: 8, style: 8, character: 7, chaos: 6, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Dennis Bergkamp", country: "Netherlands", era: "1990s", position: "OUT", oneOff: 10, seasonLong: 8, style: 10, character: 7, chaos: 4, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Patrick Kluivert", country: "Netherlands", era: "1990s–2000s", position: "OUT", oneOff: 8, seasonLong: 8, style: 8, character: 5, chaos: 5, legacy: 6, overall: 6.7, peteEligible: "N" },
+  { name: "Edgar Davids", country: "Netherlands", era: "1990s–2000s", position: "OUT", oneOff: 6, seasonLong: 8, style: 7, character: 8, chaos: 7, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Clarence Seedorf", country: "Netherlands", era: "1990s–2000s", position: "OUT", oneOff: 5, seasonLong: 8, style: 9, character: 7, chaos: 3, legacy: 5, overall: 6.2, peteEligible: "N" },
+  { name: "Edwin van der Sar", country: "Netherlands", era: "1990s–2000s", position: "GK", oneOff: 7, seasonLong: 9, style: 7, character: 8, chaos: 2, legacy: 6, overall: 6.5, peteEligible: "N" },
+  { name: "Rivaldo", country: "Brazil", era: "1990s–2000s", position: "OUT", oneOff: 9, seasonLong: 9, style: 10, character: 5, chaos: 7, legacy: 8, overall: 8, peteEligible: "Y" },
+  { name: "Roberto Carlos", country: "Brazil", era: "1990s–2000s", position: "OUT", oneOff: 8, seasonLong: 8, style: 9, character: 6, chaos: 6, legacy: 7, overall: 7.3, peteEligible: "Y" },
+  { name: "Kléberson", country: "Brazil", era: "2000s", position: "OUT", oneOff: 4, seasonLong: 6, style: 6, character: 6, chaos: 3, legacy: 4, overall: 4.8, peteEligible: "N" },
+  { name: "Lilian Thuram", country: "France", era: "1990s–2000s", position: "OUT", oneOff: 9, seasonLong: 9, style: 8, character: 9, chaos: 3, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "Marcel Desailly", country: "France", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 10, style: 8, character: 9, chaos: 3, legacy: 7, overall: 7.3, peteEligible: "Y" },
+  { name: "Didier Deschamps", country: "France", era: "1990s", position: "OUT", oneOff: 6, seasonLong: 9, style: 6, character: 10, chaos: 2, legacy: 7, overall: 6.7, peteEligible: "Y" },
+  { name: "Thierry Henry", country: "France", era: "1990s–2010s", position: "OUT", oneOff: 8, seasonLong: 8, style: 10, character: 7, chaos: 5, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "David Trezeguet", country: "France", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 7, style: 7, character: 7, chaos: 4, legacy: 5, overall: 6.2, peteEligible: "N" },
+  { name: "Patrick Vieira", country: "France", era: "1990s–2000s", position: "OUT", oneOff: 6, seasonLong: 8, style: 8, character: 9, chaos: 5, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Gabriel Batistuta", country: "Argentina", era: "1990s–2000s", position: "OUT", oneOff: 10, seasonLong: 9, style: 8, character: 9, chaos: 4, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Juan Sebastián Verón", country: "Argentina", era: "1990s–2000s", position: "OUT", oneOff: 5, seasonLong: 6, style: 9, character: 6, chaos: 5, legacy: 5, overall: 6, peteEligible: "N" },
+  { name: "Pep Guardiola", country: "Spain", era: "1990s", position: "OUT", oneOff: 5, seasonLong: 8, style: 9, character: 8, chaos: 3, legacy: 5, overall: 6.3, peteEligible: "N" },
+  { name: "Gordon Banks", country: "England", era: "1960s–70s", position: "GK", oneOff: 10, seasonLong: 9, style: 7, character: 9, chaos: 2, legacy: 8, overall: 7.5, peteEligible: "Y" },
+  { name: "Dino Zoff", country: "Italy", era: "1970s–80s", position: "GK", oneOff: 8, seasonLong: 10, style: 7, character: 10, chaos: 2, legacy: 9, overall: 7.7, peteEligible: "Y" },
+  { name: "Oliver Kahn", country: "Germany", era: "1990s–2000s", position: "GK", oneOff: 9, seasonLong: 10, style: 7, character: 8, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Claudio Taffarel", country: "Brazil", era: "1990s", position: "GK", oneOff: 7, seasonLong: 9, style: 5, character: 8, chaos: 3, legacy: 7, overall: 6.5, peteEligible: "Y" },
+  { name: "Daniel Passarella", country: "Argentina", era: "1970s–80s", position: "OUT", oneOff: 8, seasonLong: 9, style: 7, character: 9, chaos: 5, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "Paolo Rossi", country: "Italy", era: "1980s", position: "OUT", oneOff: 10, seasonLong: 9, style: 7, character: 7, chaos: 6, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Marco Tardelli", country: "Italy", era: "1980s", position: "OUT", oneOff: 9, seasonLong: 9, style: 7, character: 8, chaos: 6, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Andreas Brehme", country: "Germany", era: "1980s–90s", position: "OUT", oneOff: 10, seasonLong: 9, style: 7, character: 8, chaos: 4, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "Jürgen Klinsmann", country: "Germany", era: "1990s", position: "OUT", oneOff: 9, seasonLong: 9, style: 8, character: 8, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Rudi Völler", country: "Germany", era: "1980s–90s", position: "OUT", oneOff: 8, seasonLong: 8, style: 7, character: 7, chaos: 6, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Karl-Heinz Rummenigge", country: "Germany", era: "1980s", position: "OUT", oneOff: 9, seasonLong: 9, style: 9, character: 8, chaos: 5, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Enzo Francescoli", country: "Uruguay", era: "1980s–90s", position: "OUT", oneOff: 7, seasonLong: 8, style: 9, character: 8, chaos: 4, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "George Weah", country: "Liberia", era: "1990s", position: "OUT", oneOff: 8, seasonLong: 8, style: 9, character: 9, chaos: 5, legacy: 5, overall: 7.3, peteEligible: "N" },
+  { name: "Roger Milla", country: "Cameroon", era: "1990s", position: "OUT", oneOff: 10, seasonLong: 9, style: 7, character: 8, chaos: 8, legacy: 7, overall: 8.2, peteEligible: "Y" },
+  { name: "El Hadji Diouf", country: "Senegal", era: "2000s", position: "OUT", oneOff: 8, seasonLong: 9, style: 8, character: 3, chaos: 9, legacy: 6, overall: 7.2, peteEligible: "Y" },
+  { name: "Asamoah Gyan", country: "Ghana", era: "2010s", position: "OUT", oneOff: 9, seasonLong: 8, style: 7, character: 8, chaos: 6, legacy: 6, overall: 7.3, peteEligible: "N" },
+  { name: "Park Ji-sung", country: "South Korea", era: "2000s–2010s", position: "OUT", oneOff: 8, seasonLong: 9, style: 7, character: 9, chaos: 4, legacy: 6, overall: 7.2, peteEligible: "N" },
+  { name: "Hidetoshi Nakata", country: "Japan", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 8, style: 8, character: 8, chaos: 4, legacy: 5, overall: 6.7, peteEligible: "N" },
+  { name: "Tim Cahill", country: "Australia", era: "2010s", position: "OUT", oneOff: 9, seasonLong: 8, style: 6, character: 8, chaos: 5, legacy: 5, overall: 6.8, peteEligible: "N" },
+  { name: "Landon Donovan", country: "USA", era: "2010s", position: "OUT", oneOff: 10, seasonLong: 8, style: 7, character: 7, chaos: 5, legacy: 6, overall: 7.2, peteEligible: "Y" },
+  { name: "Javier Mascherano", country: "Argentina", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 10, style: 7, character: 9, chaos: 3, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Ángel Di María", country: "Argentina", era: "2010s–2020s", position: "OUT", oneOff: 10, seasonLong: 8, style: 9, character: 7, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Emi Martínez", country: "Argentina", era: "2020s", position: "GK", oneOff: 10, seasonLong: 9, style: 6, character: 7, chaos: 8, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Antoine Griezmann", country: "France", era: "2010s–2020s", position: "OUT", oneOff: 9, seasonLong: 10, style: 8, character: 8, chaos: 4, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Paul Pogba", country: "France", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 8, style: 9, character: 5, chaos: 6, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "N'Golo Kanté", country: "France", era: "2010s–2020s", position: "OUT", oneOff: 6, seasonLong: 10, style: 7, character: 10, chaos: 1, legacy: 7, overall: 6.8, peteEligible: "Y" },
+  { name: "Hugo Lloris", country: "France", era: "2010s–2020s", position: "GK", oneOff: 7, seasonLong: 9, style: 7, character: 9, chaos: 3, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Raphaël Varane", country: "France", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 10, style: 8, character: 9, chaos: 2, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Olivier Giroud", country: "France", era: "2010s–2020s", position: "OUT", oneOff: 6, seasonLong: 8, style: 7, character: 8, chaos: 3, legacy: 6, overall: 6.3, peteEligible: "N" },
+  { name: "Mesut Özil", country: "Germany", era: "2010s", position: "OUT", oneOff: 7, seasonLong: 9, style: 10, character: 5, chaos: 5, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Miroslav Klose", country: "Germany", era: "2000s–2010s", position: "OUT", oneOff: 8, seasonLong: 10, style: 7, character: 9, chaos: 2, legacy: 8, overall: 7.3, peteEligible: "Y" },
+  { name: "Bastian Schweinsteiger", country: "Germany", era: "2000s–2010s", position: "OUT", oneOff: 9, seasonLong: 10, style: 8, character: 9, chaos: 3, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Philipp Lahm", country: "Germany", era: "2000s–2010s", position: "OUT", oneOff: 7, seasonLong: 10, style: 8, character: 10, chaos: 1, legacy: 8, overall: 7.3, peteEligible: "Y" },
+  { name: "Mats Hummels", country: "Germany", era: "2010s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 8, chaos: 3, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Jérôme Boateng", country: "Germany", era: "2010s", position: "OUT", oneOff: 6, seasonLong: 9, style: 8, character: 7, chaos: 4, legacy: 7, overall: 6.8, peteEligible: "Y" },
+  { name: "Mario Götze", country: "Germany", era: "2010s", position: "OUT", oneOff: 10, seasonLong: 6, style: 8, character: 6, chaos: 4, legacy: 9, overall: 7.2, peteEligible: "Y" },
+  { name: "Mohamed Salah", country: "Egypt", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 7, style: 9, character: 8, chaos: 3, legacy: 5, overall: 6.7, peteEligible: "N" },
+  { name: "Sadio Mané", country: "Senegal", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 8, style: 9, character: 9, chaos: 3, legacy: 5, overall: 7, peteEligible: "N" },
+  { name: "Riyad Mahrez", country: "Algeria", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 7, style: 9, character: 6, chaos: 4, legacy: 4, overall: 6.3, peteEligible: "N" },
+  { name: "Vinícius Júnior", country: "Brazil", era: "2020s–present", position: "OUT", oneOff: 8, seasonLong: 7, style: 10, character: 6, chaos: 6, legacy: 5, overall: 7, peteEligible: "N" },
+  { name: "Mario Kempes", country: "Argentina", era: "1970s", position: "OUT", oneOff: 10, seasonLong: 10, style: 8, character: 7, chaos: 5, legacy: 8, overall: 8, peteEligible: "Y" },
+  { name: "Osvaldo Ardiles", country: "Argentina", era: "1970s–80s", position: "OUT", oneOff: 6, seasonLong: 9, style: 8, character: 8, chaos: 4, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Sergio Agüero", country: "Argentina", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 7, style: 9, character: 7, chaos: 4, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Gonzalo Higuaín", country: "Argentina", era: "2010s", position: "OUT", oneOff: 9, seasonLong: 7, style: 8, character: 5, chaos: 5, legacy: 5, overall: 6.5, peteEligible: "N" },
+  { name: "Carlos Tevez", country: "Argentina", era: "2000s–2010s", position: "OUT", oneOff: 8, seasonLong: 8, style: 8, character: 7, chaos: 6, legacy: 6, overall: 7.2, peteEligible: "N" },
+  { name: "Juan Román Riquelme", country: "Argentina", era: "2000s", position: "OUT", oneOff: 7, seasonLong: 8, style: 10, character: 7, chaos: 4, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Diego Godín", country: "Uruguay", era: "2010s", position: "OUT", oneOff: 8, seasonLong: 10, style: 7, character: 10, chaos: 3, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "Luis Figo", country: "Portugal", era: "1990s–2000s", position: "OUT", oneOff: 8, seasonLong: 9, style: 10, character: 7, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Rui Costa", country: "Portugal", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 8, style: 10, character: 7, chaos: 4, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Pepe", country: "Portugal", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 9, style: 6, character: 5, chaos: 8, legacy: 6, overall: 6.8, peteEligible: "Y" },
+  { name: "David Beckham", country: "England", era: "1990s–2000s", position: "OUT", oneOff: 9, seasonLong: 8, style: 9, character: 6, chaos: 7, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Paul Gascoigne", country: "England", era: "1990s", position: "OUT", oneOff: 10, seasonLong: 9, style: 10, character: 4, chaos: 9, legacy: 7, overall: 8.2, peteEligible: "Y" },
+  { name: "Michael Owen", country: "England", era: "1990s–2000s", position: "OUT", oneOff: 10, seasonLong: 8, style: 8, character: 7, chaos: 4, legacy: 7, overall: 7.3, peteEligible: "Y" },
+  { name: "Frank Lampard", country: "England", era: "2000s–2010s", position: "OUT", oneOff: 6, seasonLong: 7, style: 8, character: 8, chaos: 3, legacy: 5, overall: 6.2, peteEligible: "N" },
+  { name: "Steven Gerrard", country: "England", era: "2000s–2010s", position: "OUT", oneOff: 7, seasonLong: 8, style: 8, character: 8, chaos: 4, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "John Terry", country: "England", era: "2000s–2010s", position: "OUT", oneOff: 6, seasonLong: 8, style: 6, character: 7, chaos: 5, legacy: 5, overall: 6.2, peteEligible: "N" },
+  { name: "Wayne Rooney", country: "England", era: "2000s–2010s", position: "OUT", oneOff: 7, seasonLong: 7, style: 8, character: 6, chaos: 7, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Raul", country: "Spain", era: "1990s–2000s", position: "OUT", oneOff: 8, seasonLong: 8, style: 9, character: 7, chaos: 4, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Fernando Torres", country: "Spain", era: "2000s–2010s", position: "OUT", oneOff: 8, seasonLong: 7, style: 9, character: 7, chaos: 4, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Carles Puyol", country: "Spain", era: "2000s–2010s", position: "OUT", oneOff: 9, seasonLong: 9, style: 6, character: 10, chaos: 4, legacy: 8, overall: 7.7, peteEligible: "Y" },
+  { name: "Lothar Emmerich", country: "Germany", era: "1960s", position: "OUT", oneOff: 7, seasonLong: 8, style: 7, character: 7, chaos: 4, legacy: 6, overall: 6.5, peteEligible: "N" },
+  { name: "Uwe Seeler", country: "Germany", era: "1960s–70s", position: "OUT", oneOff: 8, seasonLong: 9, style: 7, character: 9, chaos: 3, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Jimmy Greaves", country: "England", era: "1960s", position: "OUT", oneOff: 9, seasonLong: 8, style: 9, character: 6, chaos: 5, legacy: 6, overall: 7.2, peteEligible: "N" },
+  { name: "Geoff Hurst", country: "England", era: "1960s", position: "OUT", oneOff: 10, seasonLong: 8, style: 7, character: 7, chaos: 5, legacy: 8, overall: 7.5, peteEligible: "Y" },
+  { name: "Gianluca Vialli", country: "Italy", era: "1980s–90s", position: "OUT", oneOff: 7, seasonLong: 8, style: 8, character: 8, chaos: 4, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Salvatore Schillaci", country: "Italy", era: "1990", position: "OUT", oneOff: 10, seasonLong: 10, style: 7, character: 7, chaos: 7, legacy: 7, overall: 8, peteEligible: "Y" },
+  { name: "Giuseppe Bergomi", country: "Italy", era: "1980s–90s", position: "OUT", oneOff: 6, seasonLong: 10, style: 7, character: 10, chaos: 2, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Roberto Donadoni", country: "Italy", era: "1980s–90s", position: "OUT", oneOff: 7, seasonLong: 8, style: 9, character: 7, chaos: 3, legacy: 6, overall: 6.7, peteEligible: "N" },
+  { name: "Giancarlo Antognoni", country: "Italy", era: "1980s", position: "OUT", oneOff: 7, seasonLong: 9, style: 9, character: 8, chaos: 3, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Fernando Hierro", country: "Spain", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 8, style: 7, character: 9, chaos: 4, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Andoni Zubizarreta", country: "Spain", era: "1980s–90s", position: "GK", oneOff: 7, seasonLong: 9, style: 6, character: 8, chaos: 3, legacy: 5, overall: 6.3, peteEligible: "N" },
+  { name: "Emilio Butragueño", country: "Spain", era: "1980s", position: "OUT", oneOff: 9, seasonLong: 8, style: 9, character: 7, chaos: 4, legacy: 6, overall: 7.2, peteEligible: "N" },
+  { name: "Davor Šuker", country: "Croatia", era: "1990s", position: "OUT", oneOff: 9, seasonLong: 10, style: 9, character: 7, chaos: 5, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Robert Prosinečki", country: "Croatia", era: "1990s", position: "OUT", oneOff: 8, seasonLong: 8, style: 10, character: 6, chaos: 6, legacy: 6, overall: 7.3, peteEligible: "N" },
+  { name: "Zvonimir Boban", country: "Croatia", era: "1990s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 8, chaos: 6, legacy: 6, overall: 7.3, peteEligible: "N" },
+  { name: "Hakan Şükür", country: "Turkey", era: "2000s", position: "OUT", oneOff: 10, seasonLong: 9, style: 7, character: 7, chaos: 5, legacy: 6, overall: 7.3, peteEligible: "N" },
+  { name: "Pavel Nedvěd", country: "Czech Republic", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 9, style: 9, character: 8, chaos: 5, legacy: 6, overall: 7.3, peteEligible: "N" },
+  { name: "Igor Belanov", country: "Soviet Union", era: "1980s", position: "OUT", oneOff: 9, seasonLong: 8, style: 8, character: 7, chaos: 5, legacy: 6, overall: 7.2, peteEligible: "N" },
+  { name: "Tomáš Rosický", country: "Czech Republic", era: "2000s–2010s", position: "OUT", oneOff: 7, seasonLong: 7, style: 9, character: 7, chaos: 3, legacy: 5, overall: 6.3, peteEligible: "N" },
+  { name: "Karel Poborský", country: "Czech Republic", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 8, style: 8, character: 7, chaos: 5, legacy: 5, overall: 6.7, peteEligible: "N" },
+  { name: "Julián Álvarez", country: "Argentina", era: "2020s", position: "OUT", oneOff: 8, seasonLong: 9, style: 7, character: 8, chaos: 4, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Rodrigo De Paul", country: "Argentina", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 9, style: 7, character: 8, chaos: 5, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Cristian Romero", country: "Argentina", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 9, style: 6, character: 7, chaos: 7, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Enzo Fernández", country: "Argentina", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 7, chaos: 4, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Lautaro Martínez", country: "Argentina", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 7, style: 8, character: 7, chaos: 4, legacy: 6, overall: 6.5, peteEligible: "N" },
+  { name: "Jude Bellingham", country: "England", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 7, style: 8, character: 7, chaos: 3, legacy: 4, overall: 6, peteEligible: "N" },
+  { name: "Bukayo Saka", country: "England", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 7, style: 8, character: 7, chaos: 2, legacy: 4, overall: 5.8, peteEligible: "N" },
+  { name: "Phil Foden", country: "England", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 6, style: 8, character: 6, chaos: 3, legacy: 3, overall: 5.3, peteEligible: "N" },
+  { name: "Declan Rice", country: "England", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 8, style: 7, character: 8, chaos: 3, legacy: 4, overall: 6, peteEligible: "N" },
+  { name: "Achraf Hakimi", country: "Morocco", era: "2020s", position: "OUT", oneOff: 8, seasonLong: 9, style: 8, character: 7, chaos: 4, legacy: 6, overall: 7, peteEligible: "Y" },
+  { name: "Hakim Ziyech", country: "Morocco", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 8, style: 8, character: 6, chaos: 4, legacy: 5, overall: 6.3, peteEligible: "N" },
+  { name: "Yassine Bounou", country: "Morocco", era: "2020s", position: "GK", oneOff: 9, seasonLong: 10, style: 6, character: 9, chaos: 4, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "Sofyan Amrabat", country: "Morocco", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 10, style: 7, character: 9, chaos: 3, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Erling Haaland", country: "Norway", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 6, style: 7, character: 6, chaos: 3, legacy: 1, overall: 5, peteEligible: "N" },
+  { name: "Rodri", country: "Spain", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 8, chaos: 2, legacy: 5, overall: 6.5, peteEligible: "N" },
+  { name: "Pedri", country: "Spain", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 7, style: 8, character: 7, chaos: 2, legacy: 4, overall: 5.7, peteEligible: "N" },
+  { name: "Joaquín Correa", country: "Argentina", era: "2020s", position: "OUT", oneOff: 5, seasonLong: 6, style: 7, character: 6, chaos: 4, legacy: 4, overall: 5.3, peteEligible: "N" },
+  { name: "Theo Hernández", country: "France", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 7, chaos: 5, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Aurélien Tchouaméni", country: "France", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 8, style: 7, character: 7, chaos: 2, legacy: 5, overall: 5.8, peteEligible: "N" },
+  { name: "Heung-min Son", country: "South Korea", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 7, style: 8, character: 8, chaos: 3, legacy: 4, overall: 6.2, peteEligible: "N" },
+];
+
+// Lookup a player object in WORLD_CUP_POOL by name. Returns null if not found.
+const findWorldCupPlayer = (name) => {
+  if (!name) return null;
+  return WORLD_CUP_POOL.find(p => p.name === name) || null;
+};
+
+// Real attribute scoring for tournament R3. Returns the standard category map
+// used elsewhere in the game. Falls back to stubAttributeScores for names not
+// in the World Cup pool (e.g. R1/R2 picks coming from the daily pool).
+const worldCupAttributeScores = (playerName) => {
+  const p = findWorldCupPlayer(playerName);
+  if (!p) return stubAttributeScores(playerName);
+  return {
+    'One-Off':     p.oneOff,
+    'Season-Long': p.seasonLong,
+    'Style':       p.style,
+    'Character':   p.character,
+    'Chaos':       p.chaos,
+    'Legacy':      p.legacy,
+  };
+};
+
+// The 108-player Pete-eligible subset. Used for both Pete's R3 draws AND
+// the player's R3 draft cards. Returns full World Cup pool player objects.
+const getPeteEligiblePool = () => WORLD_CUP_POOL.filter(p => p.peteEligible === "Y");
+
+// Generate a 6-card draft from the Pete-eligible 108 for R3 player drafts.
+// Used in R3 ONLY. Excludes any names in excludeNames (typically Pete's three picks).
+// Returns three rounds of two cards each, matching generateDraft()'s shape.
+// GK cap applied at pick-time via the existing UI logic.
+//
+// Cards are enriched with the shape the draft UI expects (tier/position/flag/note),
+// plus carried-through World Cup data (overall, peteEligible, isWorldCup flag) so
+// later stages can read the real attributes.
+const generateR3Draft = (excludeNames = []) => {
+  const available = getPeteEligiblePool().filter(p => !excludeNames.includes(p.name));
+  const a = [...available];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  const picked = a.slice(0, 6);
+
+  // Map World Cup pool players to the shape draft cards expect.
+  // Tier is synthesised from Overall (Legend/Star/Cult/Wildcard bands).
+  // Position maps GK → GK, everything else → MID (the daily-game GK cap reads
+  // position === "GK", so this preserves the max-1-GK rule).
+  // Note shows the player's country and era — replaces daily-pool flavour text.
+  const enriched = picked.map(p => ({
+    name: p.name,
+    tier: p.overall >= 8.5 ? 'Legend'
+        : p.overall >= 7.5 ? 'Star'
+        : p.overall >= 6.5 ? 'Cult'
+        : 'Wildcard',
+    position: p.position === 'GK' ? 'GK' : 'MID',
+    flag: '⚽',
+    note: `${p.country} — ${p.era}`,
+    overall: p.overall,
+    peteEligible: p.peteEligible,
+    isWorldCup: true,
+  }));
+
+  return [
+    [enriched[0], enriched[1]],
+    [enriched[2], enriched[3]],
+    [enriched[4], enriched[5]],
+  ];
+};
+
+// ============ END TOURNAMENT MODE — WORLD CUP POOL ============
+
 // ============ TOURNAMENT MODE — STUB CONTENT ============
 // Placeholder content for Task 5 build. Real content lands in Phase 2.
 // Each opponent has: name, vibe (descriptor), three picks (by name), and a loss-message
