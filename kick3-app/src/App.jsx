@@ -1257,42 +1257,56 @@ const worldCupAttributeScores = (playerName) => {
 // the player's R3 draft cards. Returns full World Cup pool player objects.
 const getPeteEligiblePool = () => WORLD_CUP_POOL.filter(p => p.peteEligible === "Y");
 
-// Generate a 6-card draft from the Pete-eligible 108 for R3 player drafts.
-// Used in R3 ONLY. Excludes any names in excludeNames (typically Pete's three picks).
-// Returns three rounds of two cards each, matching generateDraft()'s shape.
-// GK cap applied at pick-time via the existing UI logic.
-//
-// Cards are enriched with the shape the draft UI expects (tier/position/flag/note),
-// plus carried-through World Cup data (overall, peteEligible, isWorldCup flag) so
-// later stages can read the real attributes.
-const generateR3Draft = (excludeNames = []) => {
-  const available = getPeteEligiblePool().filter(p => !excludeNames.includes(p.name));
+// Enrich a raw WORLD_CUP_POOL player into the shape draft cards expect.
+// Tier is synthesised from Overall (Legend/Star/Cult/Wildcard bands).
+// Position maps GK → GK, everything else → MID (the daily-game GK cap reads
+// position === "GK", so this preserves the max-1-GK rule).
+// Note shows the player's country and era — replaces daily-pool flavour text.
+// Used by both generateR3Draft and generateTournamentDraft.
+const enrichWorldCupCard = (p) => ({
+  name: p.name,
+  tier: p.overall >= 8.5 ? 'Legend'
+      : p.overall >= 7.5 ? 'Star'
+      : p.overall >= 6.5 ? 'Cult'
+      : 'Wildcard',
+  position: p.position === 'GK' ? 'GK' : 'MID',
+  flag: '⚽',
+  note: `${p.country} — ${p.era}`,
+  overall: p.overall,
+  peteEligible: p.peteEligible,
+  isWorldCup: true,
+});
+
+// Pure random shuffle helper for picking N from the World Cup pool.
+const pickRandomFromPool = (pool, n, excludeNames = []) => {
+  const available = pool.filter(p => !excludeNames.includes(p.name));
   const a = [...available];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
-  const picked = a.slice(0, 6);
+  return a.slice(0, n);
+};
 
-  // Map World Cup pool players to the shape draft cards expect.
-  // Tier is synthesised from Overall (Legend/Star/Cult/Wildcard bands).
-  // Position maps GK → GK, everything else → MID (the daily-game GK cap reads
-  // position === "GK", so this preserves the max-1-GK rule).
-  // Note shows the player's country and era — replaces daily-pool flavour text.
-  const enriched = picked.map(p => ({
-    name: p.name,
-    tier: p.overall >= 8.5 ? 'Legend'
-        : p.overall >= 7.5 ? 'Star'
-        : p.overall >= 6.5 ? 'Cult'
-        : 'Wildcard',
-    position: p.position === 'GK' ? 'GK' : 'MID',
-    flag: '⚽',
-    note: `${p.country} — ${p.era}`,
-    overall: p.overall,
-    peteEligible: p.peteEligible,
-    isWorldCup: true,
-  }));
+// Generate a 6-card draft from the full World Cup 180 for R1 and R2 player drafts.
+// Pure random — no Legend quota, no tier balancing. Phase 2, Deploy 2 / Stage 2.
+// Returns three rounds of two cards each, matching generateDraft()'s shape.
+const generateTournamentDraft = (excludeNames = []) => {
+  const picked = pickRandomFromPool(WORLD_CUP_POOL, 6, excludeNames);
+  const enriched = picked.map(enrichWorldCupCard);
+  return [
+    [enriched[0], enriched[1]],
+    [enriched[2], enriched[3]],
+    [enriched[4], enriched[5]],
+  ];
+};
 
+// Generate a 6-card draft from the Pete-eligible 108 for R3 player drafts.
+// Used in R3 ONLY. Excludes any names in excludeNames (typically Pete's three picks).
+// GK cap applied at pick-time via the existing UI logic.
+const generateR3Draft = (excludeNames = []) => {
+  const picked = pickRandomFromPool(getPeteEligiblePool(), 6, excludeNames);
+  const enriched = picked.map(enrichWorldCupCard);
   return [
     [enriched[0], enriched[1]],
     [enriched[2], enriched[3]],
@@ -1966,7 +1980,8 @@ export default function Kick3() {
     });
 
     setMode('tournament');
-    setDraftRounds(generateDraft());
+    // Phase 2, Deploy 2 / Stage 2: R1 draft now from World Cup 180 (was daily 384).
+    setDraftRounds(generateTournamentDraft());
     setCurrentRound(0);
     setSquad([]);
     setSentence('');
@@ -1987,7 +2002,9 @@ export default function Kick3() {
     const attribute = q.category;
     const questionText = q.text;
 
-    setDraftRounds(generateDraft(squad.map(p => p.name)));
+    // Phase 2, Deploy 2 / Stage 2: R2 draft now from World Cup 180 (was daily 384).
+    // Excludes R1 picks so the player doesn't see the same names twice.
+    setDraftRounds(generateTournamentDraft(squad.map(p => p.name)));
     setCurrentRound(0);
     setSquad([]);
     setTournamentRound(2);
