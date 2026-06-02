@@ -1033,12 +1033,16 @@ const getTournamentDebugMode = () => {
 };
 
 // Default tournament state for a player who has never attempted a tournament.
+// Phase 2, Deploy 5 / Stage 14: added attemptsToday + wonTodayFlag to support
+// the "3 attempts per day, cap at 1 trophy/day" model.
 const defaultTournamentState = () => ({
   lastPlayedDate: null,         // YYYY-MM-DD of last attempted tournament
   lastAttemptResult: null,      // 'won' | 'lost-r1' | 'lost-r2' | 'lost-r3' | null
   trophyCount: 0,               // Lifetime trophies (Pete wins)
   tournamentsAttempted: 0,      // Lifetime count of attempts started
   tournamentsCompleted: 0,      // Lifetime count of attempts that reached Round 3 (win or loss)
+  attemptsToday: 0,             // Count of attempts started today (resets each new day)
+  wonTodayFlag: false,          // True once player has won a trophy today (caps further attempts)
 });
 
 // Read tournament state from localStorage. Falls back to defaults on any failure.
@@ -1061,11 +1065,38 @@ const writeTournamentState = (state) => {
   } catch { /* silent */ }
 };
 
-// Has the player already attempted today's tournament? Returns true/false.
+// Phase 2, Deploy 5 / Stage 14: Tournament play allowance model.
+// Players get up to 3 attempts per day, but only 1 trophy per day.
+// Locked if: (a) attemptsToday >= 3, OR (b) they already won today.
+// State auto-resets when the calendar day changes (we compare lastPlayedDate).
+const TOURNAMENT_DAILY_ATTEMPT_CAP = 3;
+
+// Given a tournament state object and a date, return the EFFECTIVE day-scoped values,
+// auto-resetting attemptsToday and wonTodayFlag if the date has rolled over.
+// Returns { attemptsToday, wonTodayFlag, sameDay }.
+const effectiveDailyState = (state, date = new Date()) => {
+  if (!state) return { attemptsToday: 0, wonTodayFlag: false, sameDay: false };
+  const today = todayDateString(date);
+  const sameDay = state.lastPlayedDate === today;
+  if (!sameDay) {
+    // New day — counters reset.
+    return { attemptsToday: 0, wonTodayFlag: false, sameDay: false };
+  }
+  return {
+    attemptsToday: state.attemptsToday || 0,
+    wonTodayFlag: !!state.wonTodayFlag,
+    sameDay: true,
+  };
+};
+
+// Has the player exhausted today's tournament attempts? Returns true/false.
 // Used to gate the PLAY NOW button on the tournament home screen.
+// Locked when: attempts used up (3) OR a trophy already won today.
 const hasPlayedTournamentToday = (state, date = new Date()) => {
-  if (!state || !state.lastPlayedDate) return false;
-  return state.lastPlayedDate === todayDateString(date);
+  const daily = effectiveDailyState(state, date);
+  if (daily.wonTodayFlag) return true;
+  if (daily.attemptsToday >= TOURNAMENT_DAILY_ATTEMPT_CAP) return true;
+  return false;
 };
 
 // ============ TOURNAMENT MODE — WORLD CUP POOL (Phase 2, Deploy 1) ============
@@ -2549,10 +2580,17 @@ export default function Kick3() {
     const questionText = q.text;
 
     // Mark this as a fresh attempt in state.
+    // Phase 2, Deploy 5 / Stage 14: increment attemptsToday. If the day has rolled
+    // over since the last attempt, reset to 1 (this is attempt #1 of the new day).
     const state = readTournamentState();
+    const daily = effectiveDailyState(state);
     writeTournamentState({
       ...state,
       tournamentsAttempted: (state.tournamentsAttempted || 0) + 1,
+      lastPlayedDate: todayDateString(),
+      attemptsToday: daily.attemptsToday + 1,
+      // wonTodayFlag preserved if same day, cleared by effectiveDailyState if not.
+      wonTodayFlag: daily.wonTodayFlag,
     });
 
     setMode('tournament');
@@ -2790,12 +2828,15 @@ Weigh the picks, their Legacy ratings, and both arguments together. Judge betwee
       setR3PeteReaction(reaction);
 
       // Write tournament state (trophy on win, attempt completion either way).
+      // Phase 2, Deploy 5 / Stage 14: also set wonTodayFlag on a R3 win so the
+      // player can't keep attempting after they've earned today's trophy.
       writeTournamentState({
         ...state,
         lastPlayedDate: todayDateString(),
         lastAttemptResult: playerWon ? 'won-r3' : 'lost-r3',
         tournamentsCompleted: (state.tournamentsCompleted || 0) + 1,
         trophyCount: (state.trophyCount || 0) + (playerWon ? 1 : 0),
+        wonTodayFlag: state.wonTodayFlag || playerWon,
       });
 
       // Wait for the VAR animation to finish (3s) before revealing verdict.
@@ -5970,16 +6011,28 @@ Deliver your verdict as JSON.`;
     const insideWindow = !!tournamentStatus || debugMode === 'unlock' || debugMode === 'locked';
     const canPlay = insideWindow && !playedToday;
 
-    // Dynamic context line — three states.
+    // Dynamic context line — Phase 2, Deploy 5 / Stage 14.
+    // Now reflects the 3-attempts-per-day + 1-trophy-per-day model:
+    //   - Outside window: tournament returns date
+    //   - Trophy won today: "Trophy earned today. Come back tomorrow."
+    //   - Attempts exhausted (3/3 used, no trophy): "Three goes today. Try again tomorrow."
+    //   - Fresh start of day (0 attempts used): "Three goes at the trophy. Three questions per go. Beat Pete to win it."
+    //   - Mid-day (some attempts used, no trophy): "X attempts left. Beat Pete in Round 3 to earn a trophy."
     // Safe access: debug modes can flip insideWindow=true while tournamentStatus is still null
-    // (when real today is outside the window). Used to build the context line below.
+    // (when real today is outside the window).
+    const dailyForContext = effectiveDailyState(tournamentState);
+    const attemptsLeft = TOURNAMENT_DAILY_ATTEMPT_CAP - dailyForContext.attemptsToday;
     let contextLine;
     if (!insideWindow) {
       contextLine = 'Tournament returns 11 June 2026. Beat Pete in Round 3 to win a trophy.';
-    } else if (playedToday) {
-      contextLine = `You\u2019ve played today. Come back tomorrow.`;
+    } else if (dailyForContext.wonTodayFlag) {
+      contextLine = `Trophy earned today. Come back tomorrow.`;
+    } else if (attemptsLeft <= 0) {
+      contextLine = `Three goes today, no trophy. Come back tomorrow.`;
+    } else if (dailyForContext.attemptsToday === 0) {
+      contextLine = `Three goes at the trophy. Three questions per go. Beat Pete to win it.`;
     } else {
-      contextLine = `One chance, three questions. Beat Pete in Round 3 and earn a trophy.`;
+      contextLine = `${attemptsLeft} ${attemptsLeft === 1 ? 'attempt' : 'attempts'} left today. Beat Pete in Round 3 to earn a trophy.`;
     }
 
     return (
