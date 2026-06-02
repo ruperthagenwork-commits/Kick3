@@ -2071,6 +2071,13 @@ export default function Kick3() {
   // Share state — shows feedback in the share button.
   const [shareState, setShareState] = useState('idle'); // 'idle' | 'working' | 'shared' | 'copied' | 'error'
 
+  // Phase 2, Deploy 5 / Stage 16: tracks the screen the player came from when
+  // routing INTO the tournament record screen. The record screen reads this on
+  // its back button to know whether to return to home or tournament-home.
+  // - Default 'tournament-home' preserves existing behaviour for tournament-home → RECORD
+  // - New trophy badge on the main home screen sets this to 'home' before routing in
+  const [recordReturnScreen, setRecordReturnScreen] = useState('tournament-home');
+
   // ============ TOURNAMENT MODE — BETA GATE ============
   // tournamentBetaActive is true if ?beta=pete is (or was) in the URL.
   // When true, the green TOURNAMENT MODE button is rendered on the home screen.
@@ -3080,6 +3087,16 @@ Deliver your verdict as JSON.`;
       const launch = new Date(TOURNAMENT_CONFIG.startDate + 'T00:00:00');
       return now >= launch;
     })();
+
+    // Phase 2, Deploy 5 / Stage 16: trophy count for the new top-right trophy
+    // badge. Reads lifetime tournament trophies from localStorage on each render.
+    // Safe on first load (defaults to 0 if no state exists).
+    const homeTrophyCount = (() => {
+      try {
+        const state = readTournamentState();
+        return state.trophyCount || 0;
+      } catch { return 0; }
+    })();
     return (
       <>
         <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
@@ -3276,7 +3293,10 @@ Deliver your verdict as JSON.`;
               }}>
                 DAY {TODAYS_QUESTION.number}
               </div>
-              {/* Top-right: STATS button */}
+              {/* Top-right: TROPHIES pill (Stage 16) + STATS button.
+                  TROPHIES displays the lifetime tournament trophy count and routes
+                  to the tournament-record screen. Setting recordReturnScreen='home'
+                  so the back button there returns here, not to tournament-home. */}
               <div style={{
                 position: 'absolute',
                 top: '14px',
@@ -3286,6 +3306,28 @@ Deliver your verdict as JSON.`;
                 alignItems: 'flex-end',
                 gap: '6px'
               }}>
+                <button
+                  onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
+                  aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
+                  style={{
+                    background: 'rgba(20,20,30,0.85)',
+                    color: colours.gold,
+                    ...condFont,
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    letterSpacing: '0.3em',
+                    padding: '6px 10px',
+                    borderRadius: '4px',
+                    border: `1px solid ${colours.gold}`,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
+                  <span>{homeTrophyCount}</span>
+                </button>
                 <button
                   onClick={() => setScreen('stats')}
                   style={{
@@ -3561,7 +3603,6 @@ Deliver your verdict as JSON.`;
                 ) : (
                   <>
                     <span>SOLO MODE</span>
-                    <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
                   </>
                 )}
               </button>
@@ -3819,7 +3860,8 @@ Deliver your verdict as JSON.`;
                 }}>
                   DAY {TODAYS_QUESTION.number}
                 </div>
-                {/* Top-right: STATS button */}
+                {/* Top-right: TROPHIES pill (Stage 16) + STATS button.
+                    Same pattern as the phone layout, slightly larger sizing. */}
                 <div style={{
                   position: 'absolute',
                   top: '18px',
@@ -3829,6 +3871,28 @@ Deliver your verdict as JSON.`;
                   alignItems: 'flex-end',
                   gap: '8px'
                 }}>
+                  <button
+                    onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
+                    aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
+                    style={{
+                      background: 'rgba(20,20,30,0.85)',
+                      color: colours.gold,
+                      ...condFont,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      letterSpacing: '0.3em',
+                      padding: '8px 14px',
+                      borderRadius: '4px',
+                      border: `1px solid ${colours.gold}`,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
+                    <span>{homeTrophyCount}</span>
+                  </button>
                   <button
                     onClick={() => setScreen('stats')}
                     style={{
@@ -4102,7 +4166,6 @@ Deliver your verdict as JSON.`;
                   ) : (
                     <>
                       <span>SOLO MODE</span>
-                      <span style={{ fontSize: '26px', lineHeight: 1 }}>→</span>
                     </>
                   )}
                 </button>
@@ -6385,7 +6448,7 @@ Deliver your verdict as JSON.`;
 
               {/* RECORD — gold outline, active (opens tournament-record screen) */}
               <button
-                onClick={() => setScreen('tournament-record')}
+                onClick={() => { setRecordReturnScreen('tournament-home'); setScreen('tournament-record'); }}
                 className="kick3-button-hover kick3-shimmer-gold"
                 style={{
                   width: '100%',
@@ -6535,7 +6598,7 @@ Deliver your verdict as JSON.`;
 
                 {/* RECORD — gold outline, active */}
                 <button
-                  onClick={() => setScreen('tournament-record')}
+                  onClick={() => { setRecordReturnScreen('tournament-home'); setScreen('tournament-record'); }}
                   className="kick3-button-hover kick3-shimmer-gold"
                   style={{
                     width: '100%',
@@ -6739,9 +6802,10 @@ Deliver your verdict as JSON.`;
                'SHARE RECORD'}
             </button>
 
-            {/* Back to tournament home */}
+            {/* Back — routes to wherever we came from (tournament-home or home).
+                Phase 2, Deploy 5 / Stage 16: label adapts to destination. */}
             <button
-              onClick={() => setScreen('tournament-home')}
+              onClick={() => setScreen(recordReturnScreen)}
               style={{
                 width: '100%',
                 padding: '12px 20px',
@@ -6756,7 +6820,7 @@ Deliver your verdict as JSON.`;
                 cursor: 'pointer'
               }}
             >
-              ← BACK TO TOURNAMENT
+              ← {recordReturnScreen === 'home' ? 'BACK TO HOME' : 'BACK TO TOURNAMENT'}
             </button>
           </div>
         </div>
