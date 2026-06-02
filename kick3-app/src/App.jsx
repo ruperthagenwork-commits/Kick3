@@ -2073,6 +2073,93 @@ export default function Kick3() {
   // across re-renders. Reset on each tournament attempt start.
   const [roundWinReaction, setRoundWinReaction] = useState('');
 
+  // ============ DEV CONSOLE HELPERS (Phase 2, Deploy 5 / Stage 12) ============
+  // When ?debug=tournament-unlock is in the URL, expose key state setters and a
+  // few canned scenarios on `window.kick3` so we can trigger UI states from the
+  // browser console without playing through the full flow. Useful for:
+  //   - Forcing a legacy tiebreak verdict (rare in normal play, hard to trigger)
+  //   - Jumping to specific screens during development
+  //   - Inspecting the current React state
+  // No effect in production / no debug flag — completely inert.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const debugFlag = params.get('debug');
+    if (debugFlag !== 'tournament-unlock' && debugFlag !== 'tournament-locked') return;
+    window.kick3 = {
+      // Direct setters — use with caution.
+      setScreen,
+      setTournamentVarResult,
+      setTournamentRound,
+      setTournamentOpponent,
+      setTournamentAttribute,
+      setSquad,
+      // Canned scenario: force a Legacy-tiebreak WIN on the congrats screen.
+      // Player ties on attribute (18 vs 18) but wins on Legacy (22 vs 17).
+      forceTiebreakWin: () => {
+        setTournamentRound(1);
+        setTournamentOpponent({
+          label: 'PUB MATE', shortLabel: 'PUB MATE',
+          vibe: 'Loud, picks the obvious legends',
+          peteLossLine: '(test mode)',
+          picks: ['Frank Lampard', 'John Terry', 'Cafu'],
+        });
+        setTournamentAttribute('Character');
+        setSquad([
+          { name: 'Test Player 1', tier: 'Star', position: 'MID', flag: '⚽', isWorldCup: true },
+          { name: 'Test Player 2', tier: 'Star', position: 'MID', flag: '⚽', isWorldCup: true },
+          { name: 'Test Player 3', tier: 'Star', position: 'MID', flag: '⚽', isWorldCup: true },
+        ]);
+        setRoundWinReaction("Right. Pub mate's seen off. The real test starts now.");
+        setTournamentVarResult({
+          playerTotal: 18,
+          opponentTotal: 18,
+          playerLegacy: 22,
+          opponentLegacy: 17,
+          viaLegacy: true,
+          won: true,
+          phrase: 'Tied on attribute. Legacy tiebreak in your favour. You advance.',
+        });
+        setScreen('tournament-round-won');
+        console.log('[kick3] Forced Legacy tiebreak WIN — congrats screen should show');
+      },
+      // Canned scenario: force a Legacy-tiebreak LOSS on the verdict screen.
+      forceTiebreakLoss: () => {
+        setTournamentRound(1);
+        setTournamentOpponent({
+          label: 'PUB MATE', shortLabel: 'PUB MATE',
+          vibe: 'Loud, picks the obvious legends',
+          peteLossLine: 'You lost to my pub mate. My PUB MATE. Off you trot.',
+          picks: ['Frank Lampard', 'John Terry', 'Cafu'],
+        });
+        setTournamentAttribute('Character');
+        setSquad([
+          { name: 'Test Player 1', tier: 'Star', position: 'MID', flag: '⚽', isWorldCup: true },
+          { name: 'Test Player 2', tier: 'Star', position: 'MID', flag: '⚽', isWorldCup: true },
+          { name: 'Test Player 3', tier: 'Star', position: 'MID', flag: '⚽', isWorldCup: true },
+        ]);
+        setTournamentVarResult({
+          playerTotal: 18,
+          opponentTotal: 18,
+          playerLegacy: 14,
+          opponentLegacy: 19,
+          viaLegacy: true,
+          won: false,
+          phrase: 'Tied on attribute. Legacy tiebreak against you. No advance.',
+        });
+        setScreen('tournament-var');
+        console.log('[kick3] Forced Legacy tiebreak LOSS — verdict screen should show');
+      },
+    };
+    console.log('[kick3] Debug helpers attached to window.kick3');
+    console.log('[kick3] Available: window.kick3.forceTiebreakWin(), window.kick3.forceTiebreakLoss()');
+    return () => {
+      try { delete window.kick3; } catch {}
+    };
+    // Run once on mount; state setters are stable from useState so safe to omit from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ============ DRAFT CARDS — MEMOISED GK AUTO-SWAP (Phase 2, Deploy 5 / Stage 10) ============
   // BUG FIX: previously the GK auto-swap ran shuffle() inline inside the draft screen
   // render. Any state change (typing in textarea, hover, anything) re-rendered the
