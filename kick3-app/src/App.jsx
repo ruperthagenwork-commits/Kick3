@@ -2506,19 +2506,22 @@ export default function Kick3() {
   // Compute the VAR result for the current round and route to the verdict screen.
   // Phase 2, Deploy 5 / Stage 1: route now goes through the VAR-checking screen
   // for a 3-second suspense beat before revealing the verdict.
+  // Phase 2, Deploy 5 / Stage 11: Legacy totals always computed and stored in the
+  // result so the verdict/congrats screens can surface them when a tiebreak fires.
   const computeTournamentVar = (finishedSquad) => {
     const opponentPicks = resolveOpponentPicks(tournamentOpponent);
     const playerTotal = scoreTeamOnAttribute(finishedSquad, tournamentAttribute);
     const opponentTotal = scoreTeamOnAttribute(opponentPicks, tournamentAttribute);
+    // Compute Legacy unconditionally — needed for tiebreak case, also handy for surfacing.
+    const playerLegacy = scoreTeamOnAttribute(finishedSquad, 'Legacy');
+    const opponentLegacy = scoreTeamOnAttribute(opponentPicks, 'Legacy');
     let won;
     let viaLegacy = false;
     if (playerTotal > opponentTotal) {
       won = true;
     } else if (playerTotal === opponentTotal) {
       // Tiebreak on Legacy. Player wins remaining ties.
-      const playerLegacy = scoreTeamOnAttribute(finishedSquad, 'Legacy');
-      const oppLegacy = scoreTeamOnAttribute(opponentPicks, 'Legacy');
-      won = playerLegacy >= oppLegacy;
+      won = playerLegacy >= opponentLegacy;
       viaLegacy = true;
     } else {
       won = false;
@@ -2526,7 +2529,15 @@ export default function Kick3() {
     const phrase = pickVarPhrase(playerTotal, opponentTotal, viaLegacy, won);
     // Pre-compute the result and stash it; the VAR-checking screen will reveal it
     // after its 3-second animation completes.
-    setTournamentVarResult({ playerTotal, opponentTotal, viaLegacy, won, phrase });
+    setTournamentVarResult({
+      playerTotal,
+      opponentTotal,
+      playerLegacy,
+      opponentLegacy,
+      viaLegacy,
+      won,
+      phrase
+    });
     setScreen('tournament-var-checking');
   };
 
@@ -7021,6 +7032,31 @@ Deliver your verdict as JSON.`;
               </div>
             </div>
 
+            {/* Phase 2, Deploy 5 / Stage 11: Legacy tiebreak banner — only renders when the
+                tiebreak decided the round. Surfaces the actual Legacy numbers so the player
+                sees why the call went the way it did. */}
+            {r.viaLegacy && (
+              <div style={{
+                marginBottom: '20px',
+                textAlign: 'center',
+                animation: 'kick3-won-slidein 0.85s ease-out'
+              }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.gold, fontStyle: 'italic', marginBottom: '8px' }}>
+                  TIED ON {tournamentAttribute.toUpperCase()} — LEGACY TIEBREAK
+                </div>
+                <div style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'baseline', gap: '14px', padding: '8px 14px', background: 'rgba(212,175,55,0.06)', borderRadius: '4px', border: '1px solid rgba(212,175,55,0.18)' }}>
+                  <span style={{ ...condFont, fontSize: '11px', color: colours.muted, letterSpacing: '0.15em' }}>LEGACY</span>
+                  <span style={{ ...displayFont, fontSize: '18px', fontWeight: 700, color: r.playerLegacy >= r.opponentLegacy ? '#5fb04a' : colours.cream }}>
+                    {r.playerLegacy}
+                  </span>
+                  <span style={{ ...condFont, fontSize: '11px', color: colours.muted }}>vs</span>
+                  <span style={{ ...displayFont, fontSize: '18px', fontWeight: 700, color: r.opponentLegacy > r.playerLegacy ? colours.accent : colours.cream }}>
+                    {r.opponentLegacy}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* "What's next" label */}
             <div style={{
               textAlign: 'center',
@@ -7153,8 +7189,22 @@ Deliver your verdict as JSON.`;
                 </div>
               </div>
               {r.viaLegacy && (
-                <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, marginTop: '12px', fontStyle: 'italic' }}>
-                  TIED ON {tournamentAttribute.toUpperCase()} — LEGACY TIEBREAK
+                <div style={{ marginTop: '14px' }}>
+                  <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.gold, fontStyle: 'italic', marginBottom: '8px' }}>
+                    TIED ON {tournamentAttribute.toUpperCase()} — LEGACY TIEBREAK
+                  </div>
+                  {/* Phase 2, Deploy 5 / Stage 11: surface the actual Legacy numbers
+                      so the player can see exactly why the tiebreak went the way it did. */}
+                  <div style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'baseline', gap: '14px', padding: '8px 12px', background: 'rgba(212,175,55,0.06)', borderRadius: '4px' }}>
+                    <span style={{ ...condFont, fontSize: '11px', color: colours.muted, letterSpacing: '0.15em' }}>LEGACY</span>
+                    <span style={{ ...displayFont, fontSize: '18px', fontWeight: 700, color: r.playerLegacy >= r.opponentLegacy ? '#5fb04a' : colours.cream }}>
+                      {r.playerLegacy}
+                    </span>
+                    <span style={{ ...condFont, fontSize: '11px', color: colours.muted }}>vs</span>
+                    <span style={{ ...displayFont, fontSize: '18px', fontWeight: 700, color: r.opponentLegacy > r.playerLegacy ? colours.accent : colours.cream }}>
+                      {r.opponentLegacy}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
