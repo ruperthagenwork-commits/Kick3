@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 
 // --- 384 shared player pool + 31 daily questions ---
@@ -678,13 +678,38 @@ const TIER_SYMBOLS = {
   Wildcard: "✦"
 };
 
-// Category colours (from original Kick 5 spec)
+// Phase 2, Deploy 5 / Stage 9: helpers that render tournament (World Cup) cards
+// with a consistent Pete-green border and no tier symbol/label. Tiers were authored
+// for the daily 384-player pool and synthesised onto World Cup players via Overall
+// brackets — for those, the labels would make authorial claims the data doesn't
+// support, so we suppress them. Daily-game cards fall through to TIER_COLOURS /
+// TIER_SYMBOLS unchanged.
+const TOURNAMENT_BORDER_COLOUR = '#5fb04a';
+const tierColourFor = (p) => (p && p.isWorldCup)
+  ? TOURNAMENT_BORDER_COLOUR
+  : (TIER_COLOURS[p && p.tier] || '#888');
+const showTierBadge = (p) => !(p && p.isWorldCup);
+
+// Category colours (from original Kick 5 spec). Legacy added for tournament R3.
 const CATEGORY_COLOURS = {
   "One-Off": "#5DADE2",       // light blue
   "Season-Long": "#58D68D",   // green
   "Style": "#A569BD",         // purple
   "Character": "#F0B27A",     // amber
-  "Chaos": "#95A5A6"          // grey
+  "Chaos": "#95A5A6",         // grey
+  "Legacy": "#D4AF37"         // gold (R3 only)
+};
+
+// Per-category hint lines shown under the question on the draft screen.
+// Phase 2, Deploy 4: coaching nudges in Pete's voice. One line per category,
+// styled italic and muted under the question text.
+const CATEGORY_HINTS = {
+  "One-Off":     "Find someone you'd back to deliver in a single big moment.",
+  "Season-Long": "Look for the players who don't fade. Forty games. Cold Tuesdays.",
+  "Style":       "Pick the ones you'd pay to watch. Beauty over function.",
+  "Character":   "Find the voices. The ones who don't shrink when the cameras come on.",
+  "Chaos":       "Look for players who thrive when the game gets unrecognisable.",
+  "Legacy":      "World Cup history weighs heavy. Find the names sewn into it."
 };
 
 // Shuffle helper
@@ -842,6 +867,1177 @@ Return ONLY valid JSON, no markdown fences:
 
 Be specific. Mention players by name. Use both player names in the verdict. Make the verdict feel like a referee's judgement after watching both arguments.`;
 
+const PETE_ARGUMENT_PROMPT = `You are PETE THE PUNDIT writing your OWN argument for the World Cup tournament final round of Kick 3. Today you're not the judge \u2014 you're a contestant. A neutral VAR will judge between you and the player on the question of World Cup LEGACY.
+
+YOUR VOICE:
+- Same Pete as ever: opinionated, knowing, grumpy old pundit. World's #4 Pundit. Doctorate in football.
+- Pundit's voice. Roy Keane on a good day mixed with Statler from the Muppets.
+- Allergic to clich\u00e9s. Short, punchy sentences.
+- Football-literate, dry humour, no emojis, no modern slang.
+- You are SARCASTIC and CONFIDENT. You've been on the lounger waiting for this player. You think they're punching above their weight.
+
+THE STAKES:
+- This is the World Cup. The question is about World Cup Legacy specifically \u2014 names sewn into football history through World Cup moments. Not Champions League legacy. Not Premier League legacy. WORLD CUP legacy.
+- Your three picks have been randomly selected from a tightly curated pool of World Cup-elite players. They're strong names. Sound confident in that fact.
+
+FACTUAL HUMILITY:
+- Describe REPUTATION, not exact stats you might be wrong about. "Maradona \u2014 cup-final dragger" not "Maradona scored 34 World Cup goals".
+- Iconic World Cup moments are fine ("Hand of God", "Zidane headbutt", "Klose's six tournaments"). Specific stats you're unsure of, no.
+
+YOUR JOB:
+You will be given the question and three players you've been dealt. Write a SHORT, CONFIDENT argument defending those three picks against the question. End with a sarcastic "beat this" line that taunts the player.
+
+CONSTRAINTS:
+- 40-60 words total. Tight. Punchy. Not a lecture. A pub-pundit clap-back, not a column.
+- Mention each of your three picks by name with a single World Cup-specific reason.
+- End with a one-line sarcastic taunt to the player.
+- Don't reference attribute scores or the game's mechanics. Talk like a pundit.
+
+OUTPUT FORMAT (strictly):
+Return ONLY valid JSON, no markdown fences:
+{
+  "argument": "<your 60-90 word argument with the three picks named>",
+  "taunt": "<one short sarcastic closing line, max 14 words>"
+}`;
+
+const VAR_JUDGE_PROMPT = `You are VAR \u2014 the neutral video assistant referee judging Round 3 of the Kick 3 World Cup tournament. PETE THE PUNDIT versus a human player. The question is about World Cup LEGACY.
+
+YOUR VOICE:
+- Dry. Procedural. Monotone. Like a real VAR official reading a decision.
+- Short sentences. No flourish. No personality. You are NOT Pete.
+- "After review." "Decision." "Recommendation." Stadium-announcement formal.
+- No first-person opinions ("I think"). State the finding.
+
+YOUR JOB:
+Compare two cases against the same World Cup Legacy question. Each side has three player picks AND a short written argument. Decide who made the stronger overall case.
+
+WHAT YOU'RE GIVEN:
+- Each pick comes with a WORLD CUP LEGACY rating on a 0-10 scale. These are authored values: 10 = generational World Cup figure (Pel\u00e9, Maradona, Messi), 9 = unmistakable World Cup legend (Cruyff, Beckenbauer, Zidane), 8 = major World Cup name, 7 = strong World Cup CV, 6 = solid, 5 and below = present but unremarkable on the world stage.
+- Pete's three picks come from a tightly curated pool of World Cup-elite players. His Legacy ratings will usually be high (7-10). The player drafts from the same curated pool, so their ratings will also be high \u2014 the picks-vs-picks gap is usually modest. The argument is often the difference.
+
+JUDGEMENT MODEL:
+Weigh picks, Legacy ratings, AND arguments together as a single case. NOT a simple total of ratings.
+- A high-rated pick is easier to argue for, but the player still needs to make the case.
+- A lower-rated pick needs a sharper argument to justify it. Picking a weak name and barely defending it is the weakest possible case.
+- If one side's ratings are markedly higher AND their argument is competent, that side should usually win.
+- When ratings are close (within 2-3 points total), the ARGUMENT decides. This is the player's clearest path to beating Pete.
+- A brilliant, specific argument that directly dismantles the opponent's case CAN win against slightly stronger picks.
+- Pete being Pete earns him no bonus. You are neutral.
+
+WHAT MAKES A STRONG ARGUMENT:
+- Does it defend the picks specifically against the World Cup Legacy framing?
+- Are the picks coherent with the argument attached to them?
+- Specificity beats generality. "Cup-final dragger" beats "great player".
+- Engaging with the opponent's case beats ignoring it. A defence that dismantles Pete's argument is stronger than one that just presents its own.
+
+OUTPUT FORMAT (strictly):
+Return ONLY valid JSON, no markdown fences:
+{
+  "winner": "pete" | "player",
+  "verdict": "<2-3 sentences in dry VAR voice. State the decision, then briefly note what tipped it. Mention specific picks or argument points if relevant. No theatre.>",
+  "lineForCard": "<one short line, max 14 words, summary of the decision in VAR voice>"
+}`;
+
+// ============ TOURNAMENT MODE — FOUNDATIONS (v2 — trio-based) ============
+// Pure plumbing. Defines:
+//   - Tournament window: 11 June – 19 July 2026.
+//   - getTournamentStatus(date) — returns trio number, days-until-next-trio, locked-out state.
+//     Each tournament attempt = three rounds in one sitting (Pub Mate → Statistician → Pete).
+//     Same trio of questions runs for 3 consecutive days, then rotates.
+//   - Beta gate (?beta=pete) — hides tournament UI from anyone without the flag.
+//   - Debug overrides — for testing without waiting for real dates.
+//   - readTournamentState / writeTournamentState — localStorage helpers (namespace kick3_tournament_v1).
+
+const TOURNAMENT_CONFIG = {
+  startDate: '2026-06-11',  // Day 1 of Trio 1
+  endDate:   '2026-07-19',  // Last day of the window (World Cup final day)
+  daysPerTrio: 3,           // Same trio runs for 3 consecutive days, then rotates
+  storageKey: 'kick3_tournament_v1',
+  betaParam: 'pete',
+};
+
+// Parse 'YYYY-MM-DD' into a Date anchored at UTC noon (DST-safe day comparison).
+const parseTournamentDate = (str) => {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+};
+
+// Days between two dates (calendar days, ignoring time-of-day).
+const daysBetween = (from, to) => {
+  const ms = to.getTime() - from.getTime();
+  return Math.floor(ms / (1000 * 60 * 60 * 24));
+};
+
+// Today's date as a YYYY-MM-DD string. Used as the lastPlayedDate key.
+const todayDateString = (date = new Date()) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+// Given a Date, return tournament status:
+//   - null if outside the tournament window
+//   - { trioNumber, dayInTrio, totalTrios } if inside the window
+//     trioNumber: 1-based (Trio 1 starts on startDate, runs for 3 days, then Trio 2 begins).
+//     dayInTrio:  1, 2, or 3 (which of the 3 days within this trio it is).
+//     totalTrios: count of trios across the entire window.
+const getTournamentStatus = (date) => {
+  const start = parseTournamentDate(TOURNAMENT_CONFIG.startDate);
+  const end   = parseTournamentDate(TOURNAMENT_CONFIG.endDate);
+  const dayAnchor = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0));
+  if (dayAnchor < start || dayAnchor > end) return null;
+  const offset = daysBetween(start, dayAnchor);
+  const trioNumber = Math.floor(offset / TOURNAMENT_CONFIG.daysPerTrio) + 1;
+  const dayInTrio  = (offset % TOURNAMENT_CONFIG.daysPerTrio) + 1;
+  const totalTrios = Math.ceil((daysBetween(start, end) + 1) / TOURNAMENT_CONFIG.daysPerTrio);
+  return { trioNumber, dayInTrio, totalTrios };
+};
+
+// Read beta flag from URL (?beta=pete) or localStorage.
+// On first visit with the URL param, persist to localStorage so the flag survives navigation.
+// To turn off: visit ?beta=off (clears the flag).
+const isTournamentBetaActive = () => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const betaParam = params.get('beta');
+    if (betaParam === 'off') {
+      localStorage.removeItem('kick3_tournament_beta');
+      return false;
+    }
+    if (betaParam === TOURNAMENT_CONFIG.betaParam) {
+      localStorage.setItem('kick3_tournament_beta', '1');
+      return true;
+    }
+    return localStorage.getItem('kick3_tournament_beta') === '1';
+  } catch {
+    return false;
+  }
+};
+
+// Debug overrides — let us test tournament states without waiting for real dates.
+// Usage:
+//   ?debug=tournament-unlock   → force the PLAY NOW button to be available (skip lockout)
+//   ?debug=tournament-locked   → force the locked-out countdown view (just played)
+// Returns 'unlock' | 'locked' | null.
+const getTournamentDebugMode = () => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const debug = params.get('debug');
+    if (debug === 'tournament-unlock') return 'unlock';
+    if (debug === 'tournament-locked') return 'locked';
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+// Default tournament state for a player who has never attempted a tournament.
+// Phase 2, Deploy 5 / Stage 14: added attemptsToday + wonTodayFlag to support
+// the "3 attempts per day, cap at 1 trophy/day" model.
+const defaultTournamentState = () => ({
+  lastPlayedDate: null,         // YYYY-MM-DD of last attempted tournament
+  lastAttemptResult: null,      // 'won' | 'lost-r1' | 'lost-r2' | 'lost-r3' | null
+  trophyCount: 0,               // Lifetime trophies (Pete wins)
+  tournamentsAttempted: 0,      // Lifetime count of attempts started
+  tournamentsCompleted: 0,      // Lifetime count of attempts that reached Round 3 (win or loss)
+  attemptsToday: 0,             // Count of attempts started today (resets each new day)
+  wonTodayFlag: false,          // True once player has won a trophy today (caps further attempts)
+});
+
+// Read tournament state from localStorage. Falls back to defaults on any failure.
+const readTournamentState = () => {
+  try {
+    const raw = localStorage.getItem(TOURNAMENT_CONFIG.storageKey);
+    if (!raw) return defaultTournamentState();
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return defaultTournamentState();
+    return { ...defaultTournamentState(), ...parsed };
+  } catch {
+    return defaultTournamentState();
+  }
+};
+
+// Write tournament state to localStorage. Silent on failure — game still works without persistence.
+const writeTournamentState = (state) => {
+  try {
+    localStorage.setItem(TOURNAMENT_CONFIG.storageKey, JSON.stringify(state));
+  } catch { /* silent */ }
+};
+
+// Phase 2, Deploy 5 / Stage 14: Tournament play allowance model.
+// Players get up to 3 attempts per day, but only 1 trophy per day.
+// Locked if: (a) attemptsToday >= 3, OR (b) they already won today.
+// State auto-resets when the calendar day changes (we compare lastPlayedDate).
+const TOURNAMENT_DAILY_ATTEMPT_CAP = 3;
+
+// Given a tournament state object and a date, return the EFFECTIVE day-scoped values,
+// auto-resetting attemptsToday and wonTodayFlag if the date has rolled over.
+// Returns { attemptsToday, wonTodayFlag, sameDay }.
+const effectiveDailyState = (state, date = new Date()) => {
+  if (!state) return { attemptsToday: 0, wonTodayFlag: false, sameDay: false };
+  const today = todayDateString(date);
+  const sameDay = state.lastPlayedDate === today;
+  if (!sameDay) {
+    // New day — counters reset.
+    return { attemptsToday: 0, wonTodayFlag: false, sameDay: false };
+  }
+  return {
+    attemptsToday: state.attemptsToday || 0,
+    wonTodayFlag: !!state.wonTodayFlag,
+    sameDay: true,
+  };
+};
+
+// Has the player exhausted today's tournament attempts? Returns true/false.
+// Used to gate the PLAY NOW button on the tournament home screen.
+// Locked when: attempts used up (3) OR a trophy already won today.
+const hasPlayedTournamentToday = (state, date = new Date()) => {
+  const daily = effectiveDailyState(state, date);
+  if (daily.wonTodayFlag) return true;
+  if (daily.attemptsToday >= TOURNAMENT_DAILY_ATTEMPT_CAP) return true;
+  return false;
+};
+
+// ============ TOURNAMENT MODE — WORLD CUP POOL (Phase 2, Deploy 1) ============
+// 180 players authored for tournament mode only. Daily game and 1v1 still use
+// PLAYER_POOL (384). Six attributes per player on a 1-10 scale (0 never used,
+// 1 used rarely). Plus: overall (avg, one decimal), position (GK/OUT),
+// peteEligible ("Y"/"N").
+//
+// peteEligible = "Y" → in the pool Pete draws from in R3, AND the pool the
+// player drafts from in R3. 108 players currently flagged Y.
+// R1/R2 still use the daily PLAYER_POOL — Deploy 2 wires those.
+
+const WORLD_CUP_POOL = [
+  { name: "Pelé", country: "Brazil", era: "1950s–70s", position: "OUT", oneOff: 10, seasonLong: 10, style: 10, character: 9, chaos: 5, legacy: 10, overall: 9, peteEligible: "Y" },
+  { name: "Diego Maradona", country: "Argentina", era: "1980s–90s", position: "OUT", oneOff: 10, seasonLong: 9, style: 10, character: 4, chaos: 10, legacy: 10, overall: 8.8, peteEligible: "Y" },
+  { name: "Lionel Messi", country: "Argentina", era: "2000s–2020s", position: "OUT", oneOff: 10, seasonLong: 10, style: 10, character: 8, chaos: 4, legacy: 10, overall: 8.7, peteEligible: "Y" },
+  { name: "Zinedine Zidane", country: "France", era: "1990s–2000s", position: "OUT", oneOff: 9, seasonLong: 9, style: 10, character: 6, chaos: 8, legacy: 9, overall: 8.5, peteEligible: "Y" },
+  { name: "Johan Cruyff", country: "Netherlands", era: "1970s", position: "OUT", oneOff: 8, seasonLong: 10, style: 10, character: 7, chaos: 5, legacy: 9, overall: 8.2, peteEligible: "Y" },
+  { name: "Ronaldo (R9)", country: "Brazil", era: "1990s–2000s", position: "OUT", oneOff: 10, seasonLong: 6, style: 9, character: 5, chaos: 7, legacy: 9, overall: 7.7, peteEligible: "Y" },
+  { name: "Franz Beckenbauer", country: "Germany", era: "1960s–70s", position: "OUT", oneOff: 7, seasonLong: 10, style: 9, character: 10, chaos: 3, legacy: 9, overall: 8, peteEligible: "Y" },
+  { name: "Cristiano Ronaldo", country: "Portugal", era: "2000s–2020s", position: "OUT", oneOff: 10, seasonLong: 8, style: 9, character: 7, chaos: 6, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Gerd Müller", country: "Germany", era: "1970s", position: "OUT", oneOff: 10, seasonLong: 10, style: 7, character: 6, chaos: 4, legacy: 9, overall: 7.7, peteEligible: "Y" },
+  { name: "Eusébio", country: "Portugal", era: "1960s", position: "OUT", oneOff: 10, seasonLong: 9, style: 9, character: 7, chaos: 5, legacy: 8, overall: 8, peteEligible: "Y" },
+  { name: "Alfredo Di Stéfano", country: "Argentina/Spain", era: "1950s–60s", position: "OUT", oneOff: 3, seasonLong: 6, style: 10, character: 8, chaos: 4, legacy: 6, overall: 6.2, peteEligible: "N" },
+  { name: "Ferenc Puskás", country: "Hungary", era: "1950s", position: "OUT", oneOff: 8, seasonLong: 9, style: 10, character: 7, chaos: 6, legacy: 8, overall: 8, peteEligible: "Y" },
+  { name: "Bobby Charlton", country: "England", era: "1960s", position: "OUT", oneOff: 9, seasonLong: 9, style: 8, character: 9, chaos: 3, legacy: 9, overall: 7.8, peteEligible: "Y" },
+  { name: "Bobby Moore", country: "England", era: "1960s–70s", position: "OUT", oneOff: 9, seasonLong: 10, style: 8, character: 10, chaos: 2, legacy: 9, overall: 8, peteEligible: "Y" },
+  { name: "Roberto Baggio", country: "Italy", era: "1990s", position: "OUT", oneOff: 9, seasonLong: 9, style: 10, character: 6, chaos: 8, legacy: 8, overall: 8.3, peteEligible: "Y" },
+  { name: "Romário", country: "Brazil", era: "1990s", position: "OUT", oneOff: 10, seasonLong: 9, style: 9, character: 4, chaos: 8, legacy: 9, overall: 8.2, peteEligible: "Y" },
+  { name: "Ronaldinho", country: "Brazil", era: "2000s", position: "OUT", oneOff: 8, seasonLong: 7, style: 10, character: 7, chaos: 7, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Paolo Maldini", country: "Italy", era: "1990s–2000s", position: "OUT", oneOff: 6, seasonLong: 10, style: 9, character: 10, chaos: 1, legacy: 8, overall: 7.3, peteEligible: "Y" },
+  { name: "Zico", country: "Brazil", era: "1980s", position: "OUT", oneOff: 8, seasonLong: 9, style: 10, character: 7, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Michel Platini", country: "France", era: "1980s", position: "OUT", oneOff: 8, seasonLong: 9, style: 10, character: 7, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Garrincha", country: "Brazil", era: "1950s–60s", position: "OUT", oneOff: 10, seasonLong: 10, style: 10, character: 4, chaos: 9, legacy: 9, overall: 8.7, peteEligible: "Y" },
+  { name: "Lev Yashin", country: "Soviet Union", era: "1950s–60s", position: "GK", oneOff: 9, seasonLong: 10, style: 8, character: 9, chaos: 3, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Just Fontaine", country: "France", era: "1950s", position: "OUT", oneOff: 10, seasonLong: 10, style: 7, character: 6, chaos: 5, legacy: 8, overall: 7.7, peteEligible: "Y" },
+  { name: "Lothar Matthäus", country: "Germany", era: "1980s–2000s", position: "OUT", oneOff: 8, seasonLong: 9, style: 7, character: 9, chaos: 4, legacy: 8, overall: 7.5, peteEligible: "Y" },
+  { name: "Franco Baresi", country: "Italy", era: "1980s–90s", position: "OUT", oneOff: 7, seasonLong: 10, style: 8, character: 10, chaos: 2, legacy: 8, overall: 7.5, peteEligible: "Y" },
+  { name: "Andrés Iniesta", country: "Spain", era: "2000s–2010s", position: "OUT", oneOff: 10, seasonLong: 9, style: 10, character: 9, chaos: 2, legacy: 9, overall: 8.2, peteEligible: "Y" },
+  { name: "Xavi", country: "Spain", era: "2000s–2010s", position: "OUT", oneOff: 6, seasonLong: 10, style: 10, character: 9, chaos: 1, legacy: 8, overall: 7.3, peteEligible: "Y" },
+  { name: "Andrea Pirlo", country: "Italy", era: "2000s–2010s", position: "OUT", oneOff: 8, seasonLong: 9, style: 10, character: 8, chaos: 4, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Gianluigi Buffon", country: "Italy", era: "2000s–2010s", position: "GK", oneOff: 8, seasonLong: 10, style: 7, character: 9, chaos: 2, legacy: 8, overall: 7.3, peteEligible: "Y" },
+  { name: "Fabio Cannavaro", country: "Italy", era: "2000s", position: "OUT", oneOff: 9, seasonLong: 10, style: 7, character: 9, chaos: 3, legacy: 8, overall: 7.7, peteEligible: "Y" },
+  { name: "Cafu", country: "Brazil", era: "1990s–2000s", position: "OUT", oneOff: 6, seasonLong: 9, style: 8, character: 10, chaos: 3, legacy: 8, overall: 7.3, peteEligible: "Y" },
+  { name: "Carlos Alberto", country: "Brazil", era: "1970s", position: "OUT", oneOff: 10, seasonLong: 9, style: 9, character: 9, chaos: 4, legacy: 8, overall: 8.2, peteEligible: "Y" },
+  { name: "Jairzinho", country: "Brazil", era: "1970s", position: "OUT", oneOff: 10, seasonLong: 10, style: 8, character: 6, chaos: 6, legacy: 8, overall: 8, peteEligible: "Y" },
+  { name: "Tostão", country: "Brazil", era: "1970s", position: "OUT", oneOff: 8, seasonLong: 9, style: 9, character: 8, chaos: 4, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "Gerson", country: "Brazil", era: "1970s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 7, chaos: 4, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Rivelino", country: "Brazil", era: "1970s", position: "OUT", oneOff: 9, seasonLong: 9, style: 9, character: 6, chaos: 7, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Socrates", country: "Brazil", era: "1980s", position: "OUT", oneOff: 8, seasonLong: 9, style: 9, character: 9, chaos: 7, legacy: 7, overall: 8.2, peteEligible: "Y" },
+  { name: "Falcão", country: "Brazil", era: "1980s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 8, chaos: 5, legacy: 7, overall: 7.3, peteEligible: "Y" },
+  { name: "Hugo Sánchez", country: "Mexico", era: "1980s–90s", position: "OUT", oneOff: 7, seasonLong: 6, style: 9, character: 7, chaos: 6, legacy: 5, overall: 6.7, peteEligible: "N" },
+  { name: "Hristo Stoichkov", country: "Bulgaria", era: "1990s", position: "OUT", oneOff: 10, seasonLong: 9, style: 9, character: 3, chaos: 9, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Kylian Mbappé", country: "France", era: "2010s–2020s", position: "OUT", oneOff: 10, seasonLong: 9, style: 9, character: 6, chaos: 6, legacy: 8, overall: 8, peteEligible: "Y" },
+  { name: "Neymar", country: "Brazil", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 7, style: 10, character: 4, chaos: 8, legacy: 6, overall: 7.2, peteEligible: "N" },
+  { name: "Luka Modrić", country: "Croatia", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 10, style: 9, character: 9, chaos: 3, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Manuel Neuer", country: "Germany", era: "2010s–2020s", position: "GK", oneOff: 8, seasonLong: 10, style: 8, character: 9, chaos: 4, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Toni Kroos", country: "Germany", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 9, style: 9, character: 8, chaos: 2, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Thomas Müller", country: "Germany", era: "2010s–2020s", position: "OUT", oneOff: 9, seasonLong: 9, style: 6, character: 8, chaos: 5, legacy: 8, overall: 7.5, peteEligible: "Y" },
+  { name: "Sergio Ramos", country: "Spain", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 8, style: 7, character: 6, chaos: 8, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Sergio Busquets", country: "Spain", era: "2010s–2020s", position: "OUT", oneOff: 5, seasonLong: 10, style: 9, character: 8, chaos: 1, legacy: 7, overall: 6.7, peteEligible: "Y" },
+  { name: "David Villa", country: "Spain", era: "2010s", position: "OUT", oneOff: 9, seasonLong: 9, style: 8, character: 7, chaos: 4, legacy: 7, overall: 7.3, peteEligible: "Y" },
+  { name: "Iker Casillas", country: "Spain", era: "2000s–2010s", position: "GK", oneOff: 8, seasonLong: 9, style: 7, character: 9, chaos: 3, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Diego Forlán", country: "Uruguay", era: "2010s", position: "OUT", oneOff: 10, seasonLong: 10, style: 8, character: 7, chaos: 5, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Luis Suárez", country: "Uruguay", era: "2010s–2020s", position: "OUT", oneOff: 9, seasonLong: 8, style: 8, character: 3, chaos: 10, legacy: 6, overall: 7.3, peteEligible: "Y" },
+  { name: "Edinson Cavani", country: "Uruguay", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 8, style: 7, character: 8, chaos: 4, legacy: 6, overall: 6.7, peteEligible: "N" },
+  { name: "Arjen Robben", country: "Netherlands", era: "2010s", position: "OUT", oneOff: 9, seasonLong: 9, style: 9, character: 6, chaos: 7, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Wesley Sneijder", country: "Netherlands", era: "2010s", position: "OUT", oneOff: 9, seasonLong: 10, style: 8, character: 7, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "James Rodríguez", country: "Colombia", era: "2010s", position: "OUT", oneOff: 10, seasonLong: 9, style: 9, character: 6, chaos: 5, legacy: 6, overall: 7.5, peteEligible: "N" },
+  { name: "Eden Hazard", country: "Belgium", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 8, style: 9, character: 6, chaos: 4, legacy: 6, overall: 6.7, peteEligible: "N" },
+  { name: "Kevin De Bruyne", country: "Belgium", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 8, style: 9, character: 7, chaos: 3, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Romelu Lukaku", country: "Belgium", era: "2010s–2020s", position: "OUT", oneOff: 6, seasonLong: 7, style: 6, character: 6, chaos: 4, legacy: 5, overall: 5.7, peteEligible: "N" },
+  { name: "Harry Kane", country: "England", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 9, style: 7, character: 8, chaos: 3, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Marco van Basten", country: "Netherlands", era: "1980s–90s", position: "OUT", oneOff: 9, seasonLong: 7, style: 10, character: 6, chaos: 4, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Ruud Gullit", country: "Netherlands", era: "1980s–90s", position: "OUT", oneOff: 8, seasonLong: 8, style: 10, character: 8, chaos: 5, legacy: 6, overall: 7.5, peteEligible: "N" },
+  { name: "Frank Rijkaard", country: "Netherlands", era: "1980s–90s", position: "OUT", oneOff: 7, seasonLong: 8, style: 8, character: 7, chaos: 6, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Dennis Bergkamp", country: "Netherlands", era: "1990s", position: "OUT", oneOff: 10, seasonLong: 8, style: 10, character: 7, chaos: 4, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Patrick Kluivert", country: "Netherlands", era: "1990s–2000s", position: "OUT", oneOff: 8, seasonLong: 8, style: 8, character: 5, chaos: 5, legacy: 6, overall: 6.7, peteEligible: "N" },
+  { name: "Edgar Davids", country: "Netherlands", era: "1990s–2000s", position: "OUT", oneOff: 6, seasonLong: 8, style: 7, character: 8, chaos: 7, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Clarence Seedorf", country: "Netherlands", era: "1990s–2000s", position: "OUT", oneOff: 5, seasonLong: 8, style: 9, character: 7, chaos: 3, legacy: 5, overall: 6.2, peteEligible: "N" },
+  { name: "Edwin van der Sar", country: "Netherlands", era: "1990s–2000s", position: "GK", oneOff: 7, seasonLong: 9, style: 7, character: 8, chaos: 2, legacy: 6, overall: 6.5, peteEligible: "N" },
+  { name: "Rivaldo", country: "Brazil", era: "1990s–2000s", position: "OUT", oneOff: 9, seasonLong: 9, style: 10, character: 5, chaos: 7, legacy: 8, overall: 8, peteEligible: "Y" },
+  { name: "Roberto Carlos", country: "Brazil", era: "1990s–2000s", position: "OUT", oneOff: 8, seasonLong: 8, style: 9, character: 6, chaos: 6, legacy: 7, overall: 7.3, peteEligible: "Y" },
+  { name: "Kléberson", country: "Brazil", era: "2000s", position: "OUT", oneOff: 4, seasonLong: 6, style: 6, character: 6, chaos: 3, legacy: 4, overall: 4.8, peteEligible: "N" },
+  { name: "Lilian Thuram", country: "France", era: "1990s–2000s", position: "OUT", oneOff: 9, seasonLong: 9, style: 8, character: 9, chaos: 3, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "Marcel Desailly", country: "France", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 10, style: 8, character: 9, chaos: 3, legacy: 7, overall: 7.3, peteEligible: "Y" },
+  { name: "Didier Deschamps", country: "France", era: "1990s", position: "OUT", oneOff: 6, seasonLong: 9, style: 6, character: 10, chaos: 2, legacy: 7, overall: 6.7, peteEligible: "Y" },
+  { name: "Thierry Henry", country: "France", era: "1990s–2010s", position: "OUT", oneOff: 8, seasonLong: 8, style: 10, character: 7, chaos: 5, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "David Trezeguet", country: "France", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 7, style: 7, character: 7, chaos: 4, legacy: 5, overall: 6.2, peteEligible: "N" },
+  { name: "Patrick Vieira", country: "France", era: "1990s–2000s", position: "OUT", oneOff: 6, seasonLong: 8, style: 8, character: 9, chaos: 5, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Gabriel Batistuta", country: "Argentina", era: "1990s–2000s", position: "OUT", oneOff: 10, seasonLong: 9, style: 8, character: 9, chaos: 4, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Juan Sebastián Verón", country: "Argentina", era: "1990s–2000s", position: "OUT", oneOff: 5, seasonLong: 6, style: 9, character: 6, chaos: 5, legacy: 5, overall: 6, peteEligible: "N" },
+  { name: "Pep Guardiola", country: "Spain", era: "1990s", position: "OUT", oneOff: 5, seasonLong: 8, style: 9, character: 8, chaos: 3, legacy: 5, overall: 6.3, peteEligible: "N" },
+  { name: "Gordon Banks", country: "England", era: "1960s–70s", position: "GK", oneOff: 10, seasonLong: 9, style: 7, character: 9, chaos: 2, legacy: 8, overall: 7.5, peteEligible: "Y" },
+  { name: "Dino Zoff", country: "Italy", era: "1970s–80s", position: "GK", oneOff: 8, seasonLong: 10, style: 7, character: 10, chaos: 2, legacy: 9, overall: 7.7, peteEligible: "Y" },
+  { name: "Oliver Kahn", country: "Germany", era: "1990s–2000s", position: "GK", oneOff: 9, seasonLong: 10, style: 7, character: 8, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Claudio Taffarel", country: "Brazil", era: "1990s", position: "GK", oneOff: 7, seasonLong: 9, style: 5, character: 8, chaos: 3, legacy: 7, overall: 6.5, peteEligible: "Y" },
+  { name: "Daniel Passarella", country: "Argentina", era: "1970s–80s", position: "OUT", oneOff: 8, seasonLong: 9, style: 7, character: 9, chaos: 5, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "Paolo Rossi", country: "Italy", era: "1980s", position: "OUT", oneOff: 10, seasonLong: 9, style: 7, character: 7, chaos: 6, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Marco Tardelli", country: "Italy", era: "1980s", position: "OUT", oneOff: 9, seasonLong: 9, style: 7, character: 8, chaos: 6, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Andreas Brehme", country: "Germany", era: "1980s–90s", position: "OUT", oneOff: 10, seasonLong: 9, style: 7, character: 8, chaos: 4, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "Jürgen Klinsmann", country: "Germany", era: "1990s", position: "OUT", oneOff: 9, seasonLong: 9, style: 8, character: 8, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Rudi Völler", country: "Germany", era: "1980s–90s", position: "OUT", oneOff: 8, seasonLong: 8, style: 7, character: 7, chaos: 6, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Karl-Heinz Rummenigge", country: "Germany", era: "1980s", position: "OUT", oneOff: 9, seasonLong: 9, style: 9, character: 8, chaos: 5, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Enzo Francescoli", country: "Uruguay", era: "1980s–90s", position: "OUT", oneOff: 7, seasonLong: 8, style: 9, character: 8, chaos: 4, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "George Weah", country: "Liberia", era: "1990s", position: "OUT", oneOff: 8, seasonLong: 8, style: 9, character: 9, chaos: 5, legacy: 5, overall: 7.3, peteEligible: "N" },
+  { name: "Roger Milla", country: "Cameroon", era: "1990s", position: "OUT", oneOff: 10, seasonLong: 9, style: 7, character: 8, chaos: 8, legacy: 7, overall: 8.2, peteEligible: "Y" },
+  { name: "El Hadji Diouf", country: "Senegal", era: "2000s", position: "OUT", oneOff: 8, seasonLong: 9, style: 8, character: 3, chaos: 9, legacy: 6, overall: 7.2, peteEligible: "Y" },
+  { name: "Asamoah Gyan", country: "Ghana", era: "2010s", position: "OUT", oneOff: 9, seasonLong: 8, style: 7, character: 8, chaos: 6, legacy: 6, overall: 7.3, peteEligible: "N" },
+  { name: "Park Ji-sung", country: "South Korea", era: "2000s–2010s", position: "OUT", oneOff: 8, seasonLong: 9, style: 7, character: 9, chaos: 4, legacy: 6, overall: 7.2, peteEligible: "N" },
+  { name: "Hidetoshi Nakata", country: "Japan", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 8, style: 8, character: 8, chaos: 4, legacy: 5, overall: 6.7, peteEligible: "N" },
+  { name: "Tim Cahill", country: "Australia", era: "2010s", position: "OUT", oneOff: 9, seasonLong: 8, style: 6, character: 8, chaos: 5, legacy: 5, overall: 6.8, peteEligible: "N" },
+  { name: "Landon Donovan", country: "USA", era: "2010s", position: "OUT", oneOff: 10, seasonLong: 8, style: 7, character: 7, chaos: 5, legacy: 6, overall: 7.2, peteEligible: "Y" },
+  { name: "Javier Mascherano", country: "Argentina", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 10, style: 7, character: 9, chaos: 3, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Ángel Di María", country: "Argentina", era: "2010s–2020s", position: "OUT", oneOff: 10, seasonLong: 8, style: 9, character: 7, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Emi Martínez", country: "Argentina", era: "2020s", position: "GK", oneOff: 10, seasonLong: 9, style: 6, character: 7, chaos: 8, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Antoine Griezmann", country: "France", era: "2010s–2020s", position: "OUT", oneOff: 9, seasonLong: 10, style: 8, character: 8, chaos: 4, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Paul Pogba", country: "France", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 8, style: 9, character: 5, chaos: 6, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "N'Golo Kanté", country: "France", era: "2010s–2020s", position: "OUT", oneOff: 6, seasonLong: 10, style: 7, character: 10, chaos: 1, legacy: 7, overall: 6.8, peteEligible: "Y" },
+  { name: "Hugo Lloris", country: "France", era: "2010s–2020s", position: "GK", oneOff: 7, seasonLong: 9, style: 7, character: 9, chaos: 3, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Raphaël Varane", country: "France", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 10, style: 8, character: 9, chaos: 2, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Olivier Giroud", country: "France", era: "2010s–2020s", position: "OUT", oneOff: 6, seasonLong: 8, style: 7, character: 8, chaos: 3, legacy: 6, overall: 6.3, peteEligible: "N" },
+  { name: "Mesut Özil", country: "Germany", era: "2010s", position: "OUT", oneOff: 7, seasonLong: 9, style: 10, character: 5, chaos: 5, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Miroslav Klose", country: "Germany", era: "2000s–2010s", position: "OUT", oneOff: 8, seasonLong: 10, style: 7, character: 9, chaos: 2, legacy: 8, overall: 7.3, peteEligible: "Y" },
+  { name: "Bastian Schweinsteiger", country: "Germany", era: "2000s–2010s", position: "OUT", oneOff: 9, seasonLong: 10, style: 8, character: 9, chaos: 3, legacy: 8, overall: 7.8, peteEligible: "Y" },
+  { name: "Philipp Lahm", country: "Germany", era: "2000s–2010s", position: "OUT", oneOff: 7, seasonLong: 10, style: 8, character: 10, chaos: 1, legacy: 8, overall: 7.3, peteEligible: "Y" },
+  { name: "Mats Hummels", country: "Germany", era: "2010s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 8, chaos: 3, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Jérôme Boateng", country: "Germany", era: "2010s", position: "OUT", oneOff: 6, seasonLong: 9, style: 8, character: 7, chaos: 4, legacy: 7, overall: 6.8, peteEligible: "Y" },
+  { name: "Mario Götze", country: "Germany", era: "2010s", position: "OUT", oneOff: 10, seasonLong: 6, style: 8, character: 6, chaos: 4, legacy: 9, overall: 7.2, peteEligible: "Y" },
+  { name: "Mohamed Salah", country: "Egypt", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 7, style: 9, character: 8, chaos: 3, legacy: 5, overall: 6.7, peteEligible: "N" },
+  { name: "Sadio Mané", country: "Senegal", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 8, style: 9, character: 9, chaos: 3, legacy: 5, overall: 7, peteEligible: "N" },
+  { name: "Riyad Mahrez", country: "Algeria", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 7, style: 9, character: 6, chaos: 4, legacy: 4, overall: 6.3, peteEligible: "N" },
+  { name: "Vinícius Júnior", country: "Brazil", era: "2020s–present", position: "OUT", oneOff: 8, seasonLong: 7, style: 10, character: 6, chaos: 6, legacy: 5, overall: 7, peteEligible: "N" },
+  { name: "Mario Kempes", country: "Argentina", era: "1970s", position: "OUT", oneOff: 10, seasonLong: 10, style: 8, character: 7, chaos: 5, legacy: 8, overall: 8, peteEligible: "Y" },
+  { name: "Osvaldo Ardiles", country: "Argentina", era: "1970s–80s", position: "OUT", oneOff: 6, seasonLong: 9, style: 8, character: 8, chaos: 4, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Sergio Agüero", country: "Argentina", era: "2010s–2020s", position: "OUT", oneOff: 8, seasonLong: 7, style: 9, character: 7, chaos: 4, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Gonzalo Higuaín", country: "Argentina", era: "2010s", position: "OUT", oneOff: 9, seasonLong: 7, style: 8, character: 5, chaos: 5, legacy: 5, overall: 6.5, peteEligible: "N" },
+  { name: "Carlos Tevez", country: "Argentina", era: "2000s–2010s", position: "OUT", oneOff: 8, seasonLong: 8, style: 8, character: 7, chaos: 6, legacy: 6, overall: 7.2, peteEligible: "N" },
+  { name: "Juan Román Riquelme", country: "Argentina", era: "2000s", position: "OUT", oneOff: 7, seasonLong: 8, style: 10, character: 7, chaos: 4, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Diego Godín", country: "Uruguay", era: "2010s", position: "OUT", oneOff: 8, seasonLong: 10, style: 7, character: 10, chaos: 3, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "Luis Figo", country: "Portugal", era: "1990s–2000s", position: "OUT", oneOff: 8, seasonLong: 9, style: 10, character: 7, chaos: 5, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Rui Costa", country: "Portugal", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 8, style: 10, character: 7, chaos: 4, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Pepe", country: "Portugal", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 9, style: 6, character: 5, chaos: 8, legacy: 6, overall: 6.8, peteEligible: "Y" },
+  { name: "David Beckham", country: "England", era: "1990s–2000s", position: "OUT", oneOff: 9, seasonLong: 8, style: 9, character: 6, chaos: 7, legacy: 7, overall: 7.7, peteEligible: "Y" },
+  { name: "Paul Gascoigne", country: "England", era: "1990s", position: "OUT", oneOff: 10, seasonLong: 9, style: 10, character: 4, chaos: 9, legacy: 7, overall: 8.2, peteEligible: "Y" },
+  { name: "Michael Owen", country: "England", era: "1990s–2000s", position: "OUT", oneOff: 10, seasonLong: 8, style: 8, character: 7, chaos: 4, legacy: 7, overall: 7.3, peteEligible: "Y" },
+  { name: "Frank Lampard", country: "England", era: "2000s–2010s", position: "OUT", oneOff: 6, seasonLong: 7, style: 8, character: 8, chaos: 3, legacy: 5, overall: 6.2, peteEligible: "N" },
+  { name: "Steven Gerrard", country: "England", era: "2000s–2010s", position: "OUT", oneOff: 7, seasonLong: 8, style: 8, character: 8, chaos: 4, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "John Terry", country: "England", era: "2000s–2010s", position: "OUT", oneOff: 6, seasonLong: 8, style: 6, character: 7, chaos: 5, legacy: 5, overall: 6.2, peteEligible: "N" },
+  { name: "Wayne Rooney", country: "England", era: "2000s–2010s", position: "OUT", oneOff: 7, seasonLong: 7, style: 8, character: 6, chaos: 7, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Raul", country: "Spain", era: "1990s–2000s", position: "OUT", oneOff: 8, seasonLong: 8, style: 9, character: 7, chaos: 4, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Fernando Torres", country: "Spain", era: "2000s–2010s", position: "OUT", oneOff: 8, seasonLong: 7, style: 9, character: 7, chaos: 4, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Carles Puyol", country: "Spain", era: "2000s–2010s", position: "OUT", oneOff: 9, seasonLong: 9, style: 6, character: 10, chaos: 4, legacy: 8, overall: 7.7, peteEligible: "Y" },
+  { name: "Lothar Emmerich", country: "Germany", era: "1960s", position: "OUT", oneOff: 7, seasonLong: 8, style: 7, character: 7, chaos: 4, legacy: 6, overall: 6.5, peteEligible: "N" },
+  { name: "Uwe Seeler", country: "Germany", era: "1960s–70s", position: "OUT", oneOff: 8, seasonLong: 9, style: 7, character: 9, chaos: 3, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Jimmy Greaves", country: "England", era: "1960s", position: "OUT", oneOff: 9, seasonLong: 8, style: 9, character: 6, chaos: 5, legacy: 6, overall: 7.2, peteEligible: "N" },
+  { name: "Geoff Hurst", country: "England", era: "1960s", position: "OUT", oneOff: 10, seasonLong: 8, style: 7, character: 7, chaos: 5, legacy: 8, overall: 7.5, peteEligible: "Y" },
+  { name: "Gianluca Vialli", country: "Italy", era: "1980s–90s", position: "OUT", oneOff: 7, seasonLong: 8, style: 8, character: 8, chaos: 4, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Salvatore Schillaci", country: "Italy", era: "1990", position: "OUT", oneOff: 10, seasonLong: 10, style: 7, character: 7, chaos: 7, legacy: 7, overall: 8, peteEligible: "Y" },
+  { name: "Giuseppe Bergomi", country: "Italy", era: "1980s–90s", position: "OUT", oneOff: 6, seasonLong: 10, style: 7, character: 10, chaos: 2, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Roberto Donadoni", country: "Italy", era: "1980s–90s", position: "OUT", oneOff: 7, seasonLong: 8, style: 9, character: 7, chaos: 3, legacy: 6, overall: 6.7, peteEligible: "N" },
+  { name: "Giancarlo Antognoni", country: "Italy", era: "1980s", position: "OUT", oneOff: 7, seasonLong: 9, style: 9, character: 8, chaos: 3, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Fernando Hierro", country: "Spain", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 8, style: 7, character: 9, chaos: 4, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Andoni Zubizarreta", country: "Spain", era: "1980s–90s", position: "GK", oneOff: 7, seasonLong: 9, style: 6, character: 8, chaos: 3, legacy: 5, overall: 6.3, peteEligible: "N" },
+  { name: "Emilio Butragueño", country: "Spain", era: "1980s", position: "OUT", oneOff: 9, seasonLong: 8, style: 9, character: 7, chaos: 4, legacy: 6, overall: 7.2, peteEligible: "N" },
+  { name: "Davor Šuker", country: "Croatia", era: "1990s", position: "OUT", oneOff: 9, seasonLong: 10, style: 9, character: 7, chaos: 5, legacy: 7, overall: 7.8, peteEligible: "Y" },
+  { name: "Robert Prosinečki", country: "Croatia", era: "1990s", position: "OUT", oneOff: 8, seasonLong: 8, style: 10, character: 6, chaos: 6, legacy: 6, overall: 7.3, peteEligible: "N" },
+  { name: "Zvonimir Boban", country: "Croatia", era: "1990s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 8, chaos: 6, legacy: 6, overall: 7.3, peteEligible: "N" },
+  { name: "Hakan Şükür", country: "Turkey", era: "2000s", position: "OUT", oneOff: 10, seasonLong: 9, style: 7, character: 7, chaos: 5, legacy: 6, overall: 7.3, peteEligible: "N" },
+  { name: "Pavel Nedvěd", country: "Czech Republic", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 9, style: 9, character: 8, chaos: 5, legacy: 6, overall: 7.3, peteEligible: "N" },
+  { name: "Igor Belanov", country: "Soviet Union", era: "1980s", position: "OUT", oneOff: 9, seasonLong: 8, style: 8, character: 7, chaos: 5, legacy: 6, overall: 7.2, peteEligible: "N" },
+  { name: "Tomáš Rosický", country: "Czech Republic", era: "2000s–2010s", position: "OUT", oneOff: 7, seasonLong: 7, style: 9, character: 7, chaos: 3, legacy: 5, overall: 6.3, peteEligible: "N" },
+  { name: "Karel Poborský", country: "Czech Republic", era: "1990s–2000s", position: "OUT", oneOff: 7, seasonLong: 8, style: 8, character: 7, chaos: 5, legacy: 5, overall: 6.7, peteEligible: "N" },
+  { name: "Julián Álvarez", country: "Argentina", era: "2020s", position: "OUT", oneOff: 8, seasonLong: 9, style: 7, character: 8, chaos: 4, legacy: 7, overall: 7.2, peteEligible: "Y" },
+  { name: "Rodrigo De Paul", country: "Argentina", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 9, style: 7, character: 8, chaos: 5, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Cristian Romero", country: "Argentina", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 9, style: 6, character: 7, chaos: 7, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Enzo Fernández", country: "Argentina", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 7, chaos: 4, legacy: 6, overall: 6.8, peteEligible: "N" },
+  { name: "Lautaro Martínez", country: "Argentina", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 7, style: 8, character: 7, chaos: 4, legacy: 6, overall: 6.5, peteEligible: "N" },
+  { name: "Jude Bellingham", country: "England", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 7, style: 8, character: 7, chaos: 3, legacy: 4, overall: 6, peteEligible: "N" },
+  { name: "Bukayo Saka", country: "England", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 7, style: 8, character: 7, chaos: 2, legacy: 4, overall: 5.8, peteEligible: "N" },
+  { name: "Phil Foden", country: "England", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 6, style: 8, character: 6, chaos: 3, legacy: 3, overall: 5.3, peteEligible: "N" },
+  { name: "Declan Rice", country: "England", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 8, style: 7, character: 8, chaos: 3, legacy: 4, overall: 6, peteEligible: "N" },
+  { name: "Achraf Hakimi", country: "Morocco", era: "2020s", position: "OUT", oneOff: 8, seasonLong: 9, style: 8, character: 7, chaos: 4, legacy: 6, overall: 7, peteEligible: "Y" },
+  { name: "Hakim Ziyech", country: "Morocco", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 8, style: 8, character: 6, chaos: 4, legacy: 5, overall: 6.3, peteEligible: "N" },
+  { name: "Yassine Bounou", country: "Morocco", era: "2020s", position: "GK", oneOff: 9, seasonLong: 10, style: 6, character: 9, chaos: 4, legacy: 7, overall: 7.5, peteEligible: "Y" },
+  { name: "Sofyan Amrabat", country: "Morocco", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 10, style: 7, character: 9, chaos: 3, legacy: 7, overall: 7, peteEligible: "Y" },
+  { name: "Erling Haaland", country: "Norway", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 6, style: 7, character: 6, chaos: 3, legacy: 1, overall: 5, peteEligible: "N" },
+  { name: "Rodri", country: "Spain", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 8, chaos: 2, legacy: 5, overall: 6.5, peteEligible: "N" },
+  { name: "Pedri", country: "Spain", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 7, style: 8, character: 7, chaos: 2, legacy: 4, overall: 5.7, peteEligible: "N" },
+  { name: "Joaquín Correa", country: "Argentina", era: "2020s", position: "OUT", oneOff: 5, seasonLong: 6, style: 7, character: 6, chaos: 4, legacy: 4, overall: 5.3, peteEligible: "N" },
+  { name: "Theo Hernández", country: "France", era: "2020s", position: "OUT", oneOff: 7, seasonLong: 9, style: 8, character: 7, chaos: 5, legacy: 6, overall: 7, peteEligible: "N" },
+  { name: "Aurélien Tchouaméni", country: "France", era: "2020s", position: "OUT", oneOff: 6, seasonLong: 8, style: 7, character: 7, chaos: 2, legacy: 5, overall: 5.8, peteEligible: "N" },
+  { name: "Heung-min Son", country: "South Korea", era: "2010s–2020s", position: "OUT", oneOff: 7, seasonLong: 7, style: 8, character: 8, chaos: 3, legacy: 4, overall: 6.2, peteEligible: "N" },
+];
+
+// Lookup a player object in WORLD_CUP_POOL by name. Returns null if not found.
+const findWorldCupPlayer = (name) => {
+  if (!name) return null;
+  return WORLD_CUP_POOL.find(p => p.name === name) || null;
+};
+
+// Real attribute scoring for tournament R3. Returns the standard category map
+// used elsewhere in the game. Falls back to stubAttributeScores for names not
+// in the World Cup pool (e.g. R1/R2 picks coming from the daily pool).
+const worldCupAttributeScores = (playerName) => {
+  const p = findWorldCupPlayer(playerName);
+  if (!p) return stubAttributeScores(playerName);
+  return {
+    'One-Off':     p.oneOff,
+    'Season-Long': p.seasonLong,
+    'Style':       p.style,
+    'Character':   p.character,
+    'Chaos':       p.chaos,
+    'Legacy':      p.legacy,
+  };
+};
+
+// The 108-player Pete-eligible subset. Used for both Pete's R3 draws AND
+// the player's R3 draft cards. Returns full World Cup pool player objects.
+const getPeteEligiblePool = () => WORLD_CUP_POOL.filter(p => p.peteEligible === "Y");
+
+// Enrich a raw WORLD_CUP_POOL player into the shape draft cards expect.
+// Tier is synthesised from Overall (Legend/Star/Cult/Wildcard bands).
+// Position maps GK → GK, everything else → MID (the daily-game GK cap reads
+// position === "GK", so this preserves the max-1-GK rule).
+// Note shows the player's country and era — replaces daily-pool flavour text.
+// Used by both generateR3Draft and generateTournamentDraft.
+const enrichWorldCupCard = (p) => ({
+  name: p.name,
+  tier: p.overall >= 8.5 ? 'Legend'
+      : p.overall >= 7.5 ? 'Star'
+      : p.overall >= 6.5 ? 'Cult'
+      : 'Wildcard',
+  position: p.position === 'GK' ? 'GK' : 'MID',
+  flag: '⚽',
+  note: `${p.country} — ${p.era}`,
+  overall: p.overall,
+  peteEligible: p.peteEligible,
+  isWorldCup: true,
+});
+
+// Pure random shuffle helper for picking N from the World Cup pool.
+const pickRandomFromPool = (pool, n, excludeNames = []) => {
+  const available = pool.filter(p => !excludeNames.includes(p.name));
+  const a = [...available];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, n);
+};
+
+// Generate a 6-card draft from the full World Cup 180 for R1 and R2 player drafts.
+// Pure random — no Legend quota, no tier balancing. Phase 2, Deploy 2 / Stage 2.
+// Returns three rounds of two cards each, matching generateDraft()'s shape.
+const generateTournamentDraft = (excludeNames = []) => {
+  const picked = pickRandomFromPool(WORLD_CUP_POOL, 6, excludeNames);
+  const enriched = picked.map(enrichWorldCupCard);
+  return [
+    [enriched[0], enriched[1]],
+    [enriched[2], enriched[3]],
+    [enriched[4], enriched[5]],
+  ];
+};
+
+// Generate a 6-card draft from the Pete-eligible 108 for R3 player drafts.
+// Used in R3 ONLY. Excludes any names in excludeNames (typically Pete's three picks).
+// GK cap applied at pick-time via the existing UI logic.
+const generateR3Draft = (excludeNames = []) => {
+  const picked = pickRandomFromPool(getPeteEligiblePool(), 6, excludeNames);
+  const enriched = picked.map(enrichWorldCupCard);
+  return [
+    [enriched[0], enriched[1]],
+    [enriched[2], enriched[3]],
+    [enriched[4], enriched[5]],
+  ];
+};
+
+// ============ END TOURNAMENT MODE — WORLD CUP POOL ============
+
+// ============ TOURNAMENT MODE — STUB CONTENT ============
+// Placeholder content for Task 5 build. Real content lands in Phase 2.
+// Each opponent has: name, vibe (descriptor), three picks (by name), and a loss-message
+// delivered by Pete when the player loses to them.
+
+const STUB_OPPONENTS = {
+  pubmate: {
+    key: 'pubmate',
+    label: "PETE'S PUB MATE",
+    shortLabel: "PUB MATE",
+    vibe: "Loud, emotional, picks the obvious legends.",
+    // Three picks by name — must match names in PLAYER_POOL. Mid-low totals = beatable.
+    picks: ["Diego Maradona", "Pel\u00e9", "Ronaldinho"],
+    // Pete's reaction when the player loses to him.
+    peteLossLine: "You couldn\u2019t beat my pub mate. My PUB MATE. Off you trot.",
+    roundNumber: 1,
+  },
+  producer: {
+    key: 'producer',
+    label: "PETE'S PRODUCER",
+    shortLabel: "PRODUCER",
+    vibe: "Data-driven, dry, all numbers and no soul.",
+    // Three picks by name. Mid-high totals = harder.
+    picks: ["Luka Modri\u0107", "N'Golo Kant\u00e9", "Robert Lewandowski"],
+    peteLossLine: "My producer just out-pundited you. Have a long think about that overnight.",
+    roundNumber: 2,
+  },
+  pete: {
+    key: 'pete',
+    label: "PETE THE PUNDIT",
+    shortLabel: "PETE",
+    vibe: "World's #4 Pundit. Doctorate in football. Waiting for you.",
+    // Pete draws 3 at random from this high-tier sub-pool each attempt (see drawPetePicks).
+    // STUB for testing — Phase 2 replaces this with a "Pete-eligible" flag on the real
+    // World Cup pool. Names must exist in PLAYER_POOL exactly.
+    subPool: [
+      "Diego Maradona", "Pelé", "Zinedine Zidane", "Lionel Messi",
+      "Johan Cruyff", "Franz Beckenbauer", "Ronaldinho", "Cristiano Ronaldo",
+      "Zico", "Roberto Baggio", "Paolo Maldini", "Romário",
+      "Garrincha", "Michel Platini", "Lothar Matthäus"
+    ],
+    // picks is set dynamically at R3 entry by drawPetePicks(). Left empty here.
+    picks: [],
+    roundNumber: 3,
+    // Pre-written reactions on the result screen. Rotated by attempt count for variety.
+    winReactions: [
+      "Beat me. Once. Have your trophy. Don't get used to it.",
+      "Lucky day. Lounger needs a wash anyway.",
+      "Fine. You earned it. Tomorrow we go again.",
+      "Hmph. Decent argument. Don't expect a repeat.",
+    ],
+    lossReactions: [
+      "Knew it. Same time tomorrow. I'll be here. Lounger's comfy.",
+      "Predictable. The defence had no legs.",
+      "Off you trot. Have a think about those picks.",
+      "Twenty years in this game. You thought you'd just walk in?",
+    ],
+  },
+};
+
+// Draw 3 random picks for Pete from the Pete-eligible 108 (Phase 2, Deploy 1 / Stage 2).
+// Returns an array of 3 names. Names will resolve via WORLD_CUP_POOL in
+// resolveOpponentPicks(), which now checks the World Cup pool first.
+const drawPetePicks = () => {
+  const eligible = getPeteEligiblePool();
+  // Fisher-Yates shuffle, take 3.
+  const arr = [...eligible];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, 3).map(p => p.name);
+};
+
+// Deterministic attribute scoring stub.
+// Real Phase 2 will replace this with hand-authored scores per player.
+// For testing now: a small hash of the player name produces 5 attribute scores (1-10).
+// Same name → same scores every time. Predictable, comparable across draws.
+const stubAttributeScores = (playerName) => {
+  // Simple deterministic hash. Don't use this for anything important.
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < playerName.length; i++) {
+    h ^= playerName.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  // Five attribute scores in 1-10 range, derived from the hash.
+  const scoreFrom = (seed) => 1 + (seed % 10);
+  return {
+    'One-Off':     scoreFrom(h),
+    'Season-Long': scoreFrom(h >>> 3),
+    'Style':       scoreFrom(h >>> 7),
+    'Character':   scoreFrom(h >>> 11),
+    'Chaos':       scoreFrom(h >>> 17),
+    'Legacy':      scoreFrom(h >>> 23),
+  };
+};
+
+// Total a team's attribute score against a category.
+// Routes per player: World Cup pool players get real authored scores;
+// daily-pool players (R1/R2 still) fall through to the hash stub.
+// The flag `isWorldCup` is set by generateR3Draft and resolveOpponentPicks (for Pete).
+// In R1/R2 the player squad comes from daily PLAYER_POOL — those don't have the
+// flag, so they correctly fall through to stubAttributeScores.
+const scoreTeamOnAttribute = (players, attribute) => {
+  return players.reduce((sum, p) => {
+    const name = p.name || p;
+    const scores = p && p.isWorldCup
+      ? worldCupAttributeScores(name)
+      : stubAttributeScores(name);
+    return sum + (scores[attribute] || 0);
+  }, 0);
+};
+
+// Resolve opponent picks (by name) to renderable card objects.
+// Phase 2, Deploy 2 / Stage 3: all three tournament opponents (Pub Mate, Producer,
+// Pete) now have picks from the WORLD_CUP_POOL — Pub Mate and Producer via the
+// authored 78 squads, Pete via random draw from the Pete-eligible 108. So we
+// check WORLD_CUP_POOL first for any tournament-mode opponent.
+//
+// Falls back to PLAYER_POOL for any unknown name (defensive — shouldn't fire).
+const resolveOpponentPicks = (opponent) => {
+  return opponent.picks.map((name) => {
+    const wc = findWorldCupPlayer(name);
+    if (wc) return enrichWorldCupCard(wc);
+    // Defensive fallback — daily pool then placeholder.
+    const found = PLAYER_POOL.find(p => p.name === name);
+    if (found) return found;
+    return { name, tier: 'Star', position: 'MID', flag: '\u2691' };
+  });
+};
+
+// Pick a random attribute category for a tournament round.
+// Deterministic per (round, date) so the same trio gives the same attribute for 3 days.
+const pickTournamentAttribute = (roundNumber, date = new Date()) => {
+  const attrs = ['One-Off', 'Season-Long', 'Style', 'Character', 'Chaos'];
+  const start = parseTournamentDate(TOURNAMENT_CONFIG.startDate);
+  const dayAnchor = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0));
+  const offset = Math.max(0, daysBetween(start, dayAnchor));
+  const trioIndex = Math.floor(offset / TOURNAMENT_CONFIG.daysPerTrio);
+  // Different attribute per round but stable per trio.
+  return attrs[(trioIndex * 3 + roundNumber - 1) % attrs.length];
+};
+
+// ============ TOURNAMENT MODE — REAL QUESTIONS (Phase 2, Deploy 2 Stage 1) ============
+// 13 trios x 3 rounds = 39 questions. Each trio's R3 is always Legacy.
+// Date-based rotation: same trio runs for 3 consecutive days, then advances.
+// 13 trios x 3 days = 39 days = the World Cup window (11 Jun – 19 Jul 2026).
+
+const TOURNAMENT_QUESTIONS = [
+  // Trio 1
+  {
+    r1: { text: "Pick three for a sudden-death knockout in 40-degree heat.", category: "One-Off" },
+    r2: { text: "Pick three to walk out into a hostile away crowd in the group stage.", category: "Character" },
+    r3: { text: "Pick three who'd want a World Cup final on the biggest stage.", category: "Legacy" },
+  },
+  // Trio 2
+  {
+    r1: { text: "Pick three for a sun-baked open game with the world watching.", category: "Style" },
+    r2: { text: "Pick three to drag a quarter-final into extra time and penalties.", category: "Chaos" },
+    r3: { text: "Pick three with their names sewn into World Cup history.", category: "Legacy" },
+  },
+  // Trio 3
+  {
+    r1: { text: "Pick three to grind through a full World Cup with the squad rotating around them.", category: "Season-Long" },
+    r2: { text: "Pick three for a last-16 shootout after 120 minutes of nothing.", category: "One-Off" },
+    r3: { text: "Pick three whose World Cup story doesn't need a footnote.", category: "Legacy" },
+  },
+  // Trio 4
+  {
+    r1: { text: "Pick three for a Brazilian-style 4-1 demolition in the round of 16.", category: "Style" },
+    r2: { text: "Pick three to take a penalty in front of 80,000 in a partisan stadium.", category: "Character" },
+    r3: { text: "Pick three Pete couldn't write off in a column on Monday morning.", category: "Legacy" },
+  },
+  // Trio 5
+  {
+    r1: { text: "Pick three to turn a dead group-stage game into something memorable.", category: "Chaos" },
+    r2: { text: "Pick three to peak in the second week when everyone else is fading.", category: "Season-Long" },
+    r3: { text: "Pick three the commentators reach for when the trophy lifts.", category: "Legacy" },
+  },
+  // Trio 6
+  {
+    r1: { text: "Pick three for a winner-takes-all final group game in a packed stadium.", category: "One-Off" },
+    r2: { text: "Pick three to play it on the grass when the pitch is dry and quick.", category: "Style" },
+    r3: { text: "Pick three who'd make Pete's shortlist before he'd admit it.", category: "Legacy" },
+  },
+  // Trio 7
+  {
+    r1: { text: "Pick three to captain a side that's lost its first game and needs to respond.", category: "Character" },
+    r2: { text: "Pick three to break the deadlock in a 0-0 quarter-final everyone has stopped watching.", category: "Chaos" },
+    r3: { text: "Pick three whose international shirt is heavier than their club one.", category: "Legacy" },
+  },
+  // Trio 8
+  {
+    r1: { text: "Pick three to play every minute of the group stage and arrive fresh at the knockouts.", category: "Season-Long" },
+    r2: { text: "Pick three to make a tactical, low-tempo last-16 game watchable.", category: "Style" },
+    r3: { text: "Pick three who'd belong in a museum, not a podcast.", category: "Legacy" },
+  },
+  // Trio 9
+  {
+    r1: { text: "Pick three to make a semi-final unrecognisable by the 70th minute.", category: "Chaos" },
+    r2: { text: "Pick three to take the armband when your captain limps off in the opening game.", category: "Character" },
+    r3: { text: "Pick three whose World Cup is the first chapter of any book about them.", category: "Legacy" },
+  },
+  // Trio 10
+  {
+    r1: { text: "Pick three for a final against a side you've never beaten.", category: "One-Off" },
+    r2: { text: "Pick three to start every game and never play a bad one.", category: "Season-Long" },
+    r3: { text: "Pick three Pete would queue in the sun to watch warm up.", category: "Legacy" },
+  },
+  // Trio 11
+  {
+    r1: { text: "Pick three to play their natural game in front of a billion people.", category: "Style" },
+    r2: { text: "Pick three to drag the host nation out of their own tournament.", category: "Chaos" },
+    r3: { text: "Pick three you'd want on the team-sheet read out before a final.", category: "Legacy" },
+  },
+  // Trio 12
+  {
+    r1: { text: "Pick three to take the field after the anthem brings half the squad to tears.", category: "Character" },
+    r2: { text: "Pick three for a final against the tournament's golden boot winner.", category: "One-Off" },
+    r3: { text: "Pick three who'd be remembered for one tournament if they'd done nothing else.", category: "Legacy" },
+  },
+  // Trio 13
+  {
+    r1: { text: "Pick three to be the last men standing when the squad has nothing left.", category: "Season-Long" },
+    r2: { text: "Pick three to play their best football when the cameras are everywhere.", category: "Style" },
+    r3: { text: "Pick three the World Cup needed more than they needed it.", category: "Legacy" },
+  },
+];
+
+// Return the trio index (0-12) for a given date.
+// Inside the window: floor((date - startDate) / 3 days).
+// Before the window or after the window: clamp to 0 (Trio 1) so debug-unlock
+// testing pre-launch always sees Trio 1 content.
+const getTrioIndexForDate = (date = new Date()) => {
+  const status = getTournamentStatus(date);
+  if (!status) return 0; // Outside window → clamp to Trio 1.
+  return Math.max(0, Math.min(TOURNAMENT_QUESTIONS.length - 1, status.trioNumber - 1));
+};
+
+// Look up the real question for a given round (1, 2, or 3) on a given date.
+// Returns { text, category }. category drives the round's attribute scoring.
+const getTournamentQuestion = (roundNumber, date = new Date()) => {
+  const trioIdx = getTrioIndexForDate(date);
+  const trio = TOURNAMENT_QUESTIONS[trioIdx];
+  const key = roundNumber === 1 ? 'r1' : roundNumber === 2 ? 'r2' : 'r3';
+  return trio[key];
+};
+
+// ============ END TOURNAMENT MODE — REAL QUESTIONS ============
+
+// ============ TOURNAMENT MODE — OPPONENT SQUADS (Phase 2, Deploy 2 Stage 3) ============
+// 78 authored squads: 13 trios × 3 days (A/B/C) × 2 opponents (Pub Mate + Producer).
+// Each opponent has three picks (names exist in WORLD_CUP_POOL) plus a "voice"
+// flavour line. Pub Mate voices: Mate Dave / asked his dad / Twitter / TikTok mate / podcast.
+// Producer voices: model variants the football scientist ran.
+//
+// Day rotation within a trio: A = day 1 of the trio (Monday in a Mon-Wed cycle),
+// B = day 2, C = day 3. Deterministic per date.
+//
+// Calibration targets: Pub Mate avg ~16-18 (R1 win rate ~85%). Producer avg
+// ~21-22 (R2 win rate ~50%). Authored to those targets.
+
+const OPPONENT_SQUADS = [
+  // Trio 1
+  {
+    A: {
+      pubmate: { picks: ["Frank Lampard", "John Terry", "Cafu"], voice: "Mate Dave at the table" },
+      producer: { picks: ["N'Golo Kanté", "Luka Modrić", "Hristo Stoichkov"], voice: "The model said three" },
+    },
+    B: {
+      pubmate: { picks: ["Uwe Seeler", "Pep Guardiola", "Joaquín Correa"], voice: "Asked his dad" },
+      producer: { picks: ["Cafu", "Iker Casillas", "Romário"], voice: "Re-ran the model with different weights" },
+    },
+    C: {
+      pubmate: { picks: ["Bukayo Saka", "Phil Foden", "Hakim Ziyech"], voice: "Read on Twitter that morning" },
+      producer: { picks: ["Franz Beckenbauer", "Andoni Zubizarreta", "Luis Suárez"], voice: "Fresh academic paper said these three" },
+    },
+  },
+  // Trio 2
+  {
+    A: {
+      pubmate: { picks: ["John Terry", "Geoff Hurst", "Kléberson"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Luis Suárez", "Hristo Stoichkov", "Lothar Matthäus"], voice: "Variance optimisation model" },
+    },
+    B: {
+      pubmate: { picks: ["Phil Foden", "Pepe", "Tim Cahill"], voice: "His mate who watches football on TikTok" },
+      producer: { picks: ["Diego Maradona", "Rivelino", "Hugo Lloris"], voice: "Re-weighted for late-game scenarios" },
+    },
+    C: {
+      pubmate: { picks: ["John Terry", "Kléberson", "Hidetoshi Nakata"], voice: "Read it on a podcast" },
+      producer: { picks: ["Diego Maradona", "Garrincha", "Toni Kroos"], voice: "The 'unpredictability premium' paper" },
+    },
+  },
+  // Trio 3
+  {
+    A: {
+      pubmate: { picks: ["Joaquín Correa", "Mario Götze", "Kléberson"], voice: "Asked his dad" },
+      producer: { picks: ["Hugo Lloris", "N'Golo Kanté", "Hristo Stoichkov"], voice: "Penalty-conversion model" },
+    },
+    B: {
+      pubmate: { picks: ["Frank Lampard", "Wayne Rooney", "Phil Foden"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Miroslav Klose", "Toni Kroos", "Andoni Zubizarreta"], voice: "Re-weighted for tournament-stage variance" },
+    },
+    C: {
+      pubmate: { picks: ["Bukayo Saka", "Heung-min Son", "Phil Foden"], voice: "Saw it on Twitter" },
+      producer: { picks: ["Roberto Carlos", "Edgar Davids", "Miroslav Klose"], voice: "The 'clutch player' paper" },
+    },
+  },
+  // Trio 4
+  {
+    A: {
+      pubmate: { picks: ["John Terry", "Geoff Hurst", "Andoni Zubizarreta"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Andrea Pirlo", "Lothar Matthäus", "Luis Suárez"], voice: "Penalty-specific Character model" },
+    },
+    B: {
+      pubmate: { picks: ["Phil Foden", "Pepe", "El Hadji Diouf"], voice: "His mate who watches football on TikTok" },
+      producer: { picks: ["Hugo Lloris", "Roberto Baggio", "Wesley Sneijder"], voice: "Re-ran with hostile-crowd weighting" },
+    },
+    C: {
+      pubmate: { picks: ["Edgar Davids", "John Terry", "Geoff Hurst"], voice: "Read it on a podcast" },
+      producer: { picks: ["Steven Gerrard", "Frank Lampard", "David Beckham"], voice: "Penalty psychology paper" },
+    },
+  },
+  // Trio 5
+  {
+    A: {
+      pubmate: { picks: ["John Terry", "Wayne Rooney", "Asamoah Gyan"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Carlos Tevez", "Mario Götze", "Hidetoshi Nakata"], voice: "Endurance optimisation model" },
+    },
+    B: {
+      pubmate: { picks: ["Andrea Pirlo", "Paul Gascoigne", "Geoff Hurst"], voice: "Asked his dad" },
+      producer: { picks: ["Andoni Zubizarreta", "Riyad Mahrez", "Mario Götze"], voice: "Re-weighted for late-tournament fatigue" },
+    },
+    C: {
+      pubmate: { picks: ["Antoine Griezmann", "Vinícius Júnior", "Neymar"], voice: "Saw it on Twitter" },
+      producer: { picks: ["Lothar Matthäus", "Frank Lampard", "Joaquín Correa"], voice: "Minutes-played per goal contribution paper" },
+    },
+  },
+  // Trio 6
+  {
+    A: {
+      pubmate: { picks: ["Phil Foden", "Rui Costa", "Edgar Davids"], voice: "Dave (anti-Pete shift)" },
+      producer: { picks: ["Bobby Moore", "Andoni Zubizarreta", "Mats Hummels"], voice: "Pass-completion-on-the-ground model" },
+    },
+    B: {
+      pubmate: { picks: ["Olivier Giroud", "Andoni Zubizarreta", "Phil Foden"], voice: "His missus" },
+      producer: { picks: ["Patrick Vieira", "Frank Lampard", "Andoni Zubizarreta"], voice: "Re-ran with possession-retention metric" },
+    },
+    C: {
+      pubmate: { picks: ["Hidetoshi Nakata", "John Terry", "Joaquín Correa"], voice: "Read it on a podcast" },
+      producer: { picks: ["Mats Hummels", "Edgar Davids", "Andoni Zubizarreta"], voice: "Pass network analysis paper" },
+    },
+  },
+  // Trio 7
+  {
+    A: {
+      pubmate: { picks: ["Wayne Rooney", "Edgar Davids", "Romário"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Paul Gascoigne", "El Hadji Diouf", "Bobby Moore"], voice: "Late-game deadlock-breaker model" },
+    },
+    B: {
+      pubmate: { picks: ["Pepe", "Carlos Tevez", "Vinícius Júnior"], voice: "His mate who watches football on TikTok" },
+      producer: { picks: ["Garrincha", "Pepe", "Patrick Vieira"], voice: "Re-ran with creativity-under-pressure metric" },
+    },
+    C: {
+      pubmate: { picks: ["Diego Maradona", "Tim Cahill", "Phil Foden"], voice: "Read it on a podcast" },
+      producer: { picks: ["Cristiano Ronaldo", "Hristo Stoichkov", "Ronaldinho"], voice: "Unpredictability index paper" },
+    },
+  },
+  // Trio 8
+  {
+    A: {
+      pubmate: { picks: ["Bukayo Saka", "Phil Foden", "Joaquín Correa"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Marcel Desailly", "Andoni Zubizarreta", "Patrick Vieira"], voice: "Defensive distribution model" },
+    },
+    B: {
+      pubmate: { picks: ["Joaquín Correa", "Mario Götze", "Pep Guardiola"], voice: "Asked his dad" },
+      producer: { picks: ["Mats Hummels", "Frank Lampard", "Andoni Zubizarreta"], voice: "Long-range completion metric" },
+    },
+    C: {
+      pubmate: { picks: ["Vinícius Júnior", "Phil Foden", "Tim Cahill"], voice: "His mate who watches football on TikTok" },
+      producer: { picks: ["Mats Hummels", "Andoni Zubizarreta", "Roberto Carlos"], voice: "Build-from-back paper recommendation" },
+    },
+  },
+  // Trio 9
+  {
+    A: {
+      pubmate: { picks: ["Wayne Rooney", "Edgar Davids", "Antoine Griezmann"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Andrea Pirlo", "Marcel Desailly", "Hristo Stoichkov"], voice: "Composure-tournament index" },
+    },
+    B: {
+      pubmate: { picks: ["Neymar", "Vinícius Júnior", "Riyad Mahrez"], voice: "Saw it on Twitter" },
+      producer: { picks: ["Lothar Matthäus", "Hugo Lloris", "Romário"], voice: "Captain-coefficient model" },
+    },
+    C: {
+      pubmate: { picks: ["Paul Gascoigne", "Cristiano Ronaldo", "Mohamed Salah"], voice: "Read it on a podcast" },
+      producer: { picks: ["Franz Beckenbauer", "Wesley Sneijder", "Diego Maradona"], voice: "Iconic-captain dataset variance" },
+    },
+  },
+  // Trio 10
+  {
+    A: {
+      pubmate: { picks: ["Phil Foden", "Edgar Davids", "Declan Rice"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Carlos Tevez", "Luis Suárez", "Joaquín Correa"], voice: "Squad-rotation minutes model" },
+    },
+    B: {
+      pubmate: { picks: ["Tim Cahill", "Pepe", "Phil Foden"], voice: "His mate who watches football on TikTok" },
+      producer: { picks: ["Pepe", "Riyad Mahrez", "Mario Götze"], voice: "Minutes-played efficiency metric" },
+    },
+    C: {
+      pubmate: { picks: ["Hidetoshi Nakata", "Joaquín Correa", "Frank Lampard"], voice: "Read it on a podcast" },
+      producer: { picks: ["Jürgen Klinsmann", "Frank Rijkaard", "Mario Götze"], voice: "Multi-tournament veteran model" },
+    },
+  },
+  // Trio 11
+  {
+    A: {
+      pubmate: { picks: ["John Terry", "Tim Cahill", "Andoni Zubizarreta"], voice: "Dave (anti-Pete)" },
+      producer: { picks: ["Paul Gascoigne", "Emi Martínez", "Toni Kroos"], voice: "Late-game variance × calm-pivot" },
+    },
+    B: {
+      pubmate: { picks: ["Geoff Hurst", "Joaquín Correa", "Andoni Zubizarreta"], voice: "Asked his dad" },
+      producer: { picks: ["Diego Maradona", "Pepe", "Cafu"], voice: "Iconic-chaos + composure-anchor" },
+    },
+    C: {
+      pubmate: { picks: ["Hidetoshi Nakata", "Edgar Davids", "Tim Cahill"], voice: "Read it on a podcast" },
+      producer: { picks: ["Luis Suárez", "Wesley Sneijder", "Vinícius Júnior"], voice: "Disruption × modern-creative" },
+    },
+  },
+  // Trio 12
+  {
+    A: {
+      pubmate: { picks: ["Edgar Davids", "Paul Gascoigne", "Wayne Rooney"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Bastian Schweinsteiger", "Andrea Pirlo", "N'Golo Kanté"], voice: "Composure × duels model" },
+    },
+    B: {
+      pubmate: { picks: ["Vinícius Júnior", "Riyad Mahrez", "Arjen Robben"], voice: "Saw it on Twitter" },
+      producer: { picks: ["David Beckham", "Edgar Davids", "Patrick Vieira"], voice: "Premier-League-WC overlap" },
+    },
+    C: {
+      pubmate: { picks: ["Diego Maradona", "Tim Cahill", "David Beckham"], voice: "Read it on a podcast" },
+      producer: { picks: ["Fabio Cannavaro", "David Trezeguet", "Frank Lampard"], voice: "Late-2000s European delivery" },
+    },
+  },
+  // Trio 13
+  {
+    A: {
+      pubmate: { picks: ["Bukayo Saka", "Phil Foden", "Joaquín Correa"], voice: "Mate Dave at the table" },
+      producer: { picks: ["Mats Hummels", "Marcel Desailly", "Andoni Zubizarreta"], voice: "Defensive build-from-back metric" },
+    },
+    B: {
+      pubmate: { picks: ["Vinícius Júnior", "Phil Foden", "Bukayo Saka"], voice: "His mate who watches football on TikTok" },
+      producer: { picks: ["Patrick Vieira", "Cafu", "Andoni Zubizarreta"], voice: "Defensive + distribution combined" },
+    },
+    C: {
+      pubmate: { picks: ["Vinícius Júnior", "Heung-min Son", "Bukayo Saka"], voice: "Saw it on Twitter" },
+      producer: { picks: ["Roberto Carlos", "Mats Hummels", "Andoni Zubizarreta"], voice: "Backline-creator paper" },
+    },
+  },
+];
+
+// Day letter for a given date inside the tournament window.
+// Returns "A", "B", or "C" — corresponds to days 1/2/3 of the active trio.
+// Outside the window, clamps to "A" so debug-unlock testing pre-launch is stable.
+const getDayLetterForDate = (date = new Date()) => {
+  const status = getTournamentStatus(date);
+  if (!status) return "A"; // Outside window → clamp to Day A.
+  return status.dayInTrio === 1 ? "A" : status.dayInTrio === 2 ? "B" : "C";
+};
+
+// Look up the right opponent squad for today.
+// opponentType: "pubmate" | "producer".
+// Returns { picks: [n1, n2, n3], voice: "..." } or a sensible fallback.
+const getOpponentSquadForToday = (opponentType, date = new Date()) => {
+  const trioIdx = getTrioIndexForDate(date);
+  const day = getDayLetterForDate(date);
+  const trio = OPPONENT_SQUADS[trioIdx];
+  if (!trio || !trio[day] || !trio[day][opponentType]) {
+    // Defensive fallback — shouldn't fire because the array is fully populated.
+    return { picks: ["Pelé", "Diego Maradona", "Lionel Messi"], voice: "" };
+  }
+  return trio[day][opponentType];
+};
+
+// ============ END TOURNAMENT MODE — OPPONENT SQUADS ============
+
+// ============ TOURNAMENT MODE — STOCK TEXT LINES (Phase 2, Deploy 3) ============
+// 51 authored lines across 5 categories. Drawn at random on each occurrence.
+// No state, no persistence — same player can see the same line twice.
+//
+// Pub Mate loss lines (10): Pete mocks Pub Mate via the voices (Dave, his dad,
+//   Twitter, TikTok, podcast). Drawn when player loses R1.
+// Producer loss lines (10): Pete sarcastically mocks the football scientist.
+//   Drawn when player loses R2.
+// Pete R3 win reactions (8): grudging→generous→self-deprecating→warm. Drawn
+//   when VAR finds for the player in R3 (player wins trophy).
+// Pete R3 loss reactions (8): dismissive→instructive→confident→warm-grumpy.
+//   Drawn when VAR finds for Pete in R3.
+// VAR phrases (15): currently used for R1/R2 verdicts. Sub-categorised by
+//   Round opener / Pre-result hold / Player-win / Player-loss / R3 framing.
+//   The Player-win and Player-loss subsets replace the current VAR_PHRASES_STUB
+//   strings for R1/R2 final verdicts. Other categories surface in future polish.
+
+const PUBMATE_LOSS_LINES = [
+  "You lost to my pub mate. My PUB MATE. Off you trot.",
+  "His mate Dave picked it. Don't ask me why Lampard's in there. Beaten by Dave-by-proxy.",
+  "He asked his dad. His DAD. Did your dad pick yours? No? Maybe try that next time.",
+  "My pub mate read it on Twitter at 8am. He read three names and stopped scrolling. Three names. And you lost.",
+  "He asked the postman. Honestly. The POSTMAN.",
+  "His mate watches football on TikTok. He picked three players he'd seen in compilations. You lost to compilations.",
+  "My pub mate doesn't have an opinion. He has five mates with opinions. One of those mates beat you.",
+  "He told me the podcast suggested these three. He doesn't remember which podcast. You lost to a podcast he doesn't remember.",
+  "Even my pub mate could do it. Picked three names off the back of a cigarette packet. Have a long think.",
+  "You lost to a man who thinks Salah won the World Cup. Take that in. Properly.",
+];
+
+const PRODUCER_LOSS_LINES = [
+  "You lost to my producer. The man who calls goals 'positive outcomes.'",
+  "My producer's expected-goals model said you'd lose. So you did. Have a think.",
+  "He's never been moved by a football match in his life. Never. And you lost to him.",
+  "Beaten by the man who watches matches with the sound off because the commentary 'introduces bias.'",
+  "He cried once. Just once. When his spreadsheet auto-saved correctly. That man beat you.",
+  "My producer doesn't watch football. He watches graphs of football. And the graphs were right.",
+  "He optimised against you. Optimised. Like you're a delivery route. Off you trot.",
+  "You lost to a heat map. A literal heat map. Coloured squares beat you tonight.",
+  "My producer ran the numbers seventeen times to make sure he picked the dullest possible squad. And the dullest squad won. There's a lesson there. He doesn't get it either.",
+  "He's currently entering this result into his model to improve future predictions. He's enjoying it. As much as he enjoys anything.",
+];
+
+const PETE_R3_WIN_REACTIONS = [
+  "Hmm. Fine. You made the case. I don't have to like it.",
+  "I'll be honest — that was a better argument than I gave you credit for. Take the trophy. Don't make a habit of it.",
+  "Right. You got me. The producer's spreadsheet had me at 73% to win. So much for that.",
+  "Look at you. Beat the World's #4 Pundit. I'd be more impressed if I were #5.",
+  "The VAR found for you. I won't appeal. This time.",
+  "Trophy's yours. The drinks are still on me, though. House rules.",
+  "You spoke for your three like they were yours. That's the difference. Most people just list names. You picked.",
+  "Well played. Now go away. I need to read your defence again and work out where I went wrong.",
+];
+
+const PETE_R3_LOSS_REACTIONS = [
+  "That'll do. Trophy stays with me. Same time tomorrow?",
+  "You wrote a defence. I wrote a case. There's a difference. Have a think.",
+  "Three picks and four sentences. You needed five. Maybe six. Try again.",
+  "The VAR agreed with me. The VAR usually does. Off you go.",
+  "Look — I picked three players I've watched and argued about for thirty years. You picked three you'd heard of. That's why.",
+  "You started strong. Then you said 'in conclusion.' Never write 'in conclusion.' Take that one with you.",
+  "I'm not going to gloat. I'm going to make a cup of tea. Same outcome either way.",
+  "You'll get me one day. Probably not tomorrow. But one day.",
+];
+
+// Phase 2, Deploy 5 / Stage 2: Pete reactions on R1/R2 wins, shown on the
+// congratulations screen between rounds. Each line celebrates the player
+// while setting up the next opponent's threat.
+const PETE_R1_WIN_REACTIONS = [
+  "Right. Pub mate's seen off. Don't get cocky — the producer doesn't have opinions, he has spreadsheets. Different beast.",
+  "Beat my pub mate. Bigger people have. Producer's up next, and he's already optimised against you.",
+  "Pub mate handled. Decent. Now I bring in the man who watches matches with a clipboard. Brace yourself.",
+  "Good. The easy one's done. Producer next — he doesn't care that you won. He's already running the numbers on round two.",
+  "One down. The producer's been watching from the wings. He's got data on you now.",
+];
+
+const PETE_R2_WIN_REACTIONS = [
+  "You beat the spreadsheet. Surprised. Now you face me. I've been on this lounger waiting.",
+  "Producer's down. Models broken, charts in tatters. Right — my turn.",
+  "Two down. You've earned a chair across from me. Don't waste it.",
+  "Beat my producer. Decent showing. Now I'm getting up off this lounger. You won't enjoy it.",
+  "The data man fell over. Good. Now the football brain steps in. Sit down.",
+];
+
+// VAR phrases organised by category. The final verdict line for R1/R2 outcomes
+// draws from VAR_PLAYER_WIN_LINES or VAR_PLAYER_LOSS_LINES. The existing
+// VAR_PHRASES_STUB (Legacy tiebreak verdicts) remains for tie cases.
+const VAR_ROUND_OPENER_LINES = [
+  "Checking the picks.",
+  "Running the numbers.",
+  "Reviewing the selections.",
+  "Confirming the totals.",
+  "Verifying the round.",
+];
+
+const VAR_PRE_RESULT_HOLD_LINES = [
+  "One moment.",
+  "Cross-referencing.",
+  "Standby.",
+];
+
+const VAR_PLAYER_WIN_LINES = [
+  "The player advances.",
+  "The score stands. Player progresses.",
+  "Reviewed and confirmed. The player wins this round.",
+];
+
+const VAR_PLAYER_LOSS_LINES = [
+  "The score is decisive. The player does not progress.",
+  "Reviewed and confirmed. The opponent wins this round.",
+  "The numbers are clear. Tournament over for today.",
+];
+
+const VAR_R3_FRAMING_LINES = [
+  "Argument reviewed. Picks weighed. Decision incoming.",
+];
+
+// Pick a random line from a pool. Returns null if the pool is empty (defensive).
+const pickRandomLine = (pool) => {
+  if (!pool || pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
+// ============ END TOURNAMENT MODE — STOCK TEXT LINES ============
+// Stub question text for a tournament round. Real questions land in Phase 2.
+const stubTournamentQuestion = (roundNumber, attribute) => {
+  const opener = roundNumber === 1
+    ? "Round 1"
+    : roundNumber === 2
+      ? "Round 2"
+      : "Round 3";
+  const map = {
+    'One-Off':     `${opener}: pick three for a one-off cup tie you have to win.`,
+    'Season-Long': `${opener}: pick three to grind out a full season title.`,
+    'Style':       `${opener}: pick three you'd pay to watch.`,
+    'Character':   `${opener}: pick three to lead a dressing room.`,
+    'Chaos':       `${opener}: pick three to cause the most chaos on the pitch.`,
+  };
+  return map[attribute] || `${opener}: pick three.`;
+};
+
+// VAR voice — dry procedural phrases for Round 1/2 outcomes.
+// Renamed to *_STUB in Phase 2 Deploy 1 / Stage 5 — Deploy 3 will wire in the
+// 15 authored VAR phrases under the new name VAR_PHRASES (the production set).
+// Kept for now because pickVarPhrase still uses these six R1/R2 verdict strings.
+const VAR_PHRASES_STUB = {
+  winDominant:  "After review: decisive. You advance.",
+  winNarrow:    "After review: marginal. You advance.",
+  winLegacy:    "Tied on attribute. Legacy tiebreak in your favour. You advance.",
+  lossDominant: "After review: comprehensive defeat. No advance.",
+  lossNarrow:   "After review: marginal defeat. No advance.",
+  lossLegacy:   "Tied on attribute. Legacy tiebreak against you. No advance.",
+};
+
+// Phase 2, Deploy 3: VAR final verdict line for R1/R2.
+// Win/loss outcomes now draw randomly from the authored 3-line pools (was 2 static
+// strings each: dominant/narrow). The dominant-vs-narrow gap is no longer signalled
+// in text — the score totals are visible above the phrase so the player can see
+// for themselves. Legacy tiebreak still uses the stub strings (they carry essential
+// context the authored lines don't).
+const pickVarPhrase = (playerTotal, opponentTotal, viaLegacy, won) => {
+  if (viaLegacy) {
+    return won ? VAR_PHRASES_STUB.winLegacy : VAR_PHRASES_STUB.lossLegacy;
+  }
+  if (won) {
+    return pickRandomLine(VAR_PLAYER_WIN_LINES)
+      || VAR_PHRASES_STUB.winDominant;
+  }
+  return pickRandomLine(VAR_PLAYER_LOSS_LINES)
+    || VAR_PHRASES_STUB.lossDominant;
+};
+
+// ============ END TOURNAMENT MODE — STUB CONTENT ============
+
+// ============ END TOURNAMENT MODE — FOUNDATIONS ============
+
 export default function Kick3() {
   const [screen, setScreen] = useState('home');
   const [mode, setMode] = useState('solo'); // 'solo' or 'h2h'
@@ -870,54 +2066,228 @@ export default function Kick3() {
   const soloCardRef = useRef(null);
   const h2hCardRef = useRef(null);
   const statsCardRef = useRef(null);
+  const recordCardRef = useRef(null);
 
   // Share state — shows feedback in the share button.
   const [shareState, setShareState] = useState('idle'); // 'idle' | 'working' | 'shared' | 'copied' | 'error'
 
-  // ============ STREAK LOGIC ============
-  // Three values persisted to localStorage:
-  //   kick3_streak_current — current consecutive-day streak
-  //   kick3_streak_best    — highest streak ever achieved
-  //   kick3_streak_last_day — TODAYS_QUESTION.number of the last completed verdict
-  // Streak only updates when a verdict is recorded (recordStreak() called).
-  const readStreakFromStorage = () => {
-    try {
-      return {
-        current: parseInt(localStorage.getItem('kick3_streak_current') || '0', 10) || 0,
-        best:    parseInt(localStorage.getItem('kick3_streak_best')    || '0', 10) || 0,
-        lastDay: parseInt(localStorage.getItem('kick3_streak_last_day')|| '0', 10) || 0,
-      };
-    } catch {
-      // localStorage can throw in private mode / disabled storage
-      return { current: 0, best: 0, lastDay: 0 };
-    }
-  };
-  const [streak, setStreak] = useState(readStreakFromStorage);
-  // Tracks whether the player just hit a new personal best on the most recent verdict.
-  // Stored separately so we only show "NEW PERSONAL BEST" once per verdict.
-  const [isPersonalBest, setIsPersonalBest] = useState(false);
+  // ============ TOURNAMENT MODE — BETA GATE ============
+  // tournamentBetaActive is true if ?beta=pete is (or was) in the URL.
+  // When true, the green TOURNAMENT MODE button is rendered on the home screen.
+  // When false, the button is not rendered — invisible to anyone without the flag.
+  // Evaluated once on mount; URL changes don't re-evaluate (refresh to toggle).
+  const [tournamentBetaActive] = useState(() => {
+    try { return isTournamentBetaActive(); } catch { return false; }
+  });
 
-  // Call when a verdict (solo or h2h) is successfully delivered.
-  // Idempotent — calling multiple times for the same day's question is a no-op.
-  const recordStreak = () => {
-    try {
-      const today = TODAYS_QUESTION.number;
-      const prev = readStreakFromStorage();
-      // Already recorded today — no change.
-      if (prev.lastDay === today) return;
-      // Consecutive day → +1. Otherwise → reset to 1.
-      const newCurrent = (prev.lastDay === today - 1) ? prev.current + 1 : 1;
-      const newBest = Math.max(prev.best, newCurrent);
-      const beatBest = newCurrent > prev.best && prev.best > 0;
-      localStorage.setItem('kick3_streak_current', String(newCurrent));
-      localStorage.setItem('kick3_streak_best',    String(newBest));
-      localStorage.setItem('kick3_streak_last_day',String(today));
-      setStreak({ current: newCurrent, best: newBest, lastDay: today });
-      setIsPersonalBest(beatBest);
-    } catch {
-      // Storage unavailable — silently skip. Game still works.
+  // ============ TOURNAMENT MODE — IN-PLAY STATE ============
+  // Tracks state while a tournament attempt is in progress.
+  //   tournamentRound:        1, 2, or 3 — which round is being played right now
+  //   tournamentOpponent:     full opponent object from STUB_OPPONENTS (or null)
+  //   tournamentAttribute:    string attribute name for the current round's scoring
+  //   tournamentQuestionText: the round's question (stub for now, real in Phase 2)
+  //   tournamentVarResult:    { playerTotal, opponentTotal, viaLegacy, won, phrase } after VAR computes
+  const [tournamentRound, setTournamentRound] = useState(0);
+  const [tournamentOpponent, setTournamentOpponent] = useState(null);
+  const [tournamentAttribute, setTournamentAttribute] = useState(null);
+  const [tournamentQuestionText, setTournamentQuestionText] = useState('');
+  const [tournamentVarResult, setTournamentVarResult] = useState(null);
+  // ---- Round 3 (Pete) specific state ----
+  const [r3PeteArgument, setR3PeteArgument] = useState(null);   // { argument, taunt } from AI
+  const [r3PlayerDefence, setR3PlayerDefence] = useState('');    // 300-char player response
+  const [r3VarVerdict, setR3VarVerdict] = useState(null);        // { winner, verdict, lineForCard } from AI
+  const [r3PeteReaction, setR3PeteReaction] = useState('');      // pre-written, picked on verdict
+  const [r3Loading, setR3Loading] = useState(false);
+  const [r3Error, setR3Error] = useState(null);
+  // Phase 2, Deploy 5 / Stage 2: Pete's reaction shown on the round-won congrats
+  // screen between R1→R2 and R2→R3. Picked once when the player wins, stable
+  // across re-renders. Reset on each tournament attempt start.
+  const [roundWinReaction, setRoundWinReaction] = useState('');
+
+  // ============ DEV CONSOLE HELPERS (Phase 2, Deploy 5 / Stage 12) ============
+  // When ?debug=tournament-unlock is in the URL, expose key state setters and a
+  // few canned scenarios on `window.kick3` so we can trigger UI states from the
+  // browser console without playing through the full flow. Useful for:
+  //   - Forcing a legacy tiebreak verdict (rare in normal play, hard to trigger)
+  //   - Jumping to specific screens during development
+  //   - Inspecting the current React state
+  // No effect in production / no debug flag — completely inert.
+  //
+  // Phase 2, Deploy 5 / Stage 13: gated to non-production hosts only. Even if someone
+  // discovers the debug flag, the helpers won't attach on kick3.app — they only attach
+  // on Vercel preview URLs (*.vercel.app) and localhost. This is belt-and-braces:
+  // the helpers don't write server data anyway, but it's good hygiene to keep dev
+  // tools out of production.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const debugFlag = params.get('debug');
+    if (debugFlag !== 'tournament-unlock' && debugFlag !== 'tournament-locked') return;
+    const host = window.location.hostname || '';
+    const isDevHost = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.vercel.app');
+    if (!isDevHost) return; // Don't attach on production (kick3.app).
+    window.kick3 = {
+      // Direct setters — use with caution.
+      setScreen,
+      setTournamentVarResult,
+      setTournamentRound,
+      setTournamentOpponent,
+      setTournamentAttribute,
+      setSquad,
+      // Canned scenario: force a Legacy-tiebreak WIN on the congrats screen.
+      // Player ties on attribute (18 vs 18) but wins on Legacy (22 vs 17).
+      forceTiebreakWin: () => {
+        setTournamentRound(1);
+        setTournamentOpponent({
+          label: 'PUB MATE', shortLabel: 'PUB MATE',
+          vibe: 'Loud, picks the obvious legends',
+          peteLossLine: '(test mode)',
+          picks: ['Frank Lampard', 'John Terry', 'Cafu'],
+        });
+        setTournamentAttribute('Character');
+        setSquad([
+          { name: 'Test Player 1', tier: 'Star', position: 'MID', flag: '⚽', isWorldCup: true },
+          { name: 'Test Player 2', tier: 'Star', position: 'MID', flag: '⚽', isWorldCup: true },
+          { name: 'Test Player 3', tier: 'Star', position: 'MID', flag: '⚽', isWorldCup: true },
+        ]);
+        setRoundWinReaction("Right. Pub mate's seen off. The real test starts now.");
+        setTournamentVarResult({
+          playerTotal: 18,
+          opponentTotal: 18,
+          playerLegacy: 22,
+          opponentLegacy: 17,
+          viaLegacy: true,
+          won: true,
+          phrase: 'Tied on attribute. Legacy tiebreak in your favour. You advance.',
+        });
+        setScreen('tournament-round-won');
+        console.log('[kick3] Forced Legacy tiebreak WIN — congrats screen should show');
+      },
+      // Canned scenario: force a Legacy-tiebreak LOSS on the verdict screen.
+      forceTiebreakLoss: () => {
+        setTournamentRound(1);
+        setTournamentOpponent({
+          label: 'PUB MATE', shortLabel: 'PUB MATE',
+          vibe: 'Loud, picks the obvious legends',
+          peteLossLine: 'You lost to my pub mate. My PUB MATE. Off you trot.',
+          picks: ['Frank Lampard', 'John Terry', 'Cafu'],
+        });
+        setTournamentAttribute('Character');
+        setSquad([
+          { name: 'Test Player 1', tier: 'Star', position: 'MID', flag: '⚽', isWorldCup: true },
+          { name: 'Test Player 2', tier: 'Star', position: 'MID', flag: '⚽', isWorldCup: true },
+          { name: 'Test Player 3', tier: 'Star', position: 'MID', flag: '⚽', isWorldCup: true },
+        ]);
+        setTournamentVarResult({
+          playerTotal: 18,
+          opponentTotal: 18,
+          playerLegacy: 14,
+          opponentLegacy: 19,
+          viaLegacy: true,
+          won: false,
+          phrase: 'Tied on attribute. Legacy tiebreak against you. No advance.',
+        });
+        setScreen('tournament-var');
+        console.log('[kick3] Forced Legacy tiebreak LOSS — verdict screen should show');
+      },
+    };
+    console.log('[kick3] Debug helpers attached to window.kick3');
+    console.log('[kick3] Available: window.kick3.forceTiebreakWin(), window.kick3.forceTiebreakLoss()');
+    return () => {
+      try { delete window.kick3; } catch {}
+    };
+    // Run once on mount; state setters are stable from useState so safe to omit from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ============ DRAFT CARDS — MEMOISED GK AUTO-SWAP (Phase 2, Deploy 5 / Stage 10) ============
+  // BUG FIX: previously the GK auto-swap ran shuffle() inline inside the draft screen
+  // render. Any state change (typing in textarea, hover, anything) re-rendered the
+  // screen and re-shuffled the replacement cards — making players appear to "rotate"
+  // every few seconds. Memoising the swap so it only recomputes when the actual
+  // round genuinely changes.
+  //
+  // GK rule: max 1 goalkeeper per squad of 3. If the player has already picked a GK
+  // and any card in this round is also a GK, swap that GK card for a fresh non-GK
+  // pick. Source pool depends on context: R3 uses Pete-eligible 108; R1/R2 uses the
+  // full World Cup 180; daily/h2h use PLAYER_POOL.
+  const draftCardsForCurrentRound = useMemo(() => {
+    const baseCards = draftRounds[currentRound] || [];
+    const hasGkInSquad = squad.some(sq => sq.position === "GK");
+    const gkCardCount = baseCards.filter(c => c && c.position === "GK").length;
+    if (!hasGkInSquad || gkCardCount === 0) {
+      return baseCards;
     }
-  };
+    const usedNames = new Set([
+      ...squad.map(p => p.name),
+      ...draftRounds.flat().filter(Boolean).map(p => p.name)
+    ]);
+    const isWorldCupDraft = baseCards.some(c => c && c.isWorldCup);
+    let replacements;
+    if (isWorldCupDraft) {
+      const sourcePool = tournamentRound === 3 ? getPeteEligiblePool() : WORLD_CUP_POOL;
+      replacements = shuffle(
+        sourcePool.filter(p => p.position !== "GK" && !usedNames.has(p.name))
+      ).map(enrichWorldCupCard);
+    } else {
+      replacements = shuffle(
+        PLAYER_POOL.filter(p => p.position !== "GK" && !usedNames.has(p.name))
+      );
+    }
+    let ri = 0;
+    return baseCards.map(c => {
+      if (c && c.position === "GK" && ri < replacements.length) {
+        return replacements[ri++];
+      }
+      return c;
+    });
+  }, [draftRounds, currentRound, squad, tournamentRound]);
+
+  // ============ VAR-CHECKING SCREEN STATE (Phase 2, Deploy 5 / Stage 1) ============
+  // The VAR screen cycles through three status lines (1s each) before routing to
+  // the verdict. R1/R2 use this for pure suspense; R3 uses it to mask API latency.
+  //
+  // varCheckPhase: 0, 1, or 2 — which status line is currently showing.
+  // For R1/R2 only: after phase 2 elapses (3 total seconds), auto-route to the
+  // verdict screen. R3's routing is handled inside submitR3Defence (it awaits a
+  // 3-second min-delay promise, then routes itself).
+  const [varCheckPhase, setVarCheckPhase] = useState(0);
+
+  // Drive the phase cycler whenever we're on the VAR-checking screen.
+  // Resets when leaving the screen so the next attempt starts at phase 0.
+  // Phase 2, Deploy 5 / Stage 3: at the 3s mark, route based on win/loss:
+  //   Win + R1/R2 → tournament-round-won (the congrats screen IS the verdict)
+  //   Loss + R1/R2 → tournament-var (the existing loss verdict screen)
+  //   R3 (any outcome) → submitR3Defence handles routing itself
+  useEffect(() => {
+    if (screen !== 'tournament-var-checking') {
+      // Reset to phase 0 for next attempt; do nothing else.
+      if (varCheckPhase !== 0) setVarCheckPhase(0);
+      return;
+    }
+    // Phase 0 is the initial state set on entry. Advance to 1 at 1s, 2 at 2s.
+    const t1 = setTimeout(() => setVarCheckPhase(1), 1000);
+    const t2 = setTimeout(() => setVarCheckPhase(2), 2000);
+    // Auto-route at 3s for R1/R2.
+    const t3 = setTimeout(() => {
+      if (tournamentRound !== 1 && tournamentRound !== 2) return;
+      const playerWon = tournamentVarResult && tournamentVarResult.won;
+      if (playerWon) {
+        // Pre-pick Pete's reaction here so it's stable for the congrats screen.
+        const pool = tournamentRound === 1 ? PETE_R1_WIN_REACTIONS : PETE_R2_WIN_REACTIONS;
+        const reaction = pickRandomLine(pool) || pool[0];
+        setRoundWinReaction(reaction);
+        setScreen('tournament-round-won');
+      } else {
+        setScreen('tournament-var');
+      }
+    }, 3000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [screen, tournamentRound, tournamentVarResult]);
 
   // ============ DAILY PLAY LIMIT (3 solo + 3 1v1 per day) ============
   // Counters reset automatically when TODAYS_QUESTION.number advances.
@@ -1109,6 +2479,54 @@ export default function Kick3() {
     }
   };
 
+  // SHARE TOURNAMENT RECORD — same pattern as shareStats, for the tournament RECORD screen.
+  const shareRecord = async () => {
+    setShareState('working');
+    try {
+      const blob = await renderCardToBlob(recordCardRef);
+      if (!blob) throw new Error('Render failed');
+
+      const filename = `kick3-tournament-record.jpg`;
+      const file = new File([blob], filename, { type: 'image/jpeg' });
+
+      const state = readTournamentState();
+      const shareText = state.trophyCount > 0
+        ? `${state.trophyCount} Kick 3 trophies. Beat Pete to win one — kick3.app`
+        : `Tournament mode on Kick 3 — kick3.app`;
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Kick 3 — Tournament Record',
+          text: shareText
+        });
+        setShareState('shared');
+      } else if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/jpeg': blob })
+        ]);
+        setShareState('copied');
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        setShareState('shared');
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        setShareState('idle');
+        return;
+      }
+      console.error('Share failed:', err);
+      setShareState('error');
+    } finally {
+      setTimeout(() => setShareState('idle'), 2500);
+    }
+  };
+
   // Maps a verdict score (1-10) to Pete's reaction image.
   // Five reactions, in five score bands. Score is clamped to 1-10.
   const petePictureFor = (score) => {
@@ -1137,8 +2555,304 @@ export default function Kick3() {
     setSentence('');
     setVerdict(null);
     setError(null);
-    setIsPersonalBest(false);
     setScreen('draft');
+  };
+
+  // ============ TOURNAMENT — round entry helpers ============
+  // Start a tournament attempt at Round 1 (called by PLAY NOW on tournament home).
+  // Increments tournamentsAttempted in localStorage.
+  const startTournament = () => {
+    // Phase 2, Deploy 2 / Stage 3: opponent squad from authored 78.
+    // Phase 2, Deploy 3: peteLossLine now random-drawn from the 10-line pool per attempt
+    // (was a single static line). The voice line from the authored squad is preserved
+    // alongside as a future polish hook (not yet displayed).
+    const squadForToday = getOpponentSquadForToday('pubmate');
+    const opponent = {
+      ...STUB_OPPONENTS.pubmate,
+      picks: squadForToday.picks,
+      voice: squadForToday.voice,
+      peteLossLine: pickRandomLine(PUBMATE_LOSS_LINES) || STUB_OPPONENTS.pubmate.peteLossLine,
+    };
+    // Phase 2, Deploy 2 / Stage 1: real questions wired. Question selects the
+    // attribute for the round (category drives scoring).
+    const q = getTournamentQuestion(1);
+    const attribute = q.category;
+    const questionText = q.text;
+
+    // Mark this as a fresh attempt in state.
+    // Phase 2, Deploy 5 / Stage 14: increment attemptsToday. If the day has rolled
+    // over since the last attempt, reset to 1 (this is attempt #1 of the new day).
+    const state = readTournamentState();
+    const daily = effectiveDailyState(state);
+    writeTournamentState({
+      ...state,
+      tournamentsAttempted: (state.tournamentsAttempted || 0) + 1,
+      lastPlayedDate: todayDateString(),
+      attemptsToday: daily.attemptsToday + 1,
+      // wonTodayFlag preserved if same day, cleared by effectiveDailyState if not.
+      wonTodayFlag: daily.wonTodayFlag,
+    });
+
+    setMode('tournament');
+    // Phase 2, Deploy 2 / Stage 2: R1 draft now from World Cup 180 (was daily 384).
+    setDraftRounds(generateTournamentDraft());
+    setCurrentRound(0);
+    setSquad([]);
+    setSentence('');
+    setError(null);
+    setTournamentRound(1);
+    setTournamentOpponent(opponent);
+    setTournamentAttribute(attribute);
+    setTournamentQuestionText(questionText);
+    setTournamentVarResult(null);
+    setScreen('draft');
+  };
+
+  // Advance from a completed Round 1 to Round 2 vs Pete's Producer.
+  const advanceToRound2 = () => {
+    // Phase 2, Deploy 2 / Stage 3: opponent squad from authored 78.
+    // Phase 2, Deploy 3: peteLossLine now random-drawn from the 10-line pool per attempt.
+    const squadForToday = getOpponentSquadForToday('producer');
+    const opponent = {
+      ...STUB_OPPONENTS.producer,
+      picks: squadForToday.picks,
+      voice: squadForToday.voice,
+      peteLossLine: pickRandomLine(PRODUCER_LOSS_LINES) || STUB_OPPONENTS.producer.peteLossLine,
+    };
+    // Phase 2, Deploy 2 / Stage 1: real R2 question and its category attribute.
+    const q = getTournamentQuestion(2);
+    const attribute = q.category;
+    const questionText = q.text;
+
+    // Phase 2, Deploy 2 / Stage 2: R2 draft now from World Cup 180 (was daily 384).
+    // Excludes R1 picks so the player doesn't see the same names twice.
+    setDraftRounds(generateTournamentDraft(squad.map(p => p.name)));
+    setCurrentRound(0);
+    setSquad([]);
+    setTournamentRound(2);
+    setTournamentOpponent(opponent);
+    setTournamentAttribute(attribute);
+    setTournamentQuestionText(questionText);
+    setTournamentVarResult(null);
+    setScreen('draft');
+  };
+
+  // Compute the VAR result for the current round and route to the verdict screen.
+  // Phase 2, Deploy 5 / Stage 1: route now goes through the VAR-checking screen
+  // for a 3-second suspense beat before revealing the verdict.
+  // Phase 2, Deploy 5 / Stage 11: Legacy totals always computed and stored in the
+  // result so the verdict/congrats screens can surface them when a tiebreak fires.
+  const computeTournamentVar = (finishedSquad) => {
+    const opponentPicks = resolveOpponentPicks(tournamentOpponent);
+    const playerTotal = scoreTeamOnAttribute(finishedSquad, tournamentAttribute);
+    const opponentTotal = scoreTeamOnAttribute(opponentPicks, tournamentAttribute);
+    // Compute Legacy unconditionally — needed for tiebreak case, also handy for surfacing.
+    const playerLegacy = scoreTeamOnAttribute(finishedSquad, 'Legacy');
+    const opponentLegacy = scoreTeamOnAttribute(opponentPicks, 'Legacy');
+    let won;
+    let viaLegacy = false;
+    if (playerTotal > opponentTotal) {
+      won = true;
+    } else if (playerTotal === opponentTotal) {
+      // Tiebreak on Legacy. Player wins remaining ties.
+      won = playerLegacy >= opponentLegacy;
+      viaLegacy = true;
+    } else {
+      won = false;
+    }
+    const phrase = pickVarPhrase(playerTotal, opponentTotal, viaLegacy, won);
+    // Pre-compute the result and stash it; the VAR-checking screen will reveal it
+    // after its 3-second animation completes.
+    setTournamentVarResult({
+      playerTotal,
+      opponentTotal,
+      playerLegacy,
+      opponentLegacy,
+      viaLegacy,
+      won,
+      phrase
+    });
+    setScreen('tournament-var-checking');
+  };
+
+  // Called from the VAR screen on a loss (Round 1 or 2).
+  // Writes the end-of-attempt state and returns the player to the tournament home.
+  const endTournamentAttempt = (resultKey) => {
+    const state = readTournamentState();
+    writeTournamentState({
+      ...state,
+      lastPlayedDate: todayDateString(),
+      lastAttemptResult: resultKey,
+    });
+    // Reset tournament in-play state.
+    setTournamentRound(0);
+    setTournamentOpponent(null);
+    setTournamentAttribute(null);
+    setTournamentQuestionText('');
+    setTournamentVarResult(null);
+    setR3PeteArgument(null);
+    setR3PlayerDefence('');
+    setR3VarVerdict(null);
+    setR3PeteReaction('');
+    setR3Error(null);
+    setSquad([]);
+    setScreen('tournament-home');
+  };
+
+  // ============ ROUND 3 / PETE FINAL ============
+  // Entry point: player has just won Round 2 and clicks CONTINUE TO ROUND 3.
+  // Generates Pete's AI argument and routes to the R3 intro screen.
+  const startTournamentRound3 = async () => {
+    // Draw Pete's three picks at random from his sub-pool, then build an opponent
+    // object carrying those picks so the rest of the flow works unchanged.
+    const petePicks = drawPetePicks();
+    const opponent = { ...STUB_OPPONENTS.pete, picks: petePicks };
+    // R3 question is always Legacy. Phase 2, Deploy 2 / Stage 1: real R3 question.
+    const q = getTournamentQuestion(3);
+    const attribute = 'Legacy';
+    const questionText = q.text;
+
+    setTournamentRound(3);
+    setTournamentOpponent(opponent);
+    setTournamentAttribute(attribute);
+    setTournamentQuestionText(questionText);
+    setR3PeteArgument(null);
+    setR3VarVerdict(null);
+    setR3PlayerDefence('');
+    setR3PeteReaction('');
+    setR3Error(null);
+    setR3Loading(true);
+    setScreen('tournament-r3-intro');
+
+    // Generate Pete's argument via AI.
+    try {
+      const userMessage = `The question: "${questionText}"
+
+Pete's three picks: ${opponent.picks.join(', ')}.
+
+Write Pete's confident argument defending these three picks against the question. End with a sarcastic one-line taunt to the player. Return JSON only.`;
+
+      const response = await fetch("/api/verdict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemPrompt: PETE_ARGUMENT_PROMPT,
+          userMessage: userMessage
+        })
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      const data = await response.json();
+      const text = (data.text || "").trim();
+      const cleaned = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(cleaned);
+      setR3PeteArgument(parsed);
+    } catch (e) {
+      console.error('Pete argument generation failed:', e);
+      // Fallback: hardcoded Pete argument so the game can continue even if API is down.
+      setR3PeteArgument({
+        argument: `${opponent.picks[0]}, ${opponent.picks[1]}, ${opponent.picks[2]}. Three names. World Cup royalty, every one of them. Moments people still talk about. The question was clear and so is the answer. Beat that.`,
+        taunt: "Beat this. If you can be bothered."
+      });
+      setR3Error('Pete\u2019s argument used a fallback (API was unreachable).');
+    } finally {
+      setR3Loading(false);
+    }
+  };
+
+  // Submit player's R3 defence to VAR for comparative judgement.
+  const submitR3Defence = async () => {
+    if (r3Loading) return;
+    setR3Loading(true);
+    setR3Error(null);
+    // Phase 2, Deploy 5 / Stage 1: route through VAR-checking screen immediately.
+    // The API call runs in parallel with a 3s minimum animation delay; we wait for
+    // both before showing the verdict so the suspense beat is consistent.
+    setScreen('tournament-var-checking');
+    const minAnimationDelay = new Promise(resolve => setTimeout(resolve, 3000));
+    try {
+      const opponentPicks = resolveOpponentPicks(tournamentOpponent);
+      // Format each pick with its World Cup Legacy rating (0-10) so VAR can use ratings as context.
+      // R3 picks are all World Cup pool players (both Pete's and the player's), so we
+      // read real authored Legacy scores via worldCupAttributeScores. Falls through to
+      // stubAttributeScores for safety on any name not in the World Cup pool.
+      const fmtWithRating = (p) => {
+        const scores = (p && p.isWorldCup)
+          ? worldCupAttributeScores(p.name)
+          : stubAttributeScores(p.name);
+        const rating = scores['Legacy'] || 0;
+        return `${p.name} (Legacy ${rating}/10)`;
+      };
+      const peteList = opponentPicks.map(fmtWithRating).join(', ');
+      const playerList = squad.map(fmtWithRating).join(', ');
+      const userMessage = `The question: "${tournamentQuestionText}"
+This is the World Cup Legacy round. Each pick's Legacy rating (0-10) is shown.
+
+PETE'S three picks: ${peteList}.
+PETE'S argument: "${r3PeteArgument?.argument || ''}"
+
+PLAYER'S three picks: ${playerList}.
+PLAYER'S defence: "${r3PlayerDefence || '(The player did not write a defence.)'}"
+
+Weigh the picks, their Legacy ratings, and both arguments together. Judge between Pete and the player. Return JSON only.`;
+
+      const response = await fetch("/api/verdict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemPrompt: VAR_JUDGE_PROMPT,
+          userMessage: userMessage
+        })
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      const data = await response.json();
+      const text = (data.text || "").trim();
+      const cleaned = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(cleaned);
+
+      // Defensive: ensure winner is one of the two valid values.
+      const winner = parsed.winner === 'player' ? 'player' : 'pete';
+      const playerWon = winner === 'player';
+
+      // Phase 2, Deploy 3: Pete reactions now from the authored 8-line pools (was 4-item
+      // rotation by attempt index). Random selection — variety beats deterministic rotation.
+      const reactionPool = playerWon
+        ? PETE_R3_WIN_REACTIONS
+        : PETE_R3_LOSS_REACTIONS;
+      const reaction = pickRandomLine(reactionPool) || (playerWon
+        ? STUB_OPPONENTS.pete.winReactions[0]
+        : STUB_OPPONENTS.pete.lossReactions[0]);
+
+      const state = readTournamentState();
+
+      setR3VarVerdict({ ...parsed, winner, playerWon });
+      setR3PeteReaction(reaction);
+
+      // Write tournament state (trophy on win, attempt completion either way).
+      // Phase 2, Deploy 5 / Stage 14: also set wonTodayFlag on a R3 win so the
+      // player can't keep attempting after they've earned today's trophy.
+      writeTournamentState({
+        ...state,
+        lastPlayedDate: todayDateString(),
+        lastAttemptResult: playerWon ? 'won-r3' : 'lost-r3',
+        tournamentsCompleted: (state.tournamentsCompleted || 0) + 1,
+        trophyCount: (state.trophyCount || 0) + (playerWon ? 1 : 0),
+        wonTodayFlag: state.wonTodayFlag || playerWon,
+      });
+
+      // Wait for the VAR animation to finish (3s) before revealing verdict.
+      // If the API took longer than 3s, this resolves instantly. Phase 2, Deploy 5 / Stage 1.
+      await minAnimationDelay;
+      setScreen('tournament-r3-verdict');
+    } catch (e) {
+      console.error('VAR judgement failed:', e);
+      // On error, still respect the animation delay so the failure isn't jarring.
+      await minAnimationDelay;
+      setR3Error('VAR\u2019s connection dropped. Try again.');
+      // Return to the defence screen so the player can retry.
+      setScreen('tournament-r3-defend');
+    } finally {
+      setR3Loading(false);
+    }
   };
 
   const startH2H = () => {
@@ -1152,7 +2866,6 @@ export default function Kick3() {
     setP2Sentence('');
     setH2hVerdict(null);
     setError(null);
-    setIsPersonalBest(false);
     setScreen('h2h-names');
   };
 
@@ -1175,7 +2888,16 @@ export default function Kick3() {
       setCurrentRound(currentRound + 1);
     } else {
       // Done drafting
-      if (mode === 'solo') {
+      if (mode === 'tournament') {
+        // Round 3 (Pete) has a defence screen; Rounds 1 and 2 do not.
+        if (tournamentRound === 3) {
+          setSentence('');
+          setR3PlayerDefence('');
+          setScreen('tournament-r3-defend');
+        } else {
+          computeTournamentVar(newSquad);
+        }
+      } else if (mode === 'solo') {
         setScreen('defend');
       } else {
         // h2h
@@ -1244,7 +2966,6 @@ Score each /10, declare a winner, deliver verdict as JSON.`;
       const cleaned = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(cleaned);
       setH2hVerdict(parsed);
-      recordStreak();
       recordPlay('h2h');
       // For h2h the score is the higher of the two — that's what Pete reacted to
       recordScore(Math.max(parsed.p1Score || 0, parsed.p2Score || 0));
@@ -1285,7 +3006,6 @@ Deliver your verdict as JSON.`;
       const cleaned = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(cleaned);
       setVerdict(parsed);
-      recordStreak();
       recordPlay('solo');
       recordScore(parsed.score);
       setScreen('verdict');
@@ -1347,6 +3067,19 @@ Deliver your verdict as JSON.`;
 
   // ---------- HOME SCREEN ----------
   if (screen === 'home') {
+    // Phase 2, Deploy 5 / Stage 15: Tournament button now always renders on the
+    // home screen — but in a LOCKED state for the general public until 11 June
+    // 2026. Beta users (?beta=pete) and the launch date itself unlock it.
+    //
+    // Conditions for tournamentUnlocked:
+    //   - tournamentBetaActive (someone with ?beta=pete) → unlocked early
+    //   - current date is on or after 11 June 2026 → unlocked for everyone (launch)
+    const tournamentUnlocked = (() => {
+      if (tournamentBetaActive) return true;
+      const now = new Date();
+      const launch = new Date(TOURNAMENT_CONFIG.startDate + 'T00:00:00');
+      return now >= launch;
+    })();
     return (
       <>
         <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
@@ -1446,6 +3179,67 @@ Deliver your verdict as JSON.`;
             transform: scale(1.03);
             filter: brightness(1.15);
           }
+          .kick3-desktop-btn-tournament {
+            transition: transform 0.15s ease, filter 0.15s ease;
+          }
+          .kick3-desktop-btn-tournament:hover {
+            transform: scale(1.03);
+            filter: brightness(1.1);
+          }
+
+          /* ============ Phase 2, Deploy 5 / Stage 5 — button animations ============ */
+          /* Shared tactile hover scale + glow. Applied to every interactive button on the home screens. */
+          .kick3-button-hover {
+            transition: transform 0.18s ease-out, box-shadow 0.18s ease-out, filter 0.18s ease-out;
+          }
+          .kick3-button-hover:hover:not(:disabled) {
+            transform: translateY(-2px);
+            filter: brightness(1.08);
+          }
+          .kick3-button-hover:active:not(:disabled) {
+            transform: translateY(0);
+            filter: brightness(0.96);
+          }
+
+          /* Pulsing gold glow — applied to the flagship tournament buttons only.
+             Slow 3.6s breathing cycle. Glow is gold-tinted to read as trophy / prize. */
+          @keyframes kick3-pulse-gold-kf {
+            0%, 100% {
+              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 1px rgba(95,176,74,0.18), 0 0 24px 4px rgba(95,176,74,0.28);
+            }
+            50% {
+              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 6px rgba(95,176,74,0.45), 0 0 42px 12px rgba(95,176,74,0.65);
+            }
+          }
+          .kick3-pulse-gold {
+            animation: kick3-pulse-gold-kf 3.6s ease-in-out infinite;
+          }
+          .kick3-pulse-gold:disabled {
+            animation: none;
+          }
+
+          /* Shimmer sweep — diagonal highlight sliding across the button.
+             5s cycle: ~0.9s sweep, ~4.1s pause. For the RECORD button. */
+          @keyframes kick3-shimmer-gold-kf {
+            0%   { transform: translateX(-110%) skewX(-18deg); }
+            18%  { transform: translateX(110%)  skewX(-18deg); }
+            100% { transform: translateX(110%)  skewX(-18deg); }
+          }
+          .kick3-shimmer-gold {
+            position: relative;
+            overflow: hidden;
+          }
+          .kick3-shimmer-gold::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 40%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.35) 50%, transparent 100%);
+            animation: kick3-shimmer-gold-kf 5s ease-in-out infinite;
+            pointer-events: none;
+          }
 
         `}</style>
 
@@ -1482,7 +3276,7 @@ Deliver your verdict as JSON.`;
               }}>
                 DAY {TODAYS_QUESTION.number}
               </div>
-              {/* Top-right stack: streak badge (if any) + STATS button (always) */}
+              {/* Top-right: STATS button */}
               <div style={{
                 position: 'absolute',
                 top: '14px',
@@ -1492,25 +3286,6 @@ Deliver your verdict as JSON.`;
                 alignItems: 'flex-end',
                 gap: '6px'
               }}>
-                {streak.current >= 1 && (
-                  <div style={{
-                    background: 'rgba(20,20,30,0.85)',
-                    color: colours.gold,
-                    ...condFont,
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    letterSpacing: '0.3em',
-                    padding: '6px 10px',
-                    borderRadius: '4px',
-                    border: `1px solid ${colours.gold}`,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
-                    <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
-                    <span>{streak.current} DAY STREAK</span>
-                  </div>
-                )}
                 <button
                   onClick={() => setScreen('stats')}
                   style={{
@@ -1642,10 +3417,96 @@ Deliver your verdict as JSON.`;
                 </div>
               </div>
 
+              {/* TOURNAMENT MODE — green when unlocked, locked/greyed for general public pre-launch.
+                  Phase 2, Deploy 5 / Stage 15: button now ALWAYS renders. Locked state
+                  shows a 🔒 emoji and "OPENS 11 JUNE" subtitle, fully unclickable. */}
+              {tournamentUnlocked ? (
+                <button
+                  onClick={() => setScreen('tournament-home')}
+                  className="kick3-button-hover kick3-pulse-gold"
+                  style={{
+                    width: '100%',
+                    padding: '18px 20px',
+                    background: '#5fb04a',
+                    color: '#0a1a08',
+                    border: 'none',
+                    borderRadius: '10px',
+                    ...displayFont,
+                    fontSize: 'clamp(20px, 5.4vw, 24px)',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px',
+                    cursor: 'pointer',
+                    marginBottom: '12px',
+                    boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                    position: 'relative'
+                  }}
+                  aria-label="Open tournament mode"
+                >
+                  <span>TOURNAMENT MODE</span>
+                  <span style={{
+                    background: 'rgba(0,0,0,0.18)',
+                    color: '#0a1a08',
+                    ...condFont,
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    padding: '3px 7px',
+                    borderRadius: '4px',
+                    lineHeight: 1
+                  }}>BETA</span>
+                </button>
+              ) : (
+                <button
+                  disabled
+                  aria-label="Tournament mode opens 11 June 2026"
+                  style={{
+                    width: '100%',
+                    padding: '14px 20px',
+                    background: '#3a3a44',
+                    color: colours.muted,
+                    border: 'none',
+                    borderRadius: '10px',
+                    ...displayFont,
+                    fontSize: 'clamp(20px, 5.4vw, 24px)',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    cursor: 'not-allowed',
+                    marginBottom: '12px',
+                    boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                    opacity: 0.75
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span aria-hidden="true">🔒</span>
+                    <span>TOURNAMENT MODE</span>
+                  </span>
+                  <span style={{
+                    ...condFont,
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    color: colours.gold,
+                    opacity: 0.95
+                  }}>
+                    OPENS 11 JUNE
+                  </span>
+                </button>
+              )}
+
               {/* PLAY TODAY — yellow */}
               <button
                 onClick={startGame}
                 disabled={soloLocked}
+                className="kick3-button-hover"
                 style={{
                   width: '100%',
                   padding: '18px 20px',
@@ -1699,7 +3560,7 @@ Deliver your verdict as JSON.`;
                   </>
                 ) : (
                   <>
-                    <span>PLAY TODAY</span>
+                    <span>SOLO MODE</span>
                     <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
                   </>
                 )}
@@ -1709,6 +3570,7 @@ Deliver your verdict as JSON.`;
               <button
                 onClick={startH2H}
                 disabled={h2hLocked}
+                className="kick3-button-hover"
                 style={{
                   width: '100%',
                   padding: '15px 20px',
@@ -1761,7 +3623,7 @@ Deliver your verdict as JSON.`;
                     <span>1V1 LIMIT REACHED</span>
                   </>
                 ) : (
-                  <span>1V1 MODE</span>
+                  <span>2 PLAYER MODE</span>
                 )}
               </button>
 
@@ -1957,7 +3819,7 @@ Deliver your verdict as JSON.`;
                 }}>
                   DAY {TODAYS_QUESTION.number}
                 </div>
-                {/* Top-right stack: streak badge (if any) + STATS button (always) */}
+                {/* Top-right: STATS button */}
                 <div style={{
                   position: 'absolute',
                   top: '18px',
@@ -1967,25 +3829,6 @@ Deliver your verdict as JSON.`;
                   alignItems: 'flex-end',
                   gap: '8px'
                 }}>
-                  {streak.current >= 1 && (
-                    <div style={{
-                      background: 'rgba(20,20,30,0.85)',
-                      color: colours.gold,
-                      ...condFont,
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      letterSpacing: '0.3em',
-                      padding: '8px 14px',
-                      borderRadius: '4px',
-                      border: `1px solid ${colours.gold}`,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}>
-                      <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
-                      <span>{streak.current} DAY STREAK</span>
-                    </div>
-                  )}
                   <button
                     onClick={() => setScreen('stats')}
                     style={{
@@ -2116,10 +3959,95 @@ Deliver your verdict as JSON.`;
                   </div>
                 </div>
 
+                {/* TOURNAMENT MODE — green when unlocked, locked/greyed for general public pre-launch.
+                    Phase 2, Deploy 5 / Stage 15: button now ALWAYS renders. */}
+                {tournamentUnlocked ? (
+                  <button
+                    onClick={() => setScreen('tournament-home')}
+                    className="kick3-desktop-btn-tournament kick3-pulse-gold"
+                    style={{
+                      width: '100%',
+                      padding: '22px 24px',
+                      background: '#5fb04a',
+                      color: '#0a1a08',
+                      border: 'none',
+                      borderRadius: '12px',
+                      ...displayFont,
+                      fontSize: 'clamp(24px, 2.4vw, 30px)',
+                      fontWeight: 800,
+                      letterSpacing: '0.08em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '14px',
+                      cursor: 'pointer',
+                      marginBottom: '14px',
+                      boxShadow: '0 5px 0 rgba(0,0,0,0.25)',
+                      position: 'relative'
+                    }}
+                    aria-label="Open tournament mode"
+                  >
+                    <span>TOURNAMENT MODE</span>
+                    <span style={{
+                      background: 'rgba(0,0,0,0.18)',
+                      color: '#0a1a08',
+                      ...condFont,
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      padding: '4px 8px',
+                      borderRadius: '5px',
+                      lineHeight: 1
+                    }}>BETA</span>
+                  </button>
+                ) : (
+                  <button
+                    disabled
+                    aria-label="Tournament mode opens 11 June 2026"
+                    style={{
+                      width: '100%',
+                      padding: '18px 24px',
+                      background: '#3a3a44',
+                      color: colours.muted,
+                      border: 'none',
+                      borderRadius: '12px',
+                      ...displayFont,
+                      fontSize: 'clamp(24px, 2.4vw, 30px)',
+                      fontWeight: 800,
+                      letterSpacing: '0.08em',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      cursor: 'not-allowed',
+                      marginBottom: '14px',
+                      boxShadow: '0 5px 0 rgba(0,0,0,0.25)',
+                      opacity: 0.75
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span aria-hidden="true">🔒</span>
+                      <span>TOURNAMENT MODE</span>
+                    </span>
+                    <span style={{
+                      ...condFont,
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      letterSpacing: '0.2em',
+                      color: colours.gold,
+                      opacity: 0.95
+                    }}>
+                      OPENS 11 JUNE
+                    </span>
+                  </button>
+                )}
+
                 {/* PLAY TODAY — yellow */}
                 <button
                   onClick={startGame}
                   disabled={soloLocked}
+                  className="kick3-button-hover"
                   style={{
                     width: '100%',
                     padding: '22px 24px',
@@ -2173,7 +4101,7 @@ Deliver your verdict as JSON.`;
                     </>
                   ) : (
                     <>
-                      <span>PLAY TODAY</span>
+                      <span>SOLO MODE</span>
                       <span style={{ fontSize: '26px', lineHeight: 1 }}>→</span>
                     </>
                   )}
@@ -2183,6 +4111,7 @@ Deliver your verdict as JSON.`;
                 <button
                   onClick={startH2H}
                   disabled={h2hLocked}
+                  className="kick3-button-hover"
                   style={{
                     width: '100%',
                     padding: '18px 24px',
@@ -2235,7 +4164,7 @@ Deliver your verdict as JSON.`;
                       <span>1V1 LIMIT REACHED</span>
                     </>
                   ) : (
-                    <span>1V1 MODE</span>
+                    <span>2 PLAYER MODE</span>
                   )}
                 </button>
 
@@ -2408,30 +4337,7 @@ Deliver your verdict as JSON.`;
 
   // ---------- DRAFT SCREEN ----------
   if (screen === 'draft') {
-    let cards = draftRounds[currentRound] || [];
-    // Safety: if the player already has a GK AND both cards in this round are GKs,
-    // they'd be stuck with nothing to pick. Swap one of the GKs for a non-GK
-    // fallback. Single-GK rounds are left alone — the GK card is shown disabled
-    // with an "Already got a keeper" hint so the rule is visible to the player.
-    const hasGkInSquad = squad.some(sq => sq.position === "GK");
-    const gkCardCount = cards.filter(c => c && c.position === "GK").length;
-    if (hasGkInSquad && gkCardCount === cards.filter(Boolean).length && gkCardCount > 0) {
-      // All cards are GKs and player already has one — swap all but one for non-GKs.
-      const usedNames = new Set([
-        ...squad.map(p => p.name),
-        ...draftRounds.flat().filter(Boolean).map(p => p.name)
-      ]);
-      const replacements = shuffle(
-        PLAYER_POOL.filter(p => p.position !== "GK" && !usedNames.has(p.name))
-      );
-      let ri = 0;
-      cards = cards.map(c => {
-        if (c && c.position === "GK" && ri < replacements.length) {
-          return replacements[ri++];
-        }
-        return c;
-      });
-    }
+    const cards = draftCardsForCurrentRound;
     return (
       <>
         <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
@@ -2456,6 +4362,56 @@ Deliver your verdict as JSON.`;
               </div>
             )}
 
+            {/* Tournament round banner — shows opponent and their three picks */}
+            {mode === 'tournament' && tournamentOpponent && (
+              <div style={{
+                marginBottom: '20px',
+                padding: '12px 14px',
+                background: 'rgba(95,176,74,0.10)',
+                border: '1px solid rgba(95,176,74,0.40)',
+                borderRadius: '8px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: '#5fb04a', fontWeight: 700 }}>
+                    ROUND {tournamentRound} OF 3
+                  </div>
+                  <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.24em', color: colours.muted }}>
+                    {tournamentAttribute && `\u2022 ${tournamentAttribute.toUpperCase()}`}
+                  </div>
+                </div>
+                <div style={{ ...displayFont, fontSize: '20px', fontWeight: 700, color: colours.cream, letterSpacing: '0.04em', marginBottom: '4px' }}>
+                  VS {tournamentOpponent.label}
+                </div>
+                <div style={{ ...condFont, fontStyle: 'italic', fontSize: '12px', color: colours.muted, marginBottom: '10px', lineHeight: 1.4 }}>
+                  {tournamentOpponent.vibe}
+                </div>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.muted, marginBottom: '6px' }}>
+                  THEIR THREE
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {resolveOpponentPicks(tournamentOpponent).map((p, i) => (
+                    <div key={i} style={{
+                      padding: '5px 9px',
+                      background: 'rgba(0,0,0,0.30)',
+                      border: `1px solid ${tierColourFor(p)}66`,
+                      fontSize: '12px',
+                      ...condFont,
+                      fontWeight: 600,
+                      color: colours.cream,
+                      borderRadius: '4px'
+                    }}>
+                      {showTierBadge(p) && (
+                        <span style={{ color: tierColourFor(p), marginRight: '4px' }}>
+                          {TIER_SYMBOLS[p.tier] || '\u2022'}
+                        </span>
+                      )}
+                      {p.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Top bar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', paddingTop: '8px' }}>
               <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.3em', color: colours.gold }}>
@@ -2471,15 +4427,53 @@ Deliver your verdict as JSON.`;
               </div>
             </div>
 
-            {/* Question reminder */}
-            <div style={{ marginBottom: '24px', padding: '14px 18px', background: 'rgba(212,175,55,0.06)', borderLeft: `2px solid ${colours.gold}` }}>
-              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.3em', color: colours.gold, marginBottom: '4px' }}>
-                THE QUESTION
-              </div>
-              <p style={{ ...displayFont, fontSize: '18px', margin: 0, lineHeight: '1.2' }}>
-                {TODAYS_QUESTION.text}
-              </p>
-            </div>
+            {/* Question reminder — Phase 2, Deploy 4: category badge + hint line added */}
+            {(() => {
+              const activeCategory = mode === 'tournament'
+                ? (tournamentAttribute || 'Legacy')
+                : TODAYS_QUESTION.category;
+              const categoryColour = CATEGORY_COLOURS[activeCategory] || colours.gold;
+              const hintLine = CATEGORY_HINTS[activeCategory] || '';
+              return (
+                <div style={{ marginBottom: '24px', padding: '14px 18px', background: 'rgba(212,175,55,0.06)', borderLeft: `2px solid ${colours.gold}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.3em', color: colours.gold }}>
+                      THE QUESTION
+                    </div>
+                    {/* Category badge */}
+                    <div style={{
+                      ...condFont,
+                      fontSize: '10px',
+                      letterSpacing: '0.18em',
+                      fontWeight: 700,
+                      padding: '3px 9px',
+                      borderRadius: '3px',
+                      background: `${categoryColour}22`,
+                      border: `1px solid ${categoryColour}66`,
+                      color: categoryColour
+                    }}>
+                      ● {activeCategory.toUpperCase()}
+                    </div>
+                  </div>
+                  <p style={{ ...displayFont, fontSize: '18px', margin: '0 0 8px 0', lineHeight: '1.2' }}>
+                    {mode === 'tournament' ? tournamentQuestionText : TODAYS_QUESTION.text}
+                  </p>
+                  {hintLine && (
+                    <p style={{
+                      ...condFont,
+                      fontStyle: 'italic',
+                      fontSize: '12px',
+                      color: colours.muted,
+                      margin: 0,
+                      lineHeight: 1.4,
+                      opacity: 0.85
+                    }}>
+                      {hintLine}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Squad so far */}
             {squad.length > 0 && (
@@ -2492,12 +4486,12 @@ Deliver your verdict as JSON.`;
                     <div key={i} style={{
                       padding: '6px 10px',
                       background: colours.surface,
-                      border: `1px solid ${TIER_COLOURS[p.tier]}55`,
+                      border: `1px solid ${tierColourFor(p)}55`,
                       fontSize: '13px',
                       ...condFont,
                       fontWeight: 600
                     }}>
-                      <span style={{ color: TIER_COLOURS[p.tier], marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>
+                      {showTierBadge(p) && <span style={{ color: tierColourFor(p), marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>}
                       {p.name}
                     </div>
                   ))}
@@ -2513,10 +4507,12 @@ Deliver your verdict as JSON.`;
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {cards.map((p, i) => {
                 if (!p) return null;
-                // GK rule: max 1 goalkeeper per squad of 3.
-                // If the player has already picked a GK, any further GK cards are blocked.
-                const hasGkAlready = squad.some(sq => sq.position === "GK");
-                const isBlocked = p.position === "GK" && hasGkAlready;
+                // GK rule is now enforced upstream by the auto-swap logic at the top
+                // of this screen — if the player has a keeper and a GK card appears,
+                // it gets swapped for a non-GK pick before render. So isBlocked is
+                // always false here. The styling branches kept in place defensively.
+                // Phase 2, Deploy 4: was "ALREADY GOT A KEEPER" disabled card.
+                const isBlocked = false;
                 return (
                 <button
                   key={i}
@@ -2524,7 +4520,7 @@ Deliver your verdict as JSON.`;
                   disabled={isBlocked}
                   style={{
                     background: colours.surface,
-                    border: `1px solid ${isBlocked ? `${colours.muted}33` : `${TIER_COLOURS[p.tier]}66`}`,
+                    border: `1px solid ${isBlocked ? `${colours.muted}33` : `${tierColourFor(p)}66`}`,
                     borderRadius: '4px',
                     padding: '20px',
                     textAlign: 'left',
@@ -2538,22 +4534,47 @@ Deliver your verdict as JSON.`;
                   onMouseOver={e => {
                     if (isBlocked) return;
                     e.currentTarget.style.background = colours.surfaceHover;
-                    e.currentTarget.style.borderColor = TIER_COLOURS[p.tier];
+                    e.currentTarget.style.borderColor = tierColourFor(p);
                   }}
                   onMouseOut={e => {
                     if (isBlocked) return;
                     e.currentTarget.style.background = colours.surface;
-                    e.currentTarget.style.borderColor = `${TIER_COLOURS[p.tier]}66`;
+                    e.currentTarget.style.borderColor = `${tierColourFor(p)}66`;
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ color: TIER_COLOURS[p.tier], fontSize: '16px' }}>{TIER_SYMBOLS[p.tier]}</span>
-                      <span style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: TIER_COLOURS[p.tier] }}>
-                        {p.tier.toUpperCase()}
-                      </span>
+                      {showTierBadge(p) && (
+                        <>
+                          <span style={{ color: tierColourFor(p), fontSize: '16px' }}>{TIER_SYMBOLS[p.tier]}</span>
+                          <span style={{ ...condFont, fontSize: '11px', letterSpacing: '0.25em', color: tierColourFor(p) }}>
+                            {p.tier.toUpperCase()}
+                          </span>
+                        </>
+                      )}
                     </div>
-                    <span style={{ fontSize: '20px' }}>{p.flag}</span>
+                    {p.isWorldCup ? (
+                      // R3 World Cup cards: show Overall rating as a gold badge top-right.
+                      // Phase 2, Deploy 1 / Stage 4. Per spec: Overall shown on the player's
+                      // six R3 draft cards only — never on opponents or Pete's three picks.
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'baseline',
+                        gap: '3px',
+                        padding: '4px 10px',
+                        background: colours.gold,
+                        color: '#0a0a14',
+                        borderRadius: '3px',
+                        ...displayFont,
+                        fontWeight: 700,
+                        lineHeight: 1
+                      }}>
+                        <span style={{ fontSize: '16px' }}>{Number(p.overall).toFixed(1)}</span>
+                        <span style={{ fontSize: '9px', letterSpacing: '0.18em', opacity: 0.75 }}>OVR</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '20px' }}>{p.flag}</span>
+                    )}
                   </div>
                   <div style={{ ...displayFont, fontSize: '26px', lineHeight: '1.1', fontWeight: 500, marginBottom: '4px' }}>
                     {p.name}
@@ -2561,18 +4582,6 @@ Deliver your verdict as JSON.`;
                   <div style={{ ...condFont, fontStyle: 'italic', color: colours.muted, fontSize: '14px' }}>
                     {p.note}
                   </div>
-                  {isBlocked && (
-                    <div style={{
-                      marginTop: '8px',
-                      ...condFont,
-                      fontSize: '11px',
-                      letterSpacing: '0.2em',
-                      color: colours.accent,
-                      fontWeight: 600
-                    }}>
-                      ALREADY GOT A KEEPER
-                    </div>
-                  )}
                 </button>
                 );
               })}
@@ -2603,16 +4612,18 @@ Deliver your verdict as JSON.`;
                   padding: '12px 16px',
                   marginBottom: '8px',
                   background: colours.surface,
-                  borderLeft: `3px solid ${TIER_COLOURS[p.tier]}`,
+                  borderLeft: `3px solid ${tierColourFor(p)}`,
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
                   <div>
                     <div style={{ ...displayFont, fontSize: '20px', fontWeight: 500 }}>{p.name}</div>
-                    <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: TIER_COLOURS[p.tier] }}>
-                      {TIER_SYMBOLS[p.tier]} {p.tier.toUpperCase()}
-                    </div>
+                    {showTierBadge(p) && (
+                      <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: tierColourFor(p) }}>
+                        {TIER_SYMBOLS[p.tier]} {p.tier.toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   <span style={{ fontSize: '22px' }}>{p.flag}</span>
                 </div>
@@ -2768,37 +4779,6 @@ Deliver your verdict as JSON.`;
                 </div>
               </div>
 
-              {/* Streak line — sits inside the shared card */}
-              {streak.current >= 1 && (
-                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    ...condFont,
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    letterSpacing: '0.25em',
-                    color: colours.gold
-                  }}>
-                    <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
-                    <span>{streak.current} DAY STREAK</span>
-                  </div>
-                  {isPersonalBest && (
-                    <div style={{
-                      marginTop: '6px',
-                      ...condFont,
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      letterSpacing: '0.25em',
-                      color: colours.cream
-                    }}>
-                      <span aria-hidden="true">🏆</span> NEW PERSONAL BEST
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* Question */}
               <div style={{ ...condFont, fontStyle: 'italic', color: colours.muted, fontSize: '13px', textAlign: 'center', marginBottom: '6px' }}>
                 THE QUESTION
@@ -2812,14 +4792,14 @@ Deliver your verdict as JSON.`;
                 {squad.map((p, i) => (
                   <div key={i} style={{
                     padding: '8px 12px',
-                    borderLeft: `2px solid ${TIER_COLOURS[p.tier]}`,
+                    borderLeft: `2px solid ${tierColourFor(p)}`,
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     fontSize: '15px'
                   }}>
                     <span style={{ ...condFont, fontWeight: 600, letterSpacing: '0.02em' }}>
-                      <span style={{ color: TIER_COLOURS[p.tier], marginRight: '8px' }}>{TIER_SYMBOLS[p.tier]}</span>
+                      {showTierBadge(p) && <span style={{ color: tierColourFor(p), marginRight: '8px' }}>{TIER_SYMBOLS[p.tier]}</span>}
                       {p.name}
                     </span>
                     <span>{p.flag}</span>
@@ -3212,7 +5192,7 @@ Deliver your verdict as JSON.`;
             borderBottom: i < 2 ? `1px solid ${colour}22` : 'none'
           }}>
             <div style={{ ...displayFont, fontSize: '15px', fontWeight: 500, lineHeight: '1.1', marginBottom: '2px' }}>
-              <span style={{ color: TIER_COLOURS[p.tier], marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>
+              {showTierBadge(p) && <span style={{ color: tierColourFor(p), marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>}
               {p.name}
             </div>
             <div style={{ ...condFont, fontSize: '11px', color: colours.muted, fontStyle: 'italic' }}>
@@ -3330,9 +5310,9 @@ Deliver your verdict as JSON.`;
                     fontWeight: 600,
                     padding: '3px 8px',
                     background: 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${TIER_COLOURS[p.tier]}55`
+                    border: `1px solid ${tierColourFor(p)}55`
                   }}>
-                    <span style={{ color: TIER_COLOURS[p.tier], marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>
+                    {showTierBadge(p) && <span style={{ color: tierColourFor(p), marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>}
                     {p.name}
                   </span>
                 ))}
@@ -3357,9 +5337,9 @@ Deliver your verdict as JSON.`;
                     fontWeight: 600,
                     padding: '4px 8px',
                     background: 'rgba(255,255,255,0.06)',
-                    border: `1px solid ${TIER_COLOURS[p.tier]}88`
+                    border: `1px solid ${tierColourFor(p)}88`
                   }}>
-                    <span style={{ color: TIER_COLOURS[p.tier], marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>
+                    {showTierBadge(p) && <span style={{ color: tierColourFor(p), marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>}
                     {p.name}
                   </span>
                 ))}
@@ -3459,7 +5439,7 @@ Deliver your verdict as JSON.`;
         <div style={{ marginTop: '10px' }}>
           {squad.map((p, i) => (
             <div key={i} style={{ ...condFont, fontSize: '12px', fontWeight: 600, padding: '3px 0', textAlign: 'center' }}>
-              <span style={{ color: TIER_COLOURS[p.tier], marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>
+              {showTierBadge(p) && <span style={{ color: tierColourFor(p), marginRight: '4px' }}>{TIER_SYMBOLS[p.tier]}</span>}
               {p.name}
             </div>
           ))}
@@ -3505,37 +5485,6 @@ Deliver your verdict as JSON.`;
                   {winnerName.toUpperCase()} WINS
                 </div>
               </div>
-
-              {/* Streak line — sits inside the shared card */}
-              {streak.current >= 1 && (
-                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    ...condFont,
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    letterSpacing: '0.25em',
-                    color: colours.gold
-                  }}>
-                    <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">🔥</span>
-                    <span>{streak.current} DAY STREAK</span>
-                  </div>
-                  {isPersonalBest && (
-                    <div style={{
-                      marginTop: '4px',
-                      ...condFont,
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      letterSpacing: '0.25em',
-                      color: colours.cream
-                    }}>
-                      <span aria-hidden="true">🏆</span> NEW PERSONAL BEST
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Question */}
               <div style={{ ...condFont, fontStyle: 'italic', color: colours.muted, fontSize: '12px', textAlign: 'center', marginBottom: '4px' }}>
@@ -3771,12 +5720,12 @@ Deliver your verdict as JSON.`;
       {
         n: 4,
         title: "PETE DELIVERS A VERDICT",
-        body: "Score out of 10. A grudging nod or an absolute roasting. Share the verdict card — your streak, your score, Pete's face."
+        body: "Score out of 10. A grudging nod or an absolute roasting. Share the verdict card — your score, Pete's face."
       },
       {
         n: 5,
         title: "3 SOLO + 3 1V1 PER DAY",
-        body: "Limited plays. Use them. Come back tomorrow. Keep the streak alive."
+        body: "Limited plays. Use them. Come back tomorrow for a fresh question."
       },
     ];
     return (
@@ -4133,6 +6082,1985 @@ Deliver your verdict as JSON.`;
               }}
             >
               BACK TO HOME
+            </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT HOME SCREEN ----------
+  // Real screen. Pete-on-the-lounger banner, dynamic cycle context, PLAY NOW + RECORD.
+  // PLAY NOW is gated by hasPlayedTournamentToday(); locked = countdown to UK midnight.
+  // RECORD is inactive in Task 3 (greyed out) — wired up properly in Task 4.
+  if (screen === 'tournament-home') {
+    const tournamentStatus = getTournamentStatus(new Date());
+    const debugMode = getTournamentDebugMode();
+    const tournamentState = readTournamentState();
+    const playedToday = debugMode === 'unlock'
+      ? false
+      : debugMode === 'locked'
+        ? true
+        : hasPlayedTournamentToday(tournamentState);
+    // debug=unlock and debug=locked both simulate "tournament is live today" — they
+    // would be useless if insideWindow gated them out. Outside debug, insideWindow
+    // strictly enforces the real 11 Jun – 19 Jul window.
+    const insideWindow = !!tournamentStatus || debugMode === 'unlock' || debugMode === 'locked';
+    const canPlay = insideWindow && !playedToday;
+
+    // Dynamic context line — Phase 2, Deploy 5 / Stage 14.
+    // Now reflects the 3-attempts-per-day + 1-trophy-per-day model:
+    //   - Outside window: tournament returns date
+    //   - Trophy won today: "Trophy earned today. Come back tomorrow."
+    //   - Attempts exhausted (3/3 used, no trophy): "Three goes today. Try again tomorrow."
+    //   - Fresh start of day (0 attempts used): "Three goes at the trophy. Three questions per go. Beat Pete to win it."
+    //   - Mid-day (some attempts used, no trophy): "X attempts left. Beat Pete in Round 3 to earn a trophy."
+    // Safe access: debug modes can flip insideWindow=true while tournamentStatus is still null
+    // (when real today is outside the window).
+    const dailyForContext = effectiveDailyState(tournamentState);
+    const attemptsLeft = TOURNAMENT_DAILY_ATTEMPT_CAP - dailyForContext.attemptsToday;
+    let contextLine;
+    if (!insideWindow) {
+      contextLine = 'Tournament returns 11 June 2026. Beat Pete in Round 3 to win a trophy.';
+    } else if (dailyForContext.wonTodayFlag) {
+      contextLine = `Trophy earned today. Come back tomorrow.`;
+    } else if (attemptsLeft <= 0) {
+      contextLine = `Three goes today, no trophy. Come back tomorrow.`;
+    } else if (dailyForContext.attemptsToday === 0) {
+      contextLine = `Three goes at the trophy. Three questions per go. Beat Pete to win it.`;
+    } else {
+      contextLine = `${attemptsLeft} ${attemptsLeft === 1 ? 'attempt' : 'attempts'} left today. Beat Pete in Round 3 to earn a trophy.`;
+    }
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+
+        {/* Responsive CSS — phone = banner bleeds to edges, desktop = banner framed in a card */}
+        <style>{`
+          .kick3-tour-root {
+            min-height: 100vh;
+            width: 100%;
+            background: ${colours.bg};
+            color: ${colours.text};
+          }
+          /* ============ PHONE LAYOUT (default, < 900px) ============ */
+          .kick3-tour-phone-wrap {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+          }
+          .kick3-tour-phone-banner {
+            position: relative;
+            background: #1a2840;
+            overflow: hidden;
+            width: 100%;
+          }
+          .kick3-tour-phone-banner img {
+            display: block;
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+            object-position: center center;
+          }
+          .kick3-tour-phone-ui {
+            background: ${colours.bg};
+            padding: 28px 24px 40px 24px;
+            flex: 1 0 auto;
+            display: flex;
+            flex-direction: column;
+          }
+          @media (min-width: 900px) {
+            .kick3-tour-phone-wrap { display: none; }
+          }
+
+          /* ============ DESKTOP LAYOUT ============ */
+          .kick3-tour-desktop-wrap {
+            display: none;
+            min-height: 100vh;
+            width: 100%;
+            background: ${colours.bg};
+            padding: 32px 24px 48px 24px;
+          }
+          .kick3-tour-desktop-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+          }
+          .kick3-tour-desktop-banner {
+            position: relative;
+            background: #1a2840;
+            overflow: hidden;
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            margin-bottom: 32px;
+          }
+          .kick3-tour-desktop-banner img {
+            display: block;
+            width: 100%;
+            height: auto;
+          }
+          .kick3-tour-desktop-ui {
+            padding: 0 8px;
+            display: flex;
+            flex-direction: column;
+          }
+          @media (min-width: 900px) {
+            .kick3-tour-desktop-wrap { display: block; }
+          }
+
+          /* Button hover effects (desktop only) */
+          .kick3-tour-btn-play {
+            transition: transform 0.15s ease, filter 0.15s ease;
+          }
+          .kick3-tour-btn-play:hover:not(:disabled) {
+            transform: scale(1.03);
+            filter: brightness(1.1);
+          }
+
+          /* ============ Phase 2, Deploy 5 / Stage 5 — button animations ============ */
+          /* Same shared classes as the home screen. Tournament-home <style> block is
+             scoped to this screen only so we duplicate the definitions here. */
+          .kick3-button-hover {
+            transition: transform 0.18s ease-out, box-shadow 0.18s ease-out, filter 0.18s ease-out;
+          }
+          .kick3-button-hover:hover:not(:disabled) {
+            transform: translateY(-2px);
+            filter: brightness(1.08);
+          }
+          .kick3-button-hover:active:not(:disabled) {
+            transform: translateY(0);
+            filter: brightness(0.96);
+          }
+
+          @keyframes kick3-pulse-gold-kf {
+            0%, 100% {
+              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 1px rgba(95,176,74,0.18), 0 0 24px 4px rgba(95,176,74,0.28);
+            }
+            50% {
+              box-shadow: 0 4px 0 rgba(0,0,0,0.25), 0 0 0 6px rgba(95,176,74,0.45), 0 0 42px 12px rgba(95,176,74,0.65);
+            }
+          }
+          .kick3-pulse-gold {
+            animation: kick3-pulse-gold-kf 3.6s ease-in-out infinite;
+          }
+          .kick3-pulse-gold:disabled {
+            animation: none;
+          }
+
+          @keyframes kick3-shimmer-gold-kf {
+            0%   { transform: translateX(-110%) skewX(-18deg); }
+            18%  { transform: translateX(110%)  skewX(-18deg); }
+            100% { transform: translateX(110%)  skewX(-18deg); }
+          }
+          .kick3-shimmer-gold {
+            position: relative;
+            overflow: hidden;
+          }
+          .kick3-shimmer-gold::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 40%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.35) 50%, transparent 100%);
+            animation: kick3-shimmer-gold-kf 5s ease-in-out infinite;
+            pointer-events: none;
+          }
+        `}</style>
+
+        <div className="kick3-tour-root">
+
+          {/* ============ PHONE LAYOUT ============ */}
+          <div className="kick3-tour-phone-wrap">
+            <div className="kick3-tour-phone-banner">
+              <picture>
+                <source srcSet="/pete-tournament.webp" type="image/webp" />
+                <img src="/pete-tournament.jpg" alt="Pete the Pundit on a sun lounger at the World Cup" />
+              </picture>
+              {/* BACK chip — top-left */}
+              <button
+                onClick={() => setScreen('home')}
+                style={{
+                  position: 'absolute',
+                  top: '14px',
+                  left: '14px',
+                  background: 'rgba(20,20,30,0.85)',
+                  color: colours.gold,
+                  ...condFont,
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '0.18em',
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  border: `1px solid ${colours.gold}`,
+                  cursor: 'pointer'
+                }}
+                aria-label="Back to main home"
+              >
+                ← BACK
+              </button>
+            </div>
+
+            <div className="kick3-tour-phone-ui">
+              {/* Wordmark */}
+              <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                <div style={{
+                  ...displayFont,
+                  fontSize: 'clamp(40px, 11vw, 56px)',
+                  fontWeight: 800,
+                  color: '#5fb04a',
+                  letterSpacing: '0.04em',
+                  lineHeight: 1
+                }}>
+                  TOURNAMENT MODE
+                </div>
+                <div style={{
+                  ...condFont,
+                  fontSize: '11px',
+                  letterSpacing: '0.3em',
+                  color: colours.muted,
+                  fontWeight: 600,
+                  marginTop: '10px'
+                }}>
+                  — BEAT PETE TO WIN A TROPHY —
+                </div>
+              </div>
+
+              {/* Cycle context */}
+              <div style={{
+                ...condFont,
+                fontSize: '13px',
+                color: colours.cream,
+                textAlign: 'center',
+                lineHeight: 1.55,
+                marginTop: '20px',
+                marginBottom: '24px',
+                padding: '0 4px'
+              }}>
+                {contextLine}
+              </div>
+
+              {/* PLAY NOW — green */}
+              <button
+                onClick={canPlay ? startTournament : undefined}
+                disabled={!canPlay}
+                className="kick3-button-hover kick3-pulse-gold"
+                style={{
+                  width: '100%',
+                  padding: '18px 20px',
+                  background: canPlay ? '#5fb04a' : '#3a3a44',
+                  color: canPlay ? '#0a1a08' : colours.muted,
+                  border: 'none',
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(20px, 5.4vw, 24px)',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  cursor: canPlay ? 'pointer' : 'not-allowed',
+                  marginBottom: '12px',
+                  boxShadow: canPlay ? '0 4px 0 rgba(0,0,0,0.25)' : 'none',
+                  opacity: canPlay ? 1 : 0.7,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                }}
+              >
+                {!insideWindow ? (
+                  <span>TOURNAMENT NOT LIVE</span>
+                ) : playedToday ? (
+                  <>
+                    <span style={{ fontSize: '18px' }} aria-hidden="true">⏳</span>
+                    <span>NEXT IN {timeUntilNext}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>PLAY NOW</span>
+                    <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
+                  </>
+                )}
+              </button>
+
+              {/* RECORD — gold outline, active (opens tournament-record screen) */}
+              <button
+                onClick={() => setScreen('tournament-record')}
+                className="kick3-button-hover kick3-shimmer-gold"
+                style={{
+                  width: '100%',
+                  padding: '15px 20px',
+                  background: 'transparent',
+                  color: colours.gold,
+                  border: `2px solid ${colours.gold}`,
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(16px, 4.4vw, 19px)',
+                  fontWeight: 700,
+                  letterSpacing: '0.12em',
+                  cursor: 'pointer',
+                  marginBottom: '24px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
+                }}
+              >
+                <span style={{ fontSize: '16px' }} aria-hidden="true">🏆</span>
+                <span>RECORD</span>
+              </button>
+
+              {/* Pete taunt */}
+              <div style={{
+                ...condFont,
+                fontStyle: 'italic',
+                fontSize: '12px',
+                color: colours.muted,
+                textAlign: 'center',
+                lineHeight: 1.55,
+                padding: '0 12px'
+              }}>
+                &ldquo;I&rsquo;ve forgotten more football than you&rsquo;ll ever know. Three rounds. Beat me. I&rsquo;ll wait.&rdquo;
+              </div>
+            </div>
+          </div>
+
+          {/* ============ DESKTOP LAYOUT ============ */}
+          <div className="kick3-tour-desktop-wrap">
+            <div className="kick3-tour-desktop-inner">
+              <div className="kick3-tour-desktop-banner">
+                <picture>
+                  <source srcSet="/pete-tournament.webp" type="image/webp" />
+                  <img src="/pete-tournament.jpg" alt="Pete the Pundit on a sun lounger at the World Cup" />
+                </picture>
+                {/* BACK chip — top-left of banner */}
+                <button
+                  onClick={() => setScreen('home')}
+                  style={{
+                    position: 'absolute',
+                    top: '18px',
+                    left: '18px',
+                    background: 'rgba(20,20,30,0.85)',
+                    color: colours.gold,
+                    ...condFont,
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    padding: '10px 16px',
+                    borderRadius: '5px',
+                    border: `1px solid ${colours.gold}`,
+                    cursor: 'pointer'
+                  }}
+                  aria-label="Back to main home"
+                >
+                  ← BACK
+                </button>
+              </div>
+
+              <div className="kick3-tour-desktop-ui">
+                {/* Wordmark */}
+                <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+                  <div style={{
+                    ...displayFont,
+                    fontSize: 'clamp(48px, 5vw, 64px)',
+                    fontWeight: 800,
+                    color: '#5fb04a',
+                    letterSpacing: '0.04em',
+                    lineHeight: 1
+                  }}>
+                    TOURNAMENT MODE
+                  </div>
+                  <div style={{
+                    ...condFont,
+                    fontSize: '13px',
+                    letterSpacing: '0.3em',
+                    color: colours.muted,
+                    fontWeight: 600,
+                    marginTop: '14px'
+                  }}>
+                    — BEAT PETE TO WIN A TROPHY —
+                  </div>
+                </div>
+
+                {/* Cycle context */}
+                <div style={{
+                  ...condFont,
+                  fontSize: '15px',
+                  color: colours.cream,
+                  textAlign: 'center',
+                  lineHeight: 1.55,
+                  marginTop: '24px',
+                  marginBottom: '28px',
+                  maxWidth: '600px',
+                  marginLeft: 'auto',
+                  marginRight: 'auto'
+                }}>
+                  {contextLine}
+                </div>
+
+                {/* PLAY NOW — green */}
+                <button
+                  onClick={canPlay ? startTournament : undefined}
+                  disabled={!canPlay}
+                  className="kick3-tour-btn-play kick3-pulse-gold"
+                  style={{
+                    width: '100%',
+                    padding: '22px 24px',
+                    background: canPlay ? '#5fb04a' : '#3a3a44',
+                    color: canPlay ? '#0a1a08' : colours.muted,
+                    border: 'none',
+                    borderRadius: '12px',
+                    ...displayFont,
+                    fontSize: 'clamp(24px, 2.4vw, 30px)',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                    cursor: canPlay ? 'pointer' : 'not-allowed',
+                    marginBottom: '14px',
+                    boxShadow: canPlay ? '0 5px 0 rgba(0,0,0,0.25)' : 'none',
+                    opacity: canPlay ? 1 : 0.7,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px'
+                  }}
+                >
+                  {!insideWindow ? (
+                    <span>TOURNAMENT NOT LIVE</span>
+                  ) : playedToday ? (
+                    <>
+                      <span style={{ fontSize: '22px' }} aria-hidden="true">⏳</span>
+                      <span>NEXT IN {timeUntilNext}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>PLAY NOW</span>
+                      <span style={{ fontSize: '26px', lineHeight: 1 }}>→</span>
+                    </>
+                  )}
+                </button>
+
+                {/* RECORD — gold outline, active */}
+                <button
+                  onClick={() => setScreen('tournament-record')}
+                  className="kick3-button-hover kick3-shimmer-gold"
+                  style={{
+                    width: '100%',
+                    padding: '18px 24px',
+                    background: 'transparent',
+                    color: colours.gold,
+                    border: `2px solid ${colours.gold}`,
+                    borderRadius: '12px',
+                    ...displayFont,
+                    fontSize: 'clamp(18px, 1.8vw, 22px)',
+                    fontWeight: 700,
+                    letterSpacing: '0.12em',
+                    cursor: 'pointer',
+                    marginBottom: '28px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }} aria-hidden="true">🏆</span>
+                  <span>RECORD</span>
+                </button>
+
+                {/* Pete taunt */}
+                <div style={{
+                  ...condFont,
+                  fontStyle: 'italic',
+                  fontSize: '14px',
+                  color: colours.muted,
+                  textAlign: 'center',
+                  lineHeight: 1.55,
+                  maxWidth: '600px',
+                  marginLeft: 'auto',
+                  marginRight: 'auto',
+                  padding: '0 12px'
+                }}>
+                  &ldquo;I&rsquo;ve forgotten more football than you&rsquo;ll ever know. Three rounds. Beat me. I&rsquo;ll wait.&rdquo;
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT RECORD SCREEN ----------
+  // Shows lifetime tournament stats: trophies, attempts, win rate against Pete.
+  // Shareable via the existing share-card mechanism.
+  if (screen === 'tournament-record') {
+    const recordState = readTournamentState();
+    const trophies = recordState.trophyCount || 0;
+    const attempts = recordState.tournamentsAttempted || 0;
+    const completed = recordState.tournamentsCompleted || 0;
+    // Win rate vs Pete = trophies / tournaments that reached Round 3.
+    const winRate = completed > 0
+      ? `${Math.round((trophies / completed) * 100)}% (${trophies} of ${completed})`
+      : '—';
+    const isEmpty = attempts === 0;
+
+    // Pete's read on the record — quick flavour line.
+    const peteRead = (() => {
+      if (isEmpty) return "Your record is empty. Time to fix that.";
+      if (trophies === 0 && completed > 0) return `${completed} attempt${completed === 1 ? '' : 's'} at me. Nought trophies. Have another go.`;
+      if (trophies === 1) return "One trophy. A start.";
+      if (trophies >= 5) return `${trophies} trophies. Beginning to think you might know football.`;
+      return `${trophies} trophies. Not bad.`;
+    })();
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '640px' }}>
+
+            {/* Capturable region — everything inside this ref becomes the share image. */}
+            <div ref={recordCardRef} style={{
+              background: colours.bg,
+              padding: '20px 16px 24px',
+              marginBottom: '20px'
+            }}>
+              {/* Header */}
+              <div style={{ textAlign: 'center', paddingTop: '4px', marginBottom: '24px' }}>
+                <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: '#5fb04a', marginBottom: '8px', fontWeight: 600 }}>
+                  TOURNAMENT
+                </div>
+                <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                  MY RECORD
+                </h1>
+              </div>
+
+              {/* TROPHIES — hero stat */}
+              <div style={{
+                background: colours.surface,
+                padding: '28px 16px',
+                textAlign: 'center',
+                borderTop: `2px solid ${isEmpty ? colours.muted : colours.gold}`,
+                marginBottom: '12px'
+              }}>
+                <div style={{ fontSize: '40px', lineHeight: 1, marginBottom: '8px' }} aria-hidden="true">🏆</div>
+                <div style={{
+                  ...displayFont,
+                  fontSize: 'clamp(56px, 14vw, 80px)',
+                  fontWeight: 700,
+                  color: isEmpty ? colours.muted : colours.gold,
+                  lineHeight: 1
+                }}>
+                  {trophies}
+                </div>
+                <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.3em', color: colours.muted, marginTop: '10px' }}>
+                  {trophies === 1 ? 'TROPHY' : 'TROPHIES'}
+                </div>
+              </div>
+
+              {/* ATTEMPTS + WIN RATE — two-up grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '10px',
+                marginBottom: '24px'
+              }}>
+                <div style={{ background: colours.surface, padding: '16px 10px', textAlign: 'center', borderTop: `2px solid ${colours.cream}` }}>
+                  <div style={{ ...displayFont, fontSize: '32px', fontWeight: 700, color: isEmpty ? colours.muted : colours.cream, lineHeight: 1 }}>
+                    {attempts}
+                  </div>
+                  <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.22em', color: colours.muted, marginTop: '6px' }}>
+                    ATTEMPTED
+                  </div>
+                </div>
+                <div style={{ background: colours.surface, padding: '16px 10px', textAlign: 'center', borderTop: `2px solid #5fb04a` }}>
+                  <div style={{
+                    ...displayFont,
+                    fontSize: completed > 0 ? '24px' : '32px',
+                    fontWeight: 700,
+                    color: isEmpty ? colours.muted : colours.cream,
+                    lineHeight: 1
+                  }}>
+                    {winRate}
+                  </div>
+                  <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.22em', color: colours.muted, marginTop: '6px' }}>
+                    VS PETE
+                  </div>
+                </div>
+              </div>
+
+              {/* Pete's read */}
+              <p style={{
+                ...condFont,
+                fontStyle: 'italic',
+                color: colours.cream,
+                fontSize: '14px',
+                textAlign: 'center',
+                marginBottom: '8px',
+                marginTop: 0,
+                lineHeight: 1.45,
+                opacity: 0.9
+              }}>
+                &ldquo;{peteRead}&rdquo;
+              </p>
+
+              {/* Footer brand */}
+              <div style={{
+                ...condFont,
+                fontSize: '10px',
+                letterSpacing: '0.3em',
+                color: colours.muted,
+                textAlign: 'center',
+                marginTop: '20px',
+                opacity: 0.7
+              }}>
+                KICK3.APP
+              </div>
+            </div>
+
+            {/* Share button */}
+            <button
+              onClick={shareRecord}
+              disabled={shareState === 'working'}
+              style={{
+                width: '100%',
+                padding: '14px 20px',
+                background: colours.gold,
+                color: '#000',
+                border: 'none',
+                borderRadius: '8px',
+                ...displayFont,
+                fontSize: '16px',
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                cursor: shareState === 'working' ? 'wait' : 'pointer',
+                marginBottom: '12px',
+                boxShadow: '0 3px 0 rgba(0,0,0,0.25)',
+                opacity: shareState === 'working' ? 0.7 : 1
+              }}
+            >
+              {shareState === 'working' ? 'PREPARING...' :
+               shareState === 'shared'  ? '✓ SHARED' :
+               shareState === 'copied'  ? '✓ COPIED' :
+               shareState === 'error'   ? 'TRY AGAIN' :
+               'SHARE RECORD'}
+            </button>
+
+            {/* Back to tournament home */}
+            <button
+              onClick={() => setScreen('tournament-home')}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                background: 'transparent',
+                color: colours.muted,
+                border: `1px solid ${colours.muted}`,
+                borderRadius: '8px',
+                ...condFont,
+                fontSize: '12px',
+                fontWeight: 600,
+                letterSpacing: '0.2em',
+                cursor: 'pointer'
+              }}
+            >
+              ← BACK TO TOURNAMENT
+            </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT VAR CHECKING SCREEN ----------
+  // Phase 2, Deploy 5 / Stage 1. Suspense beat between draft submit and verdict.
+  // TV-styled frame, three cycling status lines, ~3 seconds total.
+  // R1/R2: routes to 'tournament-var' on its own (via the useEffect above).
+  // R3: routes when submitR3Defence's await minAnimationDelay resolves.
+  if (screen === 'tournament-var-checking') {
+    // Pick one line from each of the three categories. The lines are stable for
+    // the duration of this screen (don't change on re-render) — we use the phase
+    // index to pick deterministically from the pool for this attempt.
+    // Lines are random across attempts (since varCheckPhase is reset).
+    const openerLine = VAR_ROUND_OPENER_LINES[
+      Math.floor((tournamentRound || 1) * 7919) % VAR_ROUND_OPENER_LINES.length
+    ];
+    const holdLine = VAR_PRE_RESULT_HOLD_LINES[
+      Math.floor((tournamentRound || 1) * 6271) % VAR_PRE_RESULT_HOLD_LINES.length
+    ];
+    const framingLine = tournamentRound === 3
+      ? VAR_R3_FRAMING_LINES[0]
+      : "Decision incoming.";
+    const lines = [openerLine, holdLine, framingLine];
+    const currentLine = lines[varCheckPhase] || lines[0];
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <style>{`
+          @keyframes kick3-var-scanline {
+            0%   { transform: translateY(-100%); opacity: 0.5; }
+            100% { transform: translateY(200%); opacity: 0.5; }
+          }
+          @keyframes kick3-var-blink {
+            0%, 50%   { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+          }
+          @keyframes kick3-var-fadein {
+            from { opacity: 0; transform: translateY(4px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+        <div style={{ ...bgStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '420px', textAlign: 'center' }}>
+
+            {/* Label above the screen */}
+            <div style={{
+              ...condFont,
+              fontSize: '11px',
+              letterSpacing: '0.4em',
+              color: colours.muted,
+              fontWeight: 700,
+              marginBottom: '18px',
+              opacity: 0.7
+            }}>
+              VIDEO ASSISTANT REFEREE
+            </div>
+
+            {/* TV frame */}
+            <div style={{
+              background: 'linear-gradient(160deg, #1f1f2a 0%, #0d0d14 100%)',
+              border: '4px solid #2a2a36',
+              borderRadius: '14px',
+              padding: '8px',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.6), inset 0 1px 2px rgba(255,255,255,0.08)',
+              position: 'relative',
+              marginBottom: '24px'
+            }}>
+              {/* Reflection highlight on top edge */}
+              <div style={{
+                position: 'absolute',
+                top: '2px',
+                left: '8%',
+                right: '8%',
+                height: '1px',
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)',
+                borderRadius: '50%'
+              }} />
+
+              {/* Inner screen */}
+              <div style={{
+                background: '#050810',
+                borderRadius: '6px',
+                padding: '32px 20px',
+                position: 'relative',
+                overflow: 'hidden',
+                minHeight: '120px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {/* Scan line — animated */}
+                <div style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  height: '40%',
+                  background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%)',
+                  animation: 'kick3-var-scanline 3.5s linear infinite',
+                  pointerEvents: 'none'
+                }} />
+
+                {/* Subtle CRT scan-line texture */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: 'repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px)',
+                  pointerEvents: 'none'
+                }} />
+
+                {/* VAR label in top-left corner */}
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  left: '10px',
+                  ...condFont,
+                  fontSize: '10px',
+                  letterSpacing: '0.3em',
+                  color: '#5fb04a',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: '#5fb04a',
+                    animation: 'kick3-var-blink 1s ease-in-out infinite',
+                    display: 'inline-block'
+                  }} />
+                  VAR · LIVE
+                </div>
+
+                {/* Round indicator top-right */}
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '10px',
+                  ...condFont,
+                  fontSize: '10px',
+                  letterSpacing: '0.3em',
+                  color: colours.muted,
+                  fontWeight: 600
+                }}>
+                  R{tournamentRound || '-'}
+                </div>
+
+                {/* Cycling status text */}
+                <div
+                  key={varCheckPhase}
+                  style={{
+                    ...displayFont,
+                    fontSize: 'clamp(20px, 6vw, 26px)',
+                    fontWeight: 600,
+                    color: '#e8e8e0',
+                    letterSpacing: '0.04em',
+                    textAlign: 'center',
+                    position: 'relative',
+                    animation: 'kick3-var-fadein 0.35s ease-out',
+                    padding: '0 12px',
+                    lineHeight: 1.3
+                  }}
+                >
+                  {currentLine}
+                </div>
+
+                {/* Phase dots */}
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  marginTop: '20px',
+                  position: 'relative'
+                }}>
+                  {[0, 1, 2].map(i => (
+                    <span key={i} style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: i <= varCheckPhase ? '#5fb04a' : 'rgba(255,255,255,0.15)',
+                      transition: 'background 0.3s ease'
+                    }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Stand at the bottom */}
+            <div style={{
+              width: '60%',
+              height: '6px',
+              background: 'linear-gradient(180deg, #2a2a36 0%, #1a1a22 100%)',
+              borderRadius: '0 0 4px 4px',
+              margin: '-20px auto 0',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+            }} />
+            <div style={{
+              width: '30%',
+              height: '4px',
+              background: '#1a1a22',
+              borderRadius: '0 0 8px 8px',
+              margin: '0 auto'
+            }} />
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT ROUND WON SCREEN ----------
+  // Phase 2, Deploy 5 / Stage 2. Celebratory beat between R1→R2 and R2→R3.
+  // Shows the player's three, Pete's reaction (in his voice), and the call to
+  // continue. R3 win bypasses this — that's handled by the trophy verdict screen.
+  if (screen === 'tournament-round-won' && tournamentVarResult && tournamentOpponent) {
+    const r = tournamentVarResult;
+    const opponentPicks = resolveOpponentPicks(tournamentOpponent);
+    const nextRound = tournamentRound + 1;
+    const nextOpponentLabel = nextRound === 2 ? "PETE'S PRODUCER" : "PETE THE PUNDIT";
+    const continueButtonLabel = nextRound === 2 ? "FACE THE PRODUCER" : "FACE PETE";
+    const continueAction = nextRound === 2 ? advanceToRound2 : startTournamentRound3;
+
+    // Phase 2, Deploy 5 / Stage 4: confetti.
+    // 40 falling particles, brand-palette colours, randomised motion.
+    // Computed once on mount (no state changes inside this screen mean no re-renders
+    // will regenerate them). Each particle is a small rectangle with:
+    //  - random horizontal start (0-100% across viewport)
+    //  - random fall duration (2.4-3.6s)
+    //  - random delay (0-400ms) for staggered onset
+    //  - random sway angle (the keyframe is fixed; rotation/transform gives variety)
+    //  - random colour from the celebratory palette
+    //  - random size (4-8px wide, 8-14px tall)
+    // Container fades out at 3s via opacity transition; particles unmount at screen exit.
+    const CONFETTI_COLOURS = ['#D4AF37', '#5fb04a', '#e8e8e0', '#c9302c', '#f5a623'];
+    const confettiParticles = Array.from({ length: 40 }, (_, i) => {
+      const left = Math.random() * 100;
+      const duration = 2.4 + Math.random() * 1.2;
+      const delay = Math.random() * 0.4;
+      const rotateStart = Math.random() * 360;
+      const rotateEnd = rotateStart + (Math.random() * 720 - 360);
+      const sway = (Math.random() - 0.5) * 80; // px horizontal drift
+      const colour = CONFETTI_COLOURS[i % CONFETTI_COLOURS.length];
+      const width = 4 + Math.random() * 4;
+      const height = 8 + Math.random() * 6;
+      return { i, left, duration, delay, rotateStart, rotateEnd, sway, colour, width, height };
+    });
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <style>{`
+          @keyframes kick3-trophy-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50%      { transform: scale(1.04); opacity: 0.92; }
+          }
+          @keyframes kick3-won-slidein {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes kick3-confetti-fall {
+            0% {
+              transform: translate3d(0, -10vh, 0) rotate(var(--rs, 0deg));
+              opacity: 1;
+            }
+            85% {
+              opacity: 1;
+            }
+            100% {
+              transform: translate3d(var(--sway, 0px), 110vh, 0) rotate(var(--re, 360deg));
+              opacity: 0;
+            }
+          }
+          @keyframes kick3-confetti-container-fade {
+            0%, 85% { opacity: 1; }
+            100%    { opacity: 0; }
+          }
+        `}</style>
+
+        {/* Confetti overlay — pointer-events:none so the continue button is still clickable. */}
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          pointerEvents: 'none',
+          overflow: 'hidden',
+          zIndex: 9999,
+          animation: 'kick3-confetti-container-fade 4s ease-out forwards'
+        }}>
+          {confettiParticles.map(p => (
+            <div
+              key={p.i}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: `${p.left}%`,
+                width: `${p.width}px`,
+                height: `${p.height}px`,
+                background: p.colour,
+                borderRadius: '1px',
+                animation: `kick3-confetti-fall ${p.duration}s ease-in ${p.delay}s forwards`,
+                ['--rs']: `${p.rotateStart}deg`,
+                ['--re']: `${p.rotateEnd}deg`,
+                ['--sway']: `${p.sway}px`,
+              }}
+            />
+          ))}
+        </div>
+
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '560px' }}>
+
+            {/* Top label */}
+            <div style={{
+              textAlign: 'center',
+              ...condFont,
+              fontSize: '11px',
+              letterSpacing: '0.4em',
+              color: '#5fb04a',
+              fontWeight: 700,
+              marginBottom: '10px',
+              animation: 'kick3-won-slidein 0.4s ease-out'
+            }}>
+              ROUND {tournamentRound} COMPLETE
+            </div>
+
+            {/* Big celebratory headline */}
+            <h1 style={{
+              ...displayFont,
+              fontSize: 'clamp(40px, 12vw, 64px)',
+              fontWeight: 800,
+              color: colours.gold,
+              margin: '0 0 8px 0',
+              textAlign: 'center',
+              letterSpacing: '0.02em',
+              lineHeight: 1,
+              animation: 'kick3-won-slidein 0.5s ease-out',
+              textShadow: '0 4px 24px rgba(212,175,55,0.35)'
+            }}>
+              ROUND {tournamentRound} WON
+            </h1>
+
+            {/* Subhead — opponent beaten */}
+            <div style={{
+              ...condFont,
+              fontSize: '14px',
+              letterSpacing: '0.2em',
+              color: colours.cream,
+              fontWeight: 600,
+              textAlign: 'center',
+              marginBottom: '28px',
+              opacity: 0.85,
+              animation: 'kick3-won-slidein 0.6s ease-out'
+            }}>
+              {tournamentOpponent.label} — DEFEATED
+            </div>
+
+            {/* VAR verdict phrase. Phase 2, Deploy 5 / Stage 3: was on the
+                old verdict screen; lifted here as the congrats screen IS the win path. */}
+            <div style={{
+              textAlign: 'center',
+              ...condFont,
+              fontSize: '13px',
+              letterSpacing: '0.18em',
+              color: colours.muted,
+              fontStyle: 'italic',
+              marginBottom: '24px',
+              padding: '0 12px',
+              lineHeight: 1.4,
+              animation: 'kick3-won-slidein 0.65s ease-out'
+            }}>
+              {r.phrase}
+            </div>
+
+            {/* Pete's reaction — quote block in his voice */}
+            <div style={{
+              background: 'rgba(212,175,55,0.06)',
+              border: '1px solid rgba(212,175,55,0.25)',
+              borderLeft: `3px solid ${colours.gold}`,
+              padding: '18px 22px',
+              borderRadius: '6px',
+              marginBottom: '28px',
+              animation: 'kick3-won-slidein 0.7s ease-out'
+            }}>
+              <div style={{
+                ...condFont,
+                fontSize: '10px',
+                letterSpacing: '0.3em',
+                color: colours.gold,
+                marginBottom: '8px',
+                fontWeight: 700
+              }}>
+                PETE
+              </div>
+              <p style={{
+                ...displayFont,
+                fontSize: 'clamp(17px, 4.5vw, 20px)',
+                fontStyle: 'italic',
+                color: colours.cream,
+                margin: 0,
+                lineHeight: 1.4
+              }}>
+                &ldquo;{roundWinReaction}&rdquo;
+              </p>
+            </div>
+
+            {/* Score recap — your three vs their three.
+                Phase 2, Deploy 5 / Stage 3: per-player attribute scores added
+                so the player sees how the win was earned (parity with the
+                old verdict screen). */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '12px',
+              marginBottom: '28px',
+              animation: 'kick3-won-slidein 0.8s ease-out'
+            }}>
+              {/* Player squad */}
+              <div style={{ background: colours.surface, padding: '12px 10px', borderRadius: '6px' }}>
+                <div style={{
+                  ...condFont,
+                  fontSize: '10px',
+                  letterSpacing: '0.22em',
+                  color: colours.gold,
+                  marginBottom: '8px',
+                  textAlign: 'center',
+                  fontWeight: 700
+                }}>
+                  YOUR THREE
+                </div>
+                {squad.map((p, i) => {
+                  const scoresMap = p && p.isWorldCup
+                    ? worldCupAttributeScores(p.name)
+                    : stubAttributeScores(p.name);
+                  const sc = scoresMap[tournamentAttribute] || 0;
+                  return (
+                    <div key={i} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '4px 0',
+                      borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                      ...condFont,
+                      fontSize: '12px'
+                    }}>
+                      <span style={{ color: colours.cream, fontWeight: 600 }}>{p.name}</span>
+                      <span style={{ color: colours.gold, fontWeight: 700, fontSize: '14px' }}>{sc}</span>
+                    </div>
+                  );
+                })}
+                <div style={{
+                  marginTop: '8px',
+                  paddingTop: '8px',
+                  borderTop: '1px solid rgba(212,175,55,0.2)',
+                  ...condFont,
+                  fontSize: '11px',
+                  color: colours.gold,
+                  letterSpacing: '0.15em',
+                  textAlign: 'center'
+                }}>
+                  {tournamentAttribute}: <span style={{ fontWeight: 800, fontSize: '14px' }}>{r.playerTotal}</span>
+                </div>
+              </div>
+
+              {/* Opponent squad */}
+              <div style={{ background: colours.surface, padding: '12px 10px', borderRadius: '6px' }}>
+                <div style={{
+                  ...condFont,
+                  fontSize: '10px',
+                  letterSpacing: '0.22em',
+                  color: colours.muted,
+                  marginBottom: '8px',
+                  textAlign: 'center',
+                  fontWeight: 700
+                }}>
+                  THEIR THREE
+                </div>
+                {opponentPicks.map((p, i) => {
+                  const scoresMap = p && p.isWorldCup
+                    ? worldCupAttributeScores(p.name)
+                    : stubAttributeScores(p.name);
+                  const sc = scoresMap[tournamentAttribute] || 0;
+                  return (
+                    <div key={i} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '4px 0',
+                      borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                      ...condFont,
+                      fontSize: '12px'
+                    }}>
+                      <span style={{ color: colours.cream, fontWeight: 600 }}>{p.name}</span>
+                      <span style={{ color: colours.muted, fontWeight: 700, fontSize: '14px' }}>{sc}</span>
+                    </div>
+                  );
+                })}
+                <div style={{
+                  marginTop: '8px',
+                  paddingTop: '8px',
+                  borderTop: '1px solid rgba(255,255,255,0.1)',
+                  ...condFont,
+                  fontSize: '11px',
+                  color: colours.muted,
+                  letterSpacing: '0.15em',
+                  textAlign: 'center'
+                }}>
+                  {tournamentAttribute}: <span style={{ fontWeight: 800, fontSize: '14px' }}>{r.opponentTotal}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Phase 2, Deploy 5 / Stage 11: Legacy tiebreak banner — only renders when the
+                tiebreak decided the round. Surfaces the actual Legacy numbers so the player
+                sees why the call went the way it did. */}
+            {r.viaLegacy && (
+              <div style={{
+                marginBottom: '20px',
+                textAlign: 'center',
+                animation: 'kick3-won-slidein 0.85s ease-out'
+              }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.gold, fontStyle: 'italic', marginBottom: '8px' }}>
+                  TIED ON {tournamentAttribute.toUpperCase()} — LEGACY TIEBREAK
+                </div>
+                <div style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'baseline', gap: '14px', padding: '8px 14px', background: 'rgba(212,175,55,0.06)', borderRadius: '4px', border: '1px solid rgba(212,175,55,0.18)' }}>
+                  <span style={{ ...condFont, fontSize: '11px', color: colours.muted, letterSpacing: '0.15em' }}>LEGACY</span>
+                  <span style={{ ...displayFont, fontSize: '18px', fontWeight: 700, color: r.playerLegacy >= r.opponentLegacy ? '#5fb04a' : colours.cream }}>
+                    {r.playerLegacy}
+                  </span>
+                  <span style={{ ...condFont, fontSize: '11px', color: colours.muted }}>vs</span>
+                  <span style={{ ...displayFont, fontSize: '18px', fontWeight: 700, color: r.opponentLegacy > r.playerLegacy ? colours.accent : colours.cream }}>
+                    {r.opponentLegacy}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* "What's next" label */}
+            <div style={{
+              textAlign: 'center',
+              ...condFont,
+              fontSize: '11px',
+              letterSpacing: '0.3em',
+              color: colours.muted,
+              fontWeight: 700,
+              marginBottom: '6px',
+              animation: 'kick3-won-slidein 0.9s ease-out'
+            }}>
+              NEXT — ROUND {nextRound}
+            </div>
+            <div style={{
+              textAlign: 'center',
+              ...displayFont,
+              fontSize: 'clamp(20px, 6vw, 26px)',
+              fontWeight: 700,
+              color: colours.cream,
+              marginBottom: '20px',
+              animation: 'kick3-won-slidein 1.0s ease-out'
+            }}>
+              {nextOpponentLabel}
+            </div>
+
+            {/* Continue button */}
+            <button
+              onClick={continueAction}
+              style={{
+                width: '100%',
+                padding: '16px 20px',
+                background: '#5fb04a',
+                color: '#0a1a08',
+                border: 'none',
+                borderRadius: '10px',
+                ...displayFont,
+                fontSize: 'clamp(18px, 5vw, 22px)',
+                fontWeight: 800,
+                letterSpacing: '0.08em',
+                cursor: 'pointer',
+                marginBottom: '10px',
+                boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                animation: 'kick3-won-slidein 1.1s ease-out'
+              }}
+            >
+              <span>{continueButtonLabel}</span>
+              <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
+            </button>
+
+            {/* Stop-for-today option */}
+            <button
+              onClick={() => endTournamentAttempt(`won-r${tournamentRound}`)}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                background: 'transparent',
+                color: colours.muted,
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '8px',
+                ...condFont,
+                fontSize: '13px',
+                fontWeight: 600,
+                letterSpacing: '0.15em',
+                cursor: 'pointer'
+              }}
+            >
+              STOP HERE FOR TODAY
+            </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT VAR VERDICT SCREEN ----------
+  // Shows after each Round 1 or Round 2 draft completes. Reveals both teams,
+  // attribute totals, VAR phrase, and routes onward (next round on win, end on loss).
+  if (screen === 'tournament-var' && tournamentVarResult && tournamentOpponent) {
+    const r = tournamentVarResult;
+    const opponentPicks = resolveOpponentPicks(tournamentOpponent);
+    const isFinalRound = tournamentRound >= 2; // Task 5 stops here; Task 6 wires R3.
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '640px' }}>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', paddingTop: '8px', marginBottom: '20px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: '#5fb04a', marginBottom: '6px', fontWeight: 600 }}>
+                ROUND {tournamentRound} — VS {tournamentOpponent.shortLabel}
+              </div>
+              <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: r.won ? '#5fb04a' : colours.accent, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                {r.won ? 'YOU ADVANCE' : 'YOU LOST'}
+              </h1>
+              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.3em', color: colours.muted, marginTop: '10px' }}>
+                VAR DECISION • {tournamentAttribute && tournamentAttribute.toUpperCase()}
+              </div>
+            </div>
+
+            {/* Score line — big and central */}
+            <div style={{
+              background: colours.surface,
+              padding: '22px 16px',
+              textAlign: 'center',
+              marginBottom: '14px',
+              borderTop: `2px solid ${r.won ? '#5fb04a' : colours.accent}`
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'baseline', gap: '24px' }}>
+                <div>
+                  <div style={{ ...displayFont, fontSize: '48px', fontWeight: 700, color: r.won ? '#5fb04a' : colours.cream, lineHeight: 1 }}>
+                    {r.playerTotal}
+                  </div>
+                  <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.24em', color: colours.muted, marginTop: '6px' }}>
+                    YOU
+                  </div>
+                </div>
+                <div style={{ ...condFont, fontSize: '14px', color: colours.muted, fontWeight: 600 }}>vs</div>
+                <div>
+                  <div style={{ ...displayFont, fontSize: '48px', fontWeight: 700, color: r.won ? colours.cream : colours.accent, lineHeight: 1 }}>
+                    {r.opponentTotal}
+                  </div>
+                  <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.24em', color: colours.muted, marginTop: '6px' }}>
+                    {tournamentOpponent.shortLabel}
+                  </div>
+                </div>
+              </div>
+              {r.viaLegacy && (
+                <div style={{ marginTop: '14px' }}>
+                  <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.gold, fontStyle: 'italic', marginBottom: '8px' }}>
+                    TIED ON {tournamentAttribute.toUpperCase()} — LEGACY TIEBREAK
+                  </div>
+                  {/* Phase 2, Deploy 5 / Stage 11: surface the actual Legacy numbers
+                      so the player can see exactly why the tiebreak went the way it did. */}
+                  <div style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'baseline', gap: '14px', padding: '8px 12px', background: 'rgba(212,175,55,0.06)', borderRadius: '4px' }}>
+                    <span style={{ ...condFont, fontSize: '11px', color: colours.muted, letterSpacing: '0.15em' }}>LEGACY</span>
+                    <span style={{ ...displayFont, fontSize: '18px', fontWeight: 700, color: r.playerLegacy >= r.opponentLegacy ? '#5fb04a' : colours.cream }}>
+                      {r.playerLegacy}
+                    </span>
+                    <span style={{ ...condFont, fontSize: '11px', color: colours.muted }}>vs</span>
+                    <span style={{ ...displayFont, fontSize: '18px', fontWeight: 700, color: r.opponentLegacy > r.playerLegacy ? colours.accent : colours.cream }}>
+                      {r.opponentLegacy}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* VAR phrase — dry, procedural */}
+            <div style={{
+              ...condFont,
+              fontSize: '13px',
+              color: colours.cream,
+              textAlign: 'center',
+              padding: '14px 16px',
+              background: 'rgba(0,0,0,0.30)',
+              borderLeft: `2px solid ${colours.muted}`,
+              marginBottom: r.won ? '20px' : '14px',
+              lineHeight: 1.5,
+              letterSpacing: '0.04em'
+            }}>
+              {r.phrase}
+            </div>
+
+            {/* Pete's loss line — only on loss */}
+            {!r.won && (
+              <div style={{
+                background: 'rgba(232,52,74,0.08)',
+                border: '1px solid rgba(232,52,74,0.30)',
+                padding: '16px',
+                marginBottom: '20px',
+                borderRadius: '6px'
+              }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: colours.accent, marginBottom: '8px', fontWeight: 700 }}>
+                  PETE'S TAKE
+                </div>
+                <p style={{ ...condFont, fontStyle: 'italic', fontSize: '15px', color: colours.cream, margin: 0, lineHeight: 1.45 }}>
+                  &ldquo;{tournamentOpponent.peteLossLine}&rdquo;
+                </p>
+              </div>
+            )}
+
+            {/* Teams side-by-side */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '10px',
+              marginBottom: '24px'
+            }}>
+              {/* Player squad */}
+              <div style={{ background: colours.surface, padding: '12px 10px' }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.gold, marginBottom: '10px', textAlign: 'center', fontWeight: 700 }}>
+                  YOUR THREE
+                </div>
+                {squad.map((p, i) => {
+                  const scoresMap = p && p.isWorldCup
+                    ? worldCupAttributeScores(p.name)
+                    : stubAttributeScores(p.name);
+                  const sc = scoresMap[tournamentAttribute] || 0;
+                  return (
+                    <div key={i} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '6px 4px',
+                      borderBottom: i < 2 ? `1px solid rgba(255,255,255,0.05)` : 'none',
+                      ...condFont,
+                      fontSize: '12px'
+                    }}>
+                      <span style={{ color: colours.cream, fontWeight: 600 }}>{p.name}</span>
+                      <span style={{ color: colours.gold, fontWeight: 700, fontSize: '14px' }}>{sc}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Opponent squad */}
+              <div style={{ background: colours.surface, padding: '12px 10px' }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.muted, marginBottom: '10px', textAlign: 'center', fontWeight: 700 }}>
+                  THEIR THREE
+                </div>
+                {opponentPicks.map((p, i) => {
+                  const scoresMap = p && p.isWorldCup
+                    ? worldCupAttributeScores(p.name)
+                    : stubAttributeScores(p.name);
+                  const sc = scoresMap[tournamentAttribute] || 0;
+                  return (
+                    <div key={i} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '6px 4px',
+                      borderBottom: i < 2 ? `1px solid rgba(255,255,255,0.05)` : 'none',
+                      ...condFont,
+                      fontSize: '12px'
+                    }}>
+                      <span style={{ color: colours.cream, fontWeight: 600 }}>{p.name}</span>
+                      <span style={{ color: colours.muted, fontWeight: 700, fontSize: '14px' }}>{sc}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Action button — depends on outcome and round.
+                Phase 2, Deploy 5 / Stage 2: on a win, route to the round-won
+                congrats screen instead of advancing directly. Pick the Pete
+                reaction here so it's stable across re-renders. */}
+            {r.won && !isFinalRound && (
+              <button
+                onClick={() => {
+                  const reaction = pickRandomLine(PETE_R1_WIN_REACTIONS)
+                    || PETE_R1_WIN_REACTIONS[0];
+                  setRoundWinReaction(reaction);
+                  setScreen('tournament-round-won');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '16px 20px',
+                  background: '#5fb04a',
+                  color: '#0a1a08',
+                  border: 'none',
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(18px, 5vw, 22px)',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  cursor: 'pointer',
+                  marginBottom: '10px',
+                  boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                }}
+              >
+                <span>CONTINUE TO ROUND 2</span>
+                <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
+              </button>
+            )}
+            {r.won && isFinalRound && (
+              <button
+                onClick={() => {
+                  const reaction = pickRandomLine(PETE_R2_WIN_REACTIONS)
+                    || PETE_R2_WIN_REACTIONS[0];
+                  setRoundWinReaction(reaction);
+                  setScreen('tournament-round-won');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '16px 20px',
+                  background: '#5fb04a',
+                  color: '#0a1a08',
+                  border: 'none',
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(18px, 5vw, 22px)',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  cursor: 'pointer',
+                  marginBottom: '10px',
+                  boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                }}
+              >
+                <span>CONTINUE TO ROUND 3</span>
+                <span style={{ fontSize: '22px', lineHeight: 1 }}>→</span>
+              </button>
+            )}
+            <button
+              onClick={() => endTournamentAttempt(r.won ? `won-r${tournamentRound}` : `lost-r${tournamentRound}`)}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                background: 'transparent',
+                color: colours.muted,
+                border: `1px solid ${colours.muted}`,
+                borderRadius: '8px',
+                ...condFont,
+                fontSize: '12px',
+                fontWeight: 600,
+                letterSpacing: '0.2em',
+                cursor: 'pointer'
+              }}
+            >
+              ← BACK TO TOURNAMENT
+            </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT R3 INTRO SCREEN ----------
+  // Earns the moment. Pete-on-the-lounger banner, Pete's three picks visible,
+  // Pete's AI-generated argument shown, then the player drafts.
+  if (screen === 'tournament-r3-intro' && tournamentOpponent) {
+    const petePicks = resolveOpponentPicks(tournamentOpponent);
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '640px' }}>
+
+            {/* Pete on the lounger banner */}
+            <div style={{
+              position: 'relative',
+              marginBottom: '24px',
+              borderRadius: '10px',
+              overflow: 'hidden',
+              boxShadow: '0 6px 24px rgba(0,0,0,0.45)',
+              background: '#1a2840'
+            }}>
+              <picture>
+                <source srcSet="/pete-tournament.webp" type="image/webp" />
+                <img src="/pete-tournament.jpg" alt="Pete on the lounger" style={{ display: 'block', width: '100%', height: 'auto' }} />
+              </picture>
+            </div>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: '#5fb04a', marginBottom: '8px', fontWeight: 700 }}>
+                ROUND 3 — THE FINAL
+              </div>
+              <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 9vw, 52px)', fontWeight: 800, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                PETE THE PUNDIT
+              </h1>
+              <p style={{ ...condFont, fontStyle: 'italic', fontSize: '14px', color: colours.cream, marginTop: '14px', marginBottom: 0, opacity: 0.9 }}>
+                &ldquo;Oh. You’re still here. Sit down.&rdquo;
+              </p>
+            </div>
+
+            {/* Question */}
+            <div style={{ marginBottom: '20px', padding: '14px 18px', background: 'rgba(212,175,55,0.06)', borderLeft: `2px solid ${colours.gold}` }}>
+              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.3em', color: colours.gold, marginBottom: '4px' }}>
+                THE QUESTION
+              </div>
+              <p style={{ ...displayFont, fontSize: '18px', margin: 0, lineHeight: '1.2' }}>
+                {tournamentQuestionText}
+              </p>
+            </div>
+
+            {/* Pete's three picks */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: colours.muted, marginBottom: '8px', fontWeight: 700 }}>
+                PETE’S THREE
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {petePicks.map((p, i) => (
+                  <div key={i} style={{
+                    padding: '8px 12px',
+                    background: 'rgba(0,0,0,0.30)',
+                    border: `1px solid ${tierColourFor(p)}66`,
+                    fontSize: '14px',
+                    ...condFont,
+                    fontWeight: 600,
+                    color: colours.cream,
+                    borderRadius: '5px'
+                  }}>
+                    {showTierBadge(p) && (
+                      <span style={{ color: tierColourFor(p), marginRight: '6px' }}>
+                        {TIER_SYMBOLS[p.tier] || '\u2022'}
+                      </span>
+                    )}
+                    {p.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Pete's argument */}
+            <div style={{
+              background: 'rgba(95,176,74,0.06)',
+              border: '1px solid rgba(95,176,74,0.30)',
+              padding: '18px 20px',
+              marginBottom: '24px',
+              borderRadius: '8px'
+            }}>
+              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: '#5fb04a', marginBottom: '12px', fontWeight: 700 }}>
+                PETE’S ARGUMENT
+              </div>
+              {r3Loading && !r3PeteArgument ? (
+                <p style={{ ...condFont, fontStyle: 'italic', color: colours.muted, margin: 0, fontSize: '14px' }}>
+                  Pete is sharpening his case…
+                </p>
+              ) : r3PeteArgument ? (
+                <>
+                  <p style={{ ...condFont, fontSize: '15px', color: colours.cream, margin: '0 0 12px 0', lineHeight: 1.5 }}>
+                    {r3PeteArgument.argument}
+                  </p>
+                  <p style={{ ...condFont, fontStyle: 'italic', fontSize: '14px', color: colours.gold, margin: 0, lineHeight: 1.4 }}>
+                    &ldquo;{r3PeteArgument.taunt}&rdquo;
+                  </p>
+                </>
+              ) : (
+                <p style={{ ...condFont, color: colours.accent, margin: 0, fontSize: '14px' }}>
+                  Couldn’t reach Pete. Try again in a moment.
+                </p>
+              )}
+              {r3Error && (
+                <p style={{ ...condFont, fontSize: '11px', color: colours.muted, marginTop: '10px', marginBottom: 0, fontStyle: 'italic' }}>
+                  {r3Error}
+                </p>
+              )}
+            </div>
+
+            {/* Action button — draft your three */}
+            <button
+              onClick={() => {
+                // Begin drafting for R3. Player drafts from the Pete-eligible 108
+                // (Phase 2, Deploy 1 / Stage 3) — was generateDraft from the daily pool.
+                // Excludes Pete's three picks so there's no clash.
+                const petePickNames = resolveOpponentPicks(tournamentOpponent).map(p => p.name);
+                setDraftRounds(generateR3Draft(petePickNames));
+                setCurrentRound(0);
+                setSquad([]);
+                setScreen('draft');
+              }}
+              disabled={r3Loading || !r3PeteArgument}
+              style={{
+                width: '100%',
+                padding: '18px 20px',
+                background: (!r3Loading && r3PeteArgument) ? colours.gold : '#3a3a44',
+                color: (!r3Loading && r3PeteArgument) ? '#000' : colours.muted,
+                border: 'none',
+                borderRadius: '10px',
+                ...displayFont,
+                fontSize: 'clamp(18px, 5vw, 22px)',
+                fontWeight: 800,
+                letterSpacing: '0.08em',
+                cursor: (!r3Loading && r3PeteArgument) ? 'pointer' : 'not-allowed',
+                marginBottom: '12px',
+                boxShadow: (!r3Loading && r3PeteArgument) ? '0 4px 0 rgba(0,0,0,0.25)' : 'none',
+                opacity: (!r3Loading && r3PeteArgument) ? 1 : 0.6
+              }}
+            >
+              {r3Loading && !r3PeteArgument ? 'PETE IS THINKING…' : 'DRAFT YOUR THREE →'}
+            </button>
+
+            {/* Subtle back/forfeit */}
+            <button
+              onClick={() => endTournamentAttempt('forfeited-r3')}
+              style={{
+                width: '100%', padding: '10px 20px',
+                background: 'transparent', color: colours.muted,
+                border: `1px solid ${colours.muted}`, borderRadius: '8px',
+                ...condFont, fontSize: '11px', fontWeight: 600, letterSpacing: '0.22em',
+                cursor: 'pointer'
+              }}
+            >
+              FORFEIT — BACK TO TOURNAMENT
+            </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT R3 DEFENCE SCREEN ----------
+  // Player writes a 300-char response to Pete's argument.
+  if (screen === 'tournament-r3-defend' && tournamentOpponent) {
+    const petePicks = resolveOpponentPicks(tournamentOpponent);
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '640px' }}>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', marginBottom: '20px', paddingTop: '8px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: '#5fb04a', marginBottom: '6px', fontWeight: 700 }}>
+                ROUND 3 — YOUR DEFENCE
+              </div>
+              <h1 style={{ ...displayFont, fontSize: 'clamp(28px, 7vw, 38px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                SEND IT TO PETE
+              </h1>
+            </div>
+
+            {/* Recap of both sides */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '8px',
+              marginBottom: '16px'
+            }}>
+              <div style={{ background: colours.surface, padding: '10px 8px' }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.gold, marginBottom: '6px', textAlign: 'center', fontWeight: 700 }}>
+                  YOUR THREE
+                </div>
+                {squad.map((p, i) => (
+                  <div key={i} style={{ ...condFont, fontSize: '11px', color: colours.cream, padding: '2px 0', textAlign: 'center', fontWeight: 600 }}>
+                    {p.name}
+                  </div>
+                ))}
+              </div>
+              <div style={{ background: colours.surface, padding: '10px 8px' }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: colours.muted, marginBottom: '6px', textAlign: 'center', fontWeight: 700 }}>
+                  PETE’S THREE
+                </div>
+                {petePicks.map((p, i) => (
+                  <div key={i} style={{ ...condFont, fontSize: '11px', color: colours.cream, padding: '2px 0', textAlign: 'center', fontWeight: 600 }}>
+                    {p.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Pete's argument (recap) */}
+            {r3PeteArgument && (
+              <div style={{
+                background: 'rgba(95,176,74,0.06)',
+                border: '1px solid rgba(95,176,74,0.20)',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                borderRadius: '6px'
+              }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: '#5fb04a', marginBottom: '8px', fontWeight: 700 }}>
+                  PETE SAID
+                </div>
+                <p style={{ ...condFont, fontSize: '13px', color: colours.cream, margin: 0, lineHeight: 1.45 }}>
+                  {r3PeteArgument.argument}
+                </p>
+                <p style={{ ...condFont, fontStyle: 'italic', fontSize: '12px', color: colours.gold, margin: '8px 0 0 0' }}>
+                  &ldquo;{r3PeteArgument.taunt}&rdquo;
+                </p>
+              </div>
+            )}
+
+            {/* Instruction */}
+            <div style={{ ...condFont, fontSize: '13px', color: colours.cream, marginBottom: '12px', lineHeight: 1.5 }}>
+              Pete’s made his case. Now make yours. Argue for your three. Dismantle his. VAR is listening.
+            </div>
+
+            {/* Textarea */}
+            <textarea
+              value={r3PlayerDefence}
+              onChange={(e) => setR3PlayerDefence(e.target.value.slice(0, 250))}
+              placeholder="Argue your case in 250 characters. Be specific. Engage with Pete’s argument."
+              style={{
+                width: '100%',
+                minHeight: '120px',
+                padding: '14px',
+                background: colours.surface,
+                border: `1px solid rgba(255,255,255,0.12)`,
+                color: colours.cream,
+                ...condFont,
+                fontSize: '14px',
+                lineHeight: 1.5,
+                borderRadius: '6px',
+                resize: 'vertical',
+                boxSizing: 'border-box',
+                marginBottom: '6px'
+              }}
+            />
+            <div style={{ ...condFont, fontSize: '11px', color: colours.muted, marginBottom: '20px', textAlign: 'right' }}>
+              {r3PlayerDefence.length} / 250
+            </div>
+
+            {r3Error && (
+              <div style={{
+                ...condFont, fontSize: '12px', color: colours.accent,
+                marginBottom: '12px', padding: '8px 12px',
+                background: 'rgba(232,52,74,0.10)', border: '1px solid rgba(232,52,74,0.30)',
+                borderRadius: '4px'
+              }}>
+                {r3Error}
+              </div>
+            )}
+
+            {/* Send to Pete */}
+            <button
+              onClick={submitR3Defence}
+              disabled={r3Loading || r3PlayerDefence.trim().length === 0}
+              style={{
+                width: '100%',
+                padding: '18px 20px',
+                background: (!r3Loading && r3PlayerDefence.trim().length > 0) ? colours.gold : '#3a3a44',
+                color: (!r3Loading && r3PlayerDefence.trim().length > 0) ? '#000' : colours.muted,
+                border: 'none',
+                borderRadius: '10px',
+                ...displayFont,
+                fontSize: 'clamp(18px, 5vw, 22px)',
+                fontWeight: 800,
+                letterSpacing: '0.08em',
+                cursor: (!r3Loading && r3PlayerDefence.trim().length > 0) ? 'pointer' : 'not-allowed',
+                marginBottom: '10px',
+                boxShadow: (!r3Loading && r3PlayerDefence.trim().length > 0) ? '0 4px 0 rgba(0,0,0,0.25)' : 'none',
+                opacity: (!r3Loading && r3PlayerDefence.trim().length > 0) ? 1 : 0.6
+              }}
+            >
+              {r3Loading ? 'VAR REVIEWING…' : 'SEND IT TO PETE'}
+            </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- TOURNAMENT R3 VERDICT SCREEN ----------
+  // VAR delivers the comparative verdict. Pete reacts. Trophy awarded on win.
+  if (screen === 'tournament-r3-verdict' && r3VarVerdict && tournamentOpponent) {
+    const playerWon = r3VarVerdict.playerWon;
+    const petePicks = resolveOpponentPicks(tournamentOpponent);
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '640px' }}>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', paddingTop: '8px', marginBottom: '20px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px', fontWeight: 600 }}>
+                VAR DECISION — ROUND 3
+              </div>
+              {playerWon ? (
+                <>
+                  <div style={{ fontSize: '52px', lineHeight: 1, marginBottom: '6px' }} aria-hidden="true">🏆</div>
+                  <h1 style={{ ...displayFont, fontSize: 'clamp(38px, 10vw, 56px)', fontWeight: 800, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                    YOU BEAT PETE
+                  </h1>
+                  <div style={{ ...condFont, fontSize: '13px', letterSpacing: '0.22em', color: '#5fb04a', marginTop: '12px', fontWeight: 700 }}>
+                    +1 TROPHY
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h1 style={{ ...displayFont, fontSize: 'clamp(38px, 10vw, 56px)', fontWeight: 800, color: colours.accent, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                    PETE WINS
+                  </h1>
+                  <div style={{ ...condFont, fontSize: '13px', letterSpacing: '0.22em', color: colours.muted, marginTop: '12px', fontWeight: 600 }}>
+                    NO TROPHY TODAY
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* VAR verdict */}
+            <div style={{
+              background: 'rgba(0,0,0,0.30)',
+              borderLeft: `2px solid ${colours.muted}`,
+              padding: '14px 18px',
+              marginBottom: '14px'
+            }}>
+              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px', fontWeight: 700 }}>
+                VAR REVIEW
+              </div>
+              <p style={{ ...condFont, fontSize: '14px', color: colours.cream, margin: 0, lineHeight: 1.55, letterSpacing: '0.02em' }}>
+                {r3VarVerdict.verdict}
+              </p>
+            </div>
+
+            {/* Pete's reaction */}
+            <div style={{
+              background: playerWon ? 'rgba(212,175,55,0.08)' : 'rgba(232,52,74,0.08)',
+              border: `1px solid ${playerWon ? 'rgba(212,175,55,0.30)' : 'rgba(232,52,74,0.30)'}`,
+              padding: '14px 18px',
+              marginBottom: '20px',
+              borderRadius: '6px'
+            }}>
+              <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.28em', color: playerWon ? colours.gold : colours.accent, marginBottom: '8px', fontWeight: 700 }}>
+                PETE’S TAKE
+              </div>
+              <p style={{ ...condFont, fontStyle: 'italic', fontSize: '15px', color: colours.cream, margin: 0, lineHeight: 1.45 }}>
+                &ldquo;{r3PeteReaction}&rdquo;
+              </p>
+            </div>
+
+            {/* Recap — both sides */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '8px',
+              marginBottom: '20px'
+            }}>
+              <div style={{ background: colours.surface, padding: '10px 8px', borderTop: `2px solid ${playerWon ? colours.gold : colours.muted}` }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: playerWon ? colours.gold : colours.muted, marginBottom: '6px', textAlign: 'center', fontWeight: 700 }}>
+                  YOU
+                </div>
+                {squad.map((p, i) => (
+                  <div key={i} style={{ ...condFont, fontSize: '11px', color: colours.cream, padding: '2px 0', textAlign: 'center', fontWeight: 600 }}>
+                    {p.name}
+                  </div>
+                ))}
+              </div>
+              <div style={{ background: colours.surface, padding: '10px 8px', borderTop: `2px solid ${!playerWon ? colours.accent : colours.muted}` }}>
+                <div style={{ ...condFont, fontSize: '10px', letterSpacing: '0.22em', color: !playerWon ? colours.accent : colours.muted, marginBottom: '6px', textAlign: 'center', fontWeight: 700 }}>
+                  PETE
+                </div>
+                {petePicks.map((p, i) => (
+                  <div key={i} style={{ ...condFont, fontSize: '11px', color: colours.cream, padding: '2px 0', textAlign: 'center', fontWeight: 600 }}>
+                    {p.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Back to tournament */}
+            <button
+              onClick={() => endTournamentAttempt(playerWon ? 'won-r3' : 'lost-r3')}
+              style={{
+                width: '100%', padding: '14px 20px',
+                background: playerWon ? colours.gold : 'transparent',
+                color: playerWon ? '#000' : colours.gold,
+                border: playerWon ? 'none' : `2px solid ${colours.gold}`,
+                borderRadius: '10px',
+                ...displayFont, fontSize: '16px', fontWeight: 700, letterSpacing: '0.12em',
+                cursor: 'pointer',
+                boxShadow: playerWon ? '0 4px 0 rgba(0,0,0,0.25)' : 'none'
+              }}
+            >
+              ← BACK TO TOURNAMENT
             </button>
           </div>
         </div>
