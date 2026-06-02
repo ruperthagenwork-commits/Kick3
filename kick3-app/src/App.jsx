@@ -3067,6 +3067,19 @@ Deliver your verdict as JSON.`;
 
   // ---------- HOME SCREEN ----------
   if (screen === 'home') {
+    // Phase 2, Deploy 5 / Stage 15: Tournament button now always renders on the
+    // home screen — but in a LOCKED state for the general public until 11 June
+    // 2026. Beta users (?beta=pete) and the launch date itself unlock it.
+    //
+    // Conditions for tournamentUnlocked:
+    //   - tournamentBetaActive (someone with ?beta=pete) → unlocked early
+    //   - current date is on or after 11 June 2026 → unlocked for everyone (launch)
+    const tournamentUnlocked = (() => {
+      if (tournamentBetaActive) return true;
+      const now = new Date();
+      const launch = new Date(TOURNAMENT_CONFIG.startDate + 'T00:00:00');
+      return now >= launch;
+    })();
     return (
       <>
         <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
@@ -3404,8 +3417,10 @@ Deliver your verdict as JSON.`;
                 </div>
               </div>
 
-              {/* TOURNAMENT MODE — green (beta-only, hidden unless ?beta=pete) */}
-              {tournamentBetaActive && (
+              {/* TOURNAMENT MODE — green when unlocked, locked/greyed for general public pre-launch.
+                  Phase 2, Deploy 5 / Stage 15: button now ALWAYS renders. Locked state
+                  shows a 🔒 emoji and "OPENS 11 JUNE" subtitle, fully unclickable. */}
+              {tournamentUnlocked ? (
                 <button
                   onClick={() => setScreen('tournament-home')}
                   className="kick3-button-hover kick3-pulse-gold"
@@ -3443,6 +3458,47 @@ Deliver your verdict as JSON.`;
                     borderRadius: '4px',
                     lineHeight: 1
                   }}>BETA</span>
+                </button>
+              ) : (
+                <button
+                  disabled
+                  aria-label="Tournament mode opens 11 June 2026"
+                  style={{
+                    width: '100%',
+                    padding: '14px 20px',
+                    background: '#3a3a44',
+                    color: colours.muted,
+                    border: 'none',
+                    borderRadius: '10px',
+                    ...displayFont,
+                    fontSize: 'clamp(20px, 5.4vw, 24px)',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    cursor: 'not-allowed',
+                    marginBottom: '12px',
+                    boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                    opacity: 0.75
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span aria-hidden="true">🔒</span>
+                    <span>TOURNAMENT MODE</span>
+                  </span>
+                  <span style={{
+                    ...condFont,
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    color: colours.gold,
+                    opacity: 0.95
+                  }}>
+                    OPENS 11 JUNE
+                  </span>
                 </button>
               )}
 
@@ -3903,8 +3959,9 @@ Deliver your verdict as JSON.`;
                   </div>
                 </div>
 
-                {/* TOURNAMENT MODE — green (beta-only, hidden unless ?beta=pete) */}
-                {tournamentBetaActive && (
+                {/* TOURNAMENT MODE — green when unlocked, locked/greyed for general public pre-launch.
+                    Phase 2, Deploy 5 / Stage 15: button now ALWAYS renders. */}
+                {tournamentUnlocked ? (
                   <button
                     onClick={() => setScreen('tournament-home')}
                     className="kick3-desktop-btn-tournament kick3-pulse-gold"
@@ -3942,6 +3999,47 @@ Deliver your verdict as JSON.`;
                       borderRadius: '5px',
                       lineHeight: 1
                     }}>BETA</span>
+                  </button>
+                ) : (
+                  <button
+                    disabled
+                    aria-label="Tournament mode opens 11 June 2026"
+                    style={{
+                      width: '100%',
+                      padding: '18px 24px',
+                      background: '#3a3a44',
+                      color: colours.muted,
+                      border: 'none',
+                      borderRadius: '12px',
+                      ...displayFont,
+                      fontSize: 'clamp(24px, 2.4vw, 30px)',
+                      fontWeight: 800,
+                      letterSpacing: '0.08em',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      cursor: 'not-allowed',
+                      marginBottom: '14px',
+                      boxShadow: '0 5px 0 rgba(0,0,0,0.25)',
+                      opacity: 0.75
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span aria-hidden="true">🔒</span>
+                      <span>TOURNAMENT MODE</span>
+                    </span>
+                    <span style={{
+                      ...condFont,
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      letterSpacing: '0.2em',
+                      color: colours.gold,
+                      opacity: 0.95
+                    }}>
+                      OPENS 11 JUNE
+                    </span>
                   </button>
                 )}
 
