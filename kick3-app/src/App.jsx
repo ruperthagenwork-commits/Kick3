@@ -2081,11 +2081,20 @@ export default function Kick3() {
   //   - Jumping to specific screens during development
   //   - Inspecting the current React state
   // No effect in production / no debug flag — completely inert.
+  //
+  // Phase 2, Deploy 5 / Stage 13: gated to non-production hosts only. Even if someone
+  // discovers the debug flag, the helpers won't attach on kick3.app — they only attach
+  // on Vercel preview URLs (*.vercel.app) and localhost. This is belt-and-braces:
+  // the helpers don't write server data anyway, but it's good hygiene to keep dev
+  // tools out of production.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const debugFlag = params.get('debug');
     if (debugFlag !== 'tournament-unlock' && debugFlag !== 'tournament-locked') return;
+    const host = window.location.hostname || '';
+    const isDevHost = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.vercel.app');
+    if (!isDevHost) return; // Don't attach on production (kick3.app).
     window.kick3 = {
       // Direct setters — use with caution.
       setScreen,
