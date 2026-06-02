@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 
 // --- 384 shared player pool + 31 daily questions ---
@@ -888,7 +888,7 @@ YOUR JOB:
 You will be given the question and three players you've been dealt. Write a SHORT, CONFIDENT argument defending those three picks against the question. End with a sarcastic "beat this" line that taunts the player.
 
 CONSTRAINTS:
-- 60-90 words total. Punchy. Not a lecture.
+- 40-60 words total. Tight. Punchy. Not a lecture. A pub-pundit clap-back, not a column.
 - Mention each of your three picks by name with a single World Cup-specific reason.
 - End with a one-line sarcastic taunt to the player.
 - Don't reference attribute scores or the game's mechanics. Talk like a pundit.
@@ -1612,7 +1612,7 @@ const OPPONENT_SQUADS = [
   // Trio 1
   {
     A: {
-      pubmate: { picks: ["Frank Lampard", "John Terry", "Kléberson"], voice: "Mate Dave at the table" },
+      pubmate: { picks: ["Frank Lampard", "John Terry", "Cafu"], voice: "Mate Dave at the table" },
       producer: { picks: ["N'Golo Kanté", "Luka Modrić", "Hristo Stoichkov"], voice: "The model said three" },
     },
     B: {
@@ -1672,15 +1672,15 @@ const OPPONENT_SQUADS = [
   // Trio 5
   {
     A: {
-      pubmate: { picks: ["John Terry", "Wayne Rooney", "Steven Gerrard"], voice: "Mate Dave at the table" },
+      pubmate: { picks: ["John Terry", "Wayne Rooney", "Asamoah Gyan"], voice: "Mate Dave at the table" },
       producer: { picks: ["Carlos Tevez", "Mario Götze", "Hidetoshi Nakata"], voice: "Endurance optimisation model" },
     },
     B: {
-      pubmate: { picks: ["Bobby Charlton", "Paul Gascoigne", "Geoff Hurst"], voice: "Asked his dad" },
+      pubmate: { picks: ["Andrea Pirlo", "Paul Gascoigne", "Geoff Hurst"], voice: "Asked his dad" },
       producer: { picks: ["Andoni Zubizarreta", "Riyad Mahrez", "Mario Götze"], voice: "Re-weighted for late-tournament fatigue" },
     },
     C: {
-      pubmate: { picks: ["Bukayo Saka", "Vinícius Júnior", "Neymar"], voice: "Saw it on Twitter" },
+      pubmate: { picks: ["Antoine Griezmann", "Vinícius Júnior", "Neymar"], voice: "Saw it on Twitter" },
       producer: { picks: ["Lothar Matthäus", "Frank Lampard", "Joaquín Correa"], voice: "Minutes-played per goal contribution paper" },
     },
   },
@@ -1702,7 +1702,7 @@ const OPPONENT_SQUADS = [
   // Trio 7
   {
     A: {
-      pubmate: { picks: ["Wayne Rooney", "Edgar Davids", "Luis Suárez"], voice: "Mate Dave at the table" },
+      pubmate: { picks: ["Wayne Rooney", "Edgar Davids", "Romário"], voice: "Mate Dave at the table" },
       producer: { picks: ["Paul Gascoigne", "El Hadji Diouf", "Bobby Moore"], voice: "Late-game deadlock-breaker model" },
     },
     B: {
@@ -1732,7 +1732,7 @@ const OPPONENT_SQUADS = [
   // Trio 9
   {
     A: {
-      pubmate: { picks: ["Wayne Rooney", "Edgar Davids", "Bukayo Saka"], voice: "Mate Dave at the table" },
+      pubmate: { picks: ["Wayne Rooney", "Edgar Davids", "Antoine Griezmann"], voice: "Mate Dave at the table" },
       producer: { picks: ["Andrea Pirlo", "Marcel Desailly", "Hristo Stoichkov"], voice: "Composure-tournament index" },
     },
     B: {
@@ -1747,7 +1747,7 @@ const OPPONENT_SQUADS = [
   // Trio 10
   {
     A: {
-      pubmate: { picks: ["Phil Foden", "Edgar Davids", "Joaquín Correa"], voice: "Mate Dave at the table" },
+      pubmate: { picks: ["Phil Foden", "Edgar Davids", "Declan Rice"], voice: "Mate Dave at the table" },
       producer: { picks: ["Carlos Tevez", "Luis Suárez", "Joaquín Correa"], voice: "Squad-rotation minutes model" },
     },
     B: {
@@ -1777,11 +1777,11 @@ const OPPONENT_SQUADS = [
   // Trio 12
   {
     A: {
-      pubmate: { picks: ["Edgar Davids", "Hristo Stoichkov", "Wayne Rooney"], voice: "Mate Dave at the table" },
+      pubmate: { picks: ["Edgar Davids", "Paul Gascoigne", "Wayne Rooney"], voice: "Mate Dave at the table" },
       producer: { picks: ["Bastian Schweinsteiger", "Andrea Pirlo", "N'Golo Kanté"], voice: "Composure × duels model" },
     },
     B: {
-      pubmate: { picks: ["Vinícius Júnior", "Riyad Mahrez", "Neymar"], voice: "Saw it on Twitter" },
+      pubmate: { picks: ["Vinícius Júnior", "Riyad Mahrez", "Arjen Robben"], voice: "Saw it on Twitter" },
       producer: { picks: ["David Beckham", "Edgar Davids", "Patrick Vieira"], voice: "Premier-League-WC overlap" },
     },
     C: {
@@ -2072,6 +2072,49 @@ export default function Kick3() {
   // screen between R1→R2 and R2→R3. Picked once when the player wins, stable
   // across re-renders. Reset on each tournament attempt start.
   const [roundWinReaction, setRoundWinReaction] = useState('');
+
+  // ============ DRAFT CARDS — MEMOISED GK AUTO-SWAP (Phase 2, Deploy 5 / Stage 10) ============
+  // BUG FIX: previously the GK auto-swap ran shuffle() inline inside the draft screen
+  // render. Any state change (typing in textarea, hover, anything) re-rendered the
+  // screen and re-shuffled the replacement cards — making players appear to "rotate"
+  // every few seconds. Memoising the swap so it only recomputes when the actual
+  // round genuinely changes.
+  //
+  // GK rule: max 1 goalkeeper per squad of 3. If the player has already picked a GK
+  // and any card in this round is also a GK, swap that GK card for a fresh non-GK
+  // pick. Source pool depends on context: R3 uses Pete-eligible 108; R1/R2 uses the
+  // full World Cup 180; daily/h2h use PLAYER_POOL.
+  const draftCardsForCurrentRound = useMemo(() => {
+    const baseCards = draftRounds[currentRound] || [];
+    const hasGkInSquad = squad.some(sq => sq.position === "GK");
+    const gkCardCount = baseCards.filter(c => c && c.position === "GK").length;
+    if (!hasGkInSquad || gkCardCount === 0) {
+      return baseCards;
+    }
+    const usedNames = new Set([
+      ...squad.map(p => p.name),
+      ...draftRounds.flat().filter(Boolean).map(p => p.name)
+    ]);
+    const isWorldCupDraft = baseCards.some(c => c && c.isWorldCup);
+    let replacements;
+    if (isWorldCupDraft) {
+      const sourcePool = tournamentRound === 3 ? getPeteEligiblePool() : WORLD_CUP_POOL;
+      replacements = shuffle(
+        sourcePool.filter(p => p.position !== "GK" && !usedNames.has(p.name))
+      ).map(enrichWorldCupCard);
+    } else {
+      replacements = shuffle(
+        PLAYER_POOL.filter(p => p.position !== "GK" && !usedNames.has(p.name))
+      );
+    }
+    let ri = 0;
+    return baseCards.map(c => {
+      if (c && c.position === "GK" && ri < replacements.length) {
+        return replacements[ri++];
+      }
+      return c;
+    });
+  }, [draftRounds, currentRound, squad, tournamentRound]);
 
   // ============ VAR-CHECKING SCREEN STATE (Phase 2, Deploy 5 / Stage 1) ============
   // The VAR screen cycles through three status lines (1s each) before routing to
@@ -4048,43 +4091,7 @@ Deliver your verdict as JSON.`;
 
   // ---------- DRAFT SCREEN ----------
   if (screen === 'draft') {
-    let cards = draftRounds[currentRound] || [];
-    // GK rule: max 1 goalkeeper per squad of 3.
-    // If the player has already picked a GK and any card in this round is also a GK,
-    // swap that GK card for a fresh non-GK pick. Phase 2, Deploy 4: was previously
-    // showing the GK card disabled with "ALREADY GOT A KEEPER" — better UX is to
-    // give the player two genuine choices instead.
-    // Source pool depends on context: R3 uses the Pete-eligible 108 (preserves card
-    // shape + ratings); R1/R2 uses the World Cup 180; daily/h2h use PLAYER_POOL.
-    const hasGkInSquad = squad.some(sq => sq.position === "GK");
-    const gkCardCount = cards.filter(c => c && c.position === "GK").length;
-    if (hasGkInSquad && gkCardCount > 0) {
-      const usedNames = new Set([
-        ...squad.map(p => p.name),
-        ...draftRounds.flat().filter(Boolean).map(p => p.name)
-      ]);
-      const isWorldCupDraft = cards.some(c => c && c.isWorldCup);
-      let replacements;
-      if (isWorldCupDraft) {
-        // Tournament R1/R2 (full 180) or R3 (Pete-eligible 108).
-        // Use the same pool the round was drafted from for visual consistency.
-        const sourcePool = tournamentRound === 3 ? getPeteEligiblePool() : WORLD_CUP_POOL;
-        replacements = shuffle(
-          sourcePool.filter(p => p.position !== "GK" && !usedNames.has(p.name))
-        ).map(enrichWorldCupCard);
-      } else {
-        replacements = shuffle(
-          PLAYER_POOL.filter(p => p.position !== "GK" && !usedNames.has(p.name))
-        );
-      }
-      let ri = 0;
-      cards = cards.map(c => {
-        if (c && c.position === "GK" && ri < replacements.length) {
-          return replacements[ri++];
-        }
-        return c;
-      });
-    }
+    const cards = draftCardsForCurrentRound;
     return (
       <>
         <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&family=Permanent+Marker&display=swap" rel="stylesheet" />
