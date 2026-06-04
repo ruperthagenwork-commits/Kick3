@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import { supabase, getCurrentProfile } from './supabaseClient.js';
+import { supabase } from './supabaseClient.js';
 
 // --- 384 shared player pool + 31 daily questions ---
 // Players are drawn at random from PLAYER_POOL for every question.
@@ -1138,6 +1138,27 @@ const friendlyAuthError = (err) => {
   }
   return 'Something went wrong. Try again.';
 };
+
+// Fetch the profile row for a given Supabase user id. Uses .maybeSingle() so
+// "no row" returns null cleanly instead of throwing a 406. The Stage 17 helper
+// in supabaseClient.js used .single() which 406s when the profile hasn't been
+// inserted yet — that's the bug Stage 18.1 is fixing.
+//
+// Returns the profile row (id, handle, created_at) or null.
+const fetchProfileForUser = async (userId) => {
+  if (!userId) return null;
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, handle, created_at')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) return null;
+    return data || null;
+  } catch {
+    return null;
+  }
+};
 // ============ END AUTH HELPERS ============
 
 // Phase 2, Deploy 5 / Stage 14: Tournament play allowance model.
@@ -2189,7 +2210,7 @@ export default function Kick3() {
         if (session?.user) {
           setAuthUser(session.user);
           // Fetch matching profile row (handle, etc.). Safe if missing.
-          const profile = await getCurrentProfile();
+          const profile = await fetchProfileForUser(session.user.id);
           if (cancelled) return;
           setAuthProfile(profile);
         }
@@ -2211,7 +2232,7 @@ export default function Kick3() {
         if (cancelled) return;
         if (session?.user) {
           setAuthUser(session.user);
-          const profile = await getCurrentProfile();
+          const profile = await fetchProfileForUser(session.user.id);
           if (!cancelled) setAuthProfile(profile);
         } else {
           setAuthUser(null);
@@ -2329,8 +2350,16 @@ export default function Kick3() {
       // record the player has built up so far.
       await syncTrophiesToCloud(newUser.id);
 
-      // Step 4: success. The auth state subscription in the mount useEffect
-      // will pick up the new session and update authUser/authProfile.
+      // Step 4: success. Explicitly set authUser AND fetch+set authProfile
+      // here rather than relying on the onAuthStateChange listener — the
+      // listener already fired when signUp() returned, BEFORE the profile row
+      // existed, so authProfile is currently null. Stage 18.1 fix: we know
+      // the profile row exists now (Step 2 just inserted it), so we fetch and
+      // set it directly. The home screen check `authUser && authProfile`
+      // will now succeed and render the "SIGNED IN" badge correctly.
+      setAuthUser(newUser);
+      const newProfile = await fetchProfileForUser(newUser.id);
+      if (newProfile) setAuthProfile(newProfile);
       setAuthSuccess(`Welcome, ${handle}.`);
       // Brief celebratory pause, then return to home.
       setTimeout(() => {
@@ -2413,6 +2442,12 @@ export default function Kick3() {
         }
       }
 
+      // Stage 18.1: explicitly set authUser + authProfile here too. Sign-in
+      // generally works through the listener fine, but being explicit removes
+      // any race and makes the success path deterministic.
+      setAuthUser(signedInUser);
+      const signedInProfile = await fetchProfileForUser(signedInUser.id);
+      if (signedInProfile) setAuthProfile(signedInProfile);
       setAuthSuccess(`Welcome back, ${handle}.`);
       setTimeout(() => {
         resetAuthForm();
