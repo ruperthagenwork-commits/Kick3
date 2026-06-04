@@ -2418,6 +2418,8 @@ export default function Kick3() {
       setAuthUser(newUser);
       const newProfile = await fetchProfileForUser(newUser.id);
       if (newProfile) setAuthProfile(newProfile);
+      // Stage 21.1: fresh plays on account creation.
+      resetDailyPlayCounts();
       setAuthSuccess(`Welcome, ${handle}.`);
       // Brief celebratory pause, then return to home.
       setTimeout(() => {
@@ -2548,6 +2550,8 @@ export default function Kick3() {
       setAuthUser(signedInUser);
       const signedInProfile = await fetchProfileForUser(signedInUser.id);
       if (signedInProfile) setAuthProfile(signedInProfile);
+      // Stage 21.1: fresh plays on sign-in.
+      resetDailyPlayCounts();
       setAuthSuccess(`Welcome back, ${handle}.`);
       setTimeout(() => {
         resetAuthForm();
@@ -2560,9 +2564,56 @@ export default function Kick3() {
     }
   };
 
+  // ============ DAILY PLAY RESET (Phase 2, Deploy 5 / Stage 21.1) ============
+  // Wipe the solo + 1v1 daily play counters. Called at every auth event:
+  // sign-up, sign-in, sign-out, delete-account. Rationale: auth events are
+  // natural "fresh entry" moments — let players get a clean play allowance.
+  //
+  // Stage 21.2: ONCE PER DAY PER DEVICE. Without this cap, a user could
+  // sign-out / sign-in indefinitely to get unlimited plays. Now we track the
+  // last day a reset was granted on this device (by today's question.number),
+  // and skip the reset if it's already been used today. Crossing midnight
+  // restores the entitlement.
+  //
+  // NOT touched: the tournament daily cap (kick3_tournament_v1.attemptsToday
+  // and wonTodayFlag). Tournament trophies persist across auth events and
+  // sync to the cloud — resetting them would create inconsistency. Solo/1v1
+  // counters are pure localStorage with no cloud tie-in, safe to wipe.
+  //
+  // Special case: delete-account ALWAYS resets, bypassing the once-per-day
+  // cap. Account deletion is the strongest "fresh start" intent — if a user
+  // wipes their account, give them a clean board regardless. (Passed in via
+  // the `bypassDailyCap` argument.)
+  const PLAY_RESET_DAY_KEY = 'kick3_play_reset_day';
+
+  const resetDailyPlayCounts = (bypassDailyCap = false) => {
+    try {
+      // Check the once-per-day cap unless explicitly bypassed.
+      if (!bypassDailyCap) {
+        const lastResetDay = parseInt(localStorage.getItem(PLAY_RESET_DAY_KEY) || '0', 10);
+        if (lastResetDay === TODAYS_QUESTION.number) {
+          // Already used today's reset on this device. No-op.
+          return;
+        }
+      }
+      localStorage.removeItem('kick3_solo_plays');
+      localStorage.removeItem('kick3_h2h_plays');
+      localStorage.removeItem('kick3_plays_day');
+      // Stamp today's question.number so a subsequent auth event today
+      // doesn't get a second reset. Day rollover (different question.number)
+      // restores entitlement automatically.
+      localStorage.setItem(PLAY_RESET_DAY_KEY, String(TODAYS_QUESTION.number));
+      // Update React state so the home-screen buttons re-render unlocked.
+      setPlays({ solo: 0, h2h: 0, day: TODAYS_QUESTION.number });
+    } catch { /* silent */ }
+  };
+  // ============ END DAILY PLAY RESET ============
+
   // SIGN OUT — clear Supabase session. authUser/authProfile will be cleared
   // by the onAuthStateChange listener in the mount useEffect.
   const submitSignOut = async () => {
+    // Stage 21.1: reset daily play counts on sign-out for fresh-start feel.
+    resetDailyPlayCounts();
     try {
       await supabase.auth.signOut();
     } catch (err) {
@@ -2798,6 +2849,14 @@ export default function Kick3() {
       // Clear local trophy state too — the user explicitly chose to wipe.
       try { localStorage.removeItem(TOURNAMENT_CONFIG.storageKey); } catch {}
       try { localStorage.removeItem('kick3_sync_retry_pending'); } catch {}
+      // Stage 21.1: also wipe the daily play counters. Account deletion is
+      // the strongest "fresh start" intent — match it with the cleanest reset.
+      // Stage 21.2: pass true to bypass the once-per-day cap. Deletion is
+      // a deliberate destructive act; the user has earned a clean slate.
+      // Also clear the reset-day stamp itself so the deleted-then-signed-up
+      // user can use their once-per-day reset entitlement going forward.
+      resetDailyPlayCounts(true);
+      try { localStorage.removeItem('kick3_play_reset_day'); } catch {}
       // Reset profile-screen state and return home.
       setProfileCloudState(null);
       setDeleteConfirmStage(0);
