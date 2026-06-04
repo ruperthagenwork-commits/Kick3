@@ -2322,6 +2322,10 @@ export default function Kick3() {
     if (!userId) return;
     try {
       const local = readTournamentState();
+      // Stage 21: also capture current local daily stats so first sign-up
+      // saves everything in one round-trip. Falls back to empty object if
+      // no stats exist yet (new player).
+      const localStats = readScoreStatsFromStorage() || {};
       const { error } = await supabase
         .from('tournament_state')
         .upsert({
@@ -2331,6 +2335,7 @@ export default function Kick3() {
           tournaments_completed: local.tournamentsCompleted || 0,
           last_played_date: local.lastPlayedDate || null,
           last_attempt_result: local.lastAttemptResult || null,
+          daily_stats: localStats,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
       if (error && typeof console !== 'undefined') {
@@ -2502,10 +2507,33 @@ export default function Kick3() {
             // Local has more — push local up to cloud.
             await syncTrophiesToCloud(signedInUser.id);
           }
+
+          // Stage 21: same reconciliation pattern for daily stats.
+          // Higher TOTAL events wins as a unit (we don't try to merge
+          // distributions — too risky if a sync ran partially before).
+          const cloudStats = cloudRow.daily_stats || {};
+          const localStats = readScoreStatsFromStorage();
+          const cloudTotal = totalEventsInStats(cloudStats);
+          const localTotal = totalEventsInStats(localStats);
+          if (cloudTotal > localTotal) {
+            // Cloud is more complete — pull down to local.
+            try {
+              localStorage.setItem('kick3_score_counts', JSON.stringify(cloudStats));
+              setScoreStats(cloudStats);
+            } catch {}
+          } else if (localTotal > cloudTotal) {
+            // Local is more complete — push up to cloud.
+            await pushDailyStatsToCloud();
+          }
+          // Equal totals: do nothing (already in sync).
         } else if (!cloudRow) {
           // No cloud row exists yet (edge case — profile but no state row).
           // Push local up.
           await syncTrophiesToCloud(signedInUser.id);
+          // Stage 21: also push local stats up if we have any.
+          if (totalEventsInStats(readScoreStatsFromStorage()) > 0) {
+            await pushDailyStatsToCloud();
+          }
         }
       } catch (syncErr) {
         // Reconciliation failed — sign-in still succeeded. Log and continue.
@@ -2612,6 +2640,58 @@ export default function Kick3() {
       await pushTournamentStateToCloud();
     } catch {}
   };
+
+  // ============ DAILY STATS SYNC (Phase 2, Deploy 5 / Stage 21) ============
+  // Same pattern as tournament state: localStorage is authoritative, cloud is
+  // the cross-device backup. The score-distribution object lives under the
+  // 'daily_stats' jsonb column on tournament_state. We push after every score
+  // increment (fire-and-forget) and pull on sign-in (higher-total wins).
+
+  // Total number of verdicts captured in a stats distribution object.
+  // Used to decide which side wins reconciliation on sign-in.
+  const totalEventsInStats = (stats) => {
+    if (!stats || typeof stats !== 'object') return 0;
+    let total = 0;
+    for (const k of Object.keys(stats)) {
+      const v = parseInt(stats[k], 10);
+      if (!isNaN(v) && v > 0) total += v;
+    }
+    return total;
+  };
+
+  // Push the current localStorage daily stats up to the cloud.
+  // Writes to the daily_stats jsonb column on tournament_state.
+  // Silent on failure (sets the same retry flag tournament sync uses).
+  // No-op when signed out.
+  const pushDailyStatsToCloud = async () => {
+    if (!authUser) return false;
+    try {
+      const localStats = readScoreStatsFromStorage();
+      const { error } = await supabase
+        .from('tournament_state')
+        .upsert({
+          user_id: authUser.id,
+          daily_stats: localStats || {},
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      if (error) {
+        if (typeof console !== 'undefined') {
+          console.warn('[kick3] daily stats sync failed, will retry on next load:', error);
+        }
+        try { localStorage.setItem(SYNC_RETRY_KEY, '1'); } catch {}
+        return false;
+      }
+      try { localStorage.removeItem(SYNC_RETRY_KEY); } catch {}
+      return true;
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] daily stats sync threw, will retry on next load:', err);
+      }
+      try { localStorage.setItem(SYNC_RETRY_KEY, '1'); } catch {}
+      return false;
+    }
+  };
+  // ============ END DAILY STATS SYNC ============
   // ============ END CLOUD SYNC ============
 
   // ============ PROFILE SCREEN (Phase 2, Deploy 5 / Stage 20) ============
@@ -3026,6 +3106,9 @@ export default function Kick3() {
       const next = { ...prev, [s]: (prev[s] || 0) + 1 };
       localStorage.setItem('kick3_score_counts', JSON.stringify(next));
       setScoreStats(next);
+      // Stage 21: push to cloud if signed in. Fire-and-forget — UI doesn't
+      // wait. No-op when signed out (silent in pushDailyStatsToCloud).
+      pushDailyStatsToCloud();
     } catch { /* silent */ }
   };
 
