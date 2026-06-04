@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Analytics } from '@vercel/analytics/react';
+import { supabase, getCurrentProfile } from './supabaseClient.js';
 
 // --- 384 shared player pool + 31 daily questions ---
 // Players are drawn at random from PLAYER_POOL for every question.
@@ -2077,6 +2078,69 @@ export default function Kick3() {
   // - Default 'tournament-home' preserves existing behaviour for tournament-home → RECORD
   // - New trophy badge on the main home screen sets this to 'home' before routing in
   const [recordReturnScreen, setRecordReturnScreen] = useState('tournament-home');
+
+  // ============ AUTH STATE (Phase 2, Deploy 5 / Stage 17) ============
+  // Optional sign-in: the game works fully without it. authUser is the
+  // Supabase user object (or null when signed out). authProfile is the row
+  // from public.profiles (handle, created_at) for the current user.
+  // authReady becomes true once we've checked Supabase for an existing
+  // session — used to delay rendering of sign-in-related UI until we know.
+  const [authUser, setAuthUser] = useState(null);
+  const [authProfile, setAuthProfile] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  // Check Supabase session once on mount; subscribe to auth state changes.
+  // Session is persisted in localStorage by Supabase, so a previously signed-in
+  // user is restored automatically on page reload.
+  useEffect(() => {
+    let cancelled = false;
+
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (session?.user) {
+          setAuthUser(session.user);
+          // Fetch matching profile row (handle, etc.). Safe if missing.
+          const profile = await getCurrentProfile();
+          if (cancelled) return;
+          setAuthProfile(profile);
+        }
+      } catch (err) {
+        // Network errors are non-fatal — the game still works signed-out.
+        if (typeof console !== 'undefined') {
+          console.warn('[kick3] auth init error (non-fatal):', err);
+        }
+      } finally {
+        if (!cancelled) setAuthReady(true);
+      }
+    };
+
+    initAuth();
+
+    // Listen for auth state changes (sign-in, sign-out, token refresh).
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (cancelled) return;
+        if (session?.user) {
+          setAuthUser(session.user);
+          const profile = await getCurrentProfile();
+          if (!cancelled) setAuthProfile(profile);
+        } else {
+          setAuthUser(null);
+          setAuthProfile(null);
+        }
+      }
+    );
+
+    return () => {
+      cancelled = true;
+      // Unsubscribe from auth changes when the component unmounts.
+      if (subscription?.subscription?.unsubscribe) {
+        subscription.subscription.unsubscribe();
+      }
+    };
+  }, []);
 
   // ============ TOURNAMENT MODE — BETA GATE ============
   // tournamentBetaActive is true if ?beta=pete is (or was) in the URL.
