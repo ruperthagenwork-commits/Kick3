@@ -1122,7 +1122,15 @@ const friendlyAuthError = (err) => {
   if (!err) return 'Something went wrong. Try again.';
   const msg = (err.message || String(err)).toLowerCase();
   if (msg.includes('already registered') || msg.includes('user already exists')) {
-    return 'That handle is taken. Try another.';
+    // Stage 20.1: Distinguish from a true handle collision.
+    // This branch fires when Supabase Auth rejects the email — including the
+    // case where the handle WAS used, the user deleted their account, and
+    // they're trying to reuse the same handle. The profile is gone, the
+    // tournament_state is gone, but the auth.users shell remains (we can't
+    // delete it from the front-end). The accurate message points that out
+    // rather than claiming the handle is "taken" — it isn't taken, it's
+    // reserved by the leftover auth shell.
+    return 'That handle has been used before. Pick a different one.';
   }
   if (msg.includes('invalid login') || msg.includes('invalid credentials')) {
     return "Handle or password doesn't match.";
