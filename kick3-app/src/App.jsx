@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Analytics } from '@vercel/analytics/react';
+import { supabase } from './supabaseClient.js';
 
 // --- 384 shared player pool + 31 daily questions ---
 // Players are drawn at random from PLAYER_POOL for every question.
@@ -1065,6 +1066,109 @@ const writeTournamentState = (state) => {
   } catch { /* silent */ }
 };
 
+// ============ AUTH HELPERS (Phase 2, Deploy 5 / Stage 18) ============
+// Validates a username/handle against our rules. Returns null if valid, or a
+// short user-facing error string. Rules:
+//   - 3-20 characters
+//   - Letters, numbers, and underscores only
+//   - Must start with a letter (matches the DB constraint)
+//   - Not in the profanity blocklist
+const SIMPLE_PROFANITY_LIST = [
+  // English base — common slurs and obvious profanity. Kept small and explicit
+  // so we own the list. The bad-words npm package adds breadth (Stage 18 imports
+  // it for the form-level check). This is our hard floor.
+  'fuck','shit','cunt','bitch','bastard','dick','cock','pussy','asshole','wanker',
+  'nigger','nigga','faggot','retard','spastic','paki','chink','spick','gook',
+  'kike','tranny','dyke','homo',
+  'admin','administrator','moderator','mod','support','staff','kick3','peteThe',
+  'pete','official','help','contact',
+];
+
+const isProfaneHandle = (handle) => {
+  if (!handle) return false;
+  const lower = handle.toLowerCase();
+  // Exact match against the blocklist, or contained as substring (catches
+  // "xfuckx" → "fuck"). False positives possible ("classic" contains "ass") —
+  // intentional trade-off, players can pick different names.
+  return SIMPLE_PROFANITY_LIST.some(bad => lower.includes(bad));
+};
+
+const validateHandle = (handle) => {
+  if (!handle || handle.length === 0) return 'Pick a handle';
+  if (handle.length < 3) return 'Too short — minimum 3 characters';
+  if (handle.length > 20) return 'Too long — maximum 20 characters';
+  if (!/^[a-zA-Z]/.test(handle)) return 'Must start with a letter';
+  if (!/^[a-zA-Z0-9_]+$/.test(handle)) return 'Letters, numbers, and underscores only';
+  if (isProfaneHandle(handle)) return 'Pick a different name';
+  return null;
+};
+
+const validatePassword = (password) => {
+  if (!password || password.length === 0) return 'Pick a password';
+  if (password.length < 8) return 'Too short — minimum 8 characters';
+  if (password.length > 72) return 'Too long — maximum 72 characters';
+  return null;
+};
+
+// Build a placeholder email for Supabase Auth from a handle. Supabase requires
+// an email; we use a fake .kick3.local domain that never receives mail.
+// Lowercased so case-insensitive handle uniqueness matches what Auth sees.
+const handleToPlaceholderEmail = (handle) => `${handle.toLowerCase()}@kick3.local`;
+
+// Translate Supabase Auth error messages into player-facing copy. Supabase's
+// raw errors leak implementation detail ("AuthApiError: User already registered")
+// — this maps the common ones to clean, honest messages.
+const friendlyAuthError = (err) => {
+  if (!err) return 'Something went wrong. Try again.';
+  const msg = (err.message || String(err)).toLowerCase();
+  if (msg.includes('already registered') || msg.includes('user already exists')) {
+    // Stage 20.1: Distinguish from a true handle collision.
+    // This branch fires when Supabase Auth rejects the email — including the
+    // case where the handle WAS used, the user deleted their account, and
+    // they're trying to reuse the same handle. The profile is gone, the
+    // tournament_state is gone, but the auth.users shell remains (we can't
+    // delete it from the front-end). The accurate message points that out
+    // rather than claiming the handle is "taken" — it isn't taken, it's
+    // reserved by the leftover auth shell.
+    return 'That handle has been used before. Pick a different one.';
+  }
+  if (msg.includes('invalid login') || msg.includes('invalid credentials')) {
+    return "Handle or password doesn't match.";
+  }
+  if (msg.includes('password should be at least')) {
+    return 'Password too short — minimum 8 characters.';
+  }
+  if (msg.includes('rate limit') || msg.includes('too many')) {
+    return 'Too many attempts. Wait a minute and try again.';
+  }
+  if (msg.includes('network') || msg.includes('fetch')) {
+    return 'Connection problem. Check your internet and try again.';
+  }
+  return 'Something went wrong. Try again.';
+};
+
+// Fetch the profile row for a given Supabase user id. Uses .maybeSingle() so
+// "no row" returns null cleanly instead of throwing a 406. The Stage 17 helper
+// in supabaseClient.js used .single() which 406s when the profile hasn't been
+// inserted yet — that's the bug Stage 18.1 is fixing.
+//
+// Returns the profile row (id, handle, created_at) or null.
+const fetchProfileForUser = async (userId) => {
+  if (!userId) return null;
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, handle, created_at')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) return null;
+    return data || null;
+  } catch {
+    return null;
+  }
+};
+// ============ END AUTH HELPERS ============
+
 // Phase 2, Deploy 5 / Stage 14: Tournament play allowance model.
 // Players get up to 3 attempts per day, but only 1 trophy per day.
 // Locked if: (a) attemptsToday >= 3, OR (b) they already won today.
@@ -2078,6 +2182,695 @@ export default function Kick3() {
   // - New trophy badge on the main home screen sets this to 'home' before routing in
   const [recordReturnScreen, setRecordReturnScreen] = useState('tournament-home');
 
+  // ============ AUTH STATE (Phase 2, Deploy 5 / Stage 17) ============
+  // Optional sign-in: the game works fully without it. authUser is the
+  // Supabase user object (or null when signed out). authProfile is the row
+  // from public.profiles (handle, created_at) for the current user.
+  // authReady becomes true once we've checked Supabase for an existing
+  // session — used to delay rendering of sign-in-related UI until we know.
+  const [authUser, setAuthUser] = useState(null);
+  const [authProfile, setAuthProfile] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  // Sign-up / sign-in form state (Phase 2, Deploy 5 / Stage 18).
+  // authMode: 'signup' (creating account) or 'signin' (returning user).
+  // Toggled by a link on the auth screen — same screen handles both flows.
+  const [authMode, setAuthMode] = useState('signup');
+  const [authHandle, setAuthHandle] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authPasswordConfirm, setAuthPasswordConfirm] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  // Once-only success message shown after sign-up succeeds. Lets us show
+  // "Welcome, [handle]" before redirecting back to home.
+  const [authSuccess, setAuthSuccess] = useState('');
+
+  // Profile screen state (Phase 2, Deploy 5 / Stage 20).
+  // profileCloudState holds the row fetched from tournament_state — used to
+  // show "last synced" + cloud trophy count on the profile screen.
+  // deleteConfirmStage: 0 = normal button, 1 = "ARE YOU SURE?" state (5s window).
+  const [profileCloudState, setProfileCloudState] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [deleteConfirmStage, setDeleteConfirmStage] = useState(0);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
+
+  // Check Supabase session once on mount; subscribe to auth state changes.
+  // Session is persisted in localStorage by Supabase, so a previously signed-in
+  // user is restored automatically on page reload.
+  useEffect(() => {
+    let cancelled = false;
+
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (session?.user) {
+          setAuthUser(session.user);
+          // Fetch matching profile row (handle, etc.). Safe if missing.
+          const profile = await fetchProfileForUser(session.user.id);
+          if (cancelled) return;
+          // Stage 20.2: orphaned-session defence on mount. If we restored a
+          // session but the profile row is gone (account was deleted between
+          // sessions), sign back out cleanly so the home screen renders the
+          // signed-out state, not a confusing half-signed-in state.
+          if (!profile) {
+            try { await supabase.auth.signOut(); } catch {}
+            setAuthUser(null);
+            setAuthProfile(null);
+          } else {
+            setAuthProfile(profile);
+            // Stage 19: if a previous sync failed, retry now that we know we're online.
+            // Inline retry rather than calling retryPendingSync() because authUser
+            // isn't set in React state yet — we'd race with React's update.
+            // Stage 20.2: gated behind the profile check — no point retrying
+            // a sync for an account that no longer exists.
+            try {
+              const pending = localStorage.getItem('kick3_sync_retry_pending');
+              if (pending === '1' && !cancelled) {
+                const local = readTournamentState();
+                const { error: retryErr } = await supabase
+                  .from('tournament_state')
+                  .upsert({
+                    user_id: session.user.id,
+                    trophy_count: local.trophyCount || 0,
+                    tournaments_attempted: local.tournamentsAttempted || 0,
+                    tournaments_completed: local.tournamentsCompleted || 0,
+                    last_played_date: local.lastPlayedDate || null,
+                    last_attempt_result: local.lastAttemptResult || null,
+                    updated_at: new Date().toISOString(),
+                  }, { onConflict: 'user_id' });
+                if (!retryErr) {
+                  try { localStorage.removeItem('kick3_sync_retry_pending'); } catch {}
+                }
+              }
+            } catch {}
+          }
+        }
+      } catch (err) {
+        // Network errors are non-fatal — the game still works signed-out.
+        if (typeof console !== 'undefined') {
+          console.warn('[kick3] auth init error (non-fatal):', err);
+        }
+      } finally {
+        if (!cancelled) setAuthReady(true);
+      }
+    };
+
+    initAuth();
+
+    // Listen for auth state changes (sign-in, sign-out, token refresh).
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (cancelled) return;
+        if (session?.user) {
+          setAuthUser(session.user);
+          const profile = await fetchProfileForUser(session.user.id);
+          if (!cancelled) setAuthProfile(profile);
+        } else {
+          setAuthUser(null);
+          setAuthProfile(null);
+        }
+      }
+    );
+
+    return () => {
+      cancelled = true;
+      // Unsubscribe from auth changes when the component unmounts.
+      if (subscription?.subscription?.unsubscribe) {
+        subscription.subscription.unsubscribe();
+      }
+    };
+  }, []);
+
+  // ============ AUTH HANDLERS (Phase 2, Deploy 5 / Stage 18) ============
+  // Reset all form state. Called when entering or leaving the auth screen,
+  // and when toggling between sign-up and sign-in.
+  const resetAuthForm = () => {
+    setAuthHandle('');
+    setAuthPassword('');
+    setAuthPasswordConfirm('');
+    setAuthError('');
+    setAuthSuccess('');
+  };
+
+  // Sync localStorage trophy state UP to the cloud (one-way, used at sign-up).
+  // Reads the current tournament state from localStorage and writes it as the
+  // initial row in tournament_state for the new user. Silent on failure —
+  // game continues without persistence if the network drops.
+  const syncTrophiesToCloud = async (userId) => {
+    if (!userId) return;
+    try {
+      const local = readTournamentState();
+      // Stage 21: also capture current local daily stats so first sign-up
+      // saves everything in one round-trip. Falls back to empty object if
+      // no stats exist yet (new player).
+      const localStats = readScoreStatsFromStorage() || {};
+      const { error } = await supabase
+        .from('tournament_state')
+        .upsert({
+          user_id: userId,
+          trophy_count: local.trophyCount || 0,
+          tournaments_attempted: local.tournamentsAttempted || 0,
+          tournaments_completed: local.tournamentsCompleted || 0,
+          last_played_date: local.lastPlayedDate || null,
+          last_attempt_result: local.lastAttemptResult || null,
+          daily_stats: localStats,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      if (error && typeof console !== 'undefined') {
+        console.warn('[kick3] trophy sync failed (non-fatal):', error);
+      }
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] trophy sync threw (non-fatal):', err);
+      }
+    }
+  };
+
+  // SIGN UP — create account, insert profile, sync trophies, route to home.
+  const submitSignUp = async () => {
+    if (authLoading) return;
+    setAuthError('');
+    setAuthSuccess('');
+
+    const handle = authHandle.trim();
+    const handleErr = validateHandle(handle);
+    if (handleErr) { setAuthError(handleErr); return; }
+    const pwErr = validatePassword(authPassword);
+    if (pwErr) { setAuthError(pwErr); return; }
+    if (authPassword !== authPasswordConfirm) {
+      setAuthError('Passwords don\u2019t match');
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      // Step 1: create the Supabase Auth user. Email is a placeholder we never
+      // collect or send to — Supabase requires SOMETHING in the email field.
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email: handleToPlaceholderEmail(handle),
+        password: authPassword,
+      });
+      if (signUpErr) {
+        setAuthError(friendlyAuthError(signUpErr));
+        return;
+      }
+      const newUser = signUpData?.user;
+      if (!newUser) {
+        setAuthError('Sign-up succeeded but no user returned. Try signing in.');
+        return;
+      }
+
+      // Step 2: insert the profile row (links handle to user id). The DB has
+      // a unique constraint on lower(handle), so this catches the race where
+      // two people pick the same handle at the same time.
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .insert({ id: newUser.id, handle });
+      if (profileErr) {
+        // Profile insert failed — most likely "handle taken" from the unique
+        // index. The Auth user was created but is orphaned without a profile.
+        // We delete the Auth user via sign-out to keep the user table clean
+        // for retry. The user can pick a different handle and try again.
+        await supabase.auth.signOut();
+        const msg = (profileErr.message || '').toLowerCase();
+        if (msg.includes('duplicate') || msg.includes('unique')) {
+          setAuthError('That handle is taken. Try another.');
+        } else {
+          setAuthError('Couldn\u2019t save your profile. Try again.');
+        }
+        return;
+      }
+
+      // Step 3: sync any existing localStorage trophies to the new account.
+      // This is the "save my trophies" payoff — first sign-up captures whatever
+      // record the player has built up so far.
+      await syncTrophiesToCloud(newUser.id);
+
+      // Step 4: success. Explicitly set authUser AND fetch+set authProfile
+      // here rather than relying on the onAuthStateChange listener — the
+      // listener already fired when signUp() returned, BEFORE the profile row
+      // existed, so authProfile is currently null. Stage 18.1 fix: we know
+      // the profile row exists now (Step 2 just inserted it), so we fetch and
+      // set it directly. The home screen check `authUser && authProfile`
+      // will now succeed and render the "SIGNED IN" badge correctly.
+      setAuthUser(newUser);
+      const newProfile = await fetchProfileForUser(newUser.id);
+      if (newProfile) setAuthProfile(newProfile);
+      // Stage 21.1: fresh plays on account creation.
+      resetDailyPlayCounts();
+      setAuthSuccess(`Welcome, ${handle}.`);
+      // Brief celebratory pause, then return to home.
+      setTimeout(() => {
+        resetAuthForm();
+        setScreen('home');
+      }, 1200);
+    } catch (err) {
+      setAuthError(friendlyAuthError(err));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // SIGN IN — authenticate, sync trophy counts (cloud wins if higher), home.
+  const submitSignIn = async () => {
+    if (authLoading) return;
+    setAuthError('');
+    setAuthSuccess('');
+
+    const handle = authHandle.trim();
+    if (!handle) { setAuthError('Enter your handle'); return; }
+    if (!authPassword) { setAuthError('Enter your password'); return; }
+
+    setAuthLoading(true);
+    try {
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: handleToPlaceholderEmail(handle),
+        password: authPassword,
+      });
+      if (signInErr) {
+        setAuthError(friendlyAuthError(signInErr));
+        return;
+      }
+      const signedInUser = signInData?.user;
+      if (!signedInUser) {
+        setAuthError('Sign-in failed. Try again.');
+        return;
+      }
+
+      // Stage 20.2: Check for orphaned sign-in (auth shell exists but profile
+      // was deleted via the Delete Account flow). The auth.users row stays
+      // because we can't delete it from the front-end — but the profile is
+      // gone, which means there's no handle to display and the home screen
+      // would render in a confusingly half-signed-in state.
+      //
+      // The right behaviour: treat the deleted account as deleted. Sign the
+      // user back out immediately and show an honest error. The auth shell
+      // stays (we can't help that), but the front-end no longer ghosts.
+      const orphanCheck = await fetchProfileForUser(signedInUser.id);
+      if (!orphanCheck) {
+        // No profile row exists for this auth user → deleted account.
+        // Sign back out so we don't leave a session hanging, then show the
+        // honest error and let the user sign up with a different handle.
+        try { await supabase.auth.signOut(); } catch {}
+        setAuthError('That account was deleted. Sign up to start fresh.');
+        return;
+      }
+
+      // Reconcile localStorage trophies with cloud trophies. Higher count wins.
+      // This is a deliberate trade-off: if a player signs in on a new device
+      // with zero local state, we DON'T overwrite their cloud record. If they
+      // signed in on a device with MORE trophies than the cloud (e.g. they
+      // played offline before signing in), we keep the better record.
+      // Stage 20 wires bidirectional sync; this is the minimum honest reconcile.
+      try {
+        const local = readTournamentState();
+        const { data: cloudRow, error: fetchErr } = await supabase
+          .from('tournament_state')
+          .select('*')
+          .eq('user_id', signedInUser.id)
+          .maybeSingle();
+
+        if (!fetchErr && cloudRow) {
+          const cloudTrophies = cloudRow.trophy_count || 0;
+          const localTrophies = local.trophyCount || 0;
+          if (cloudTrophies >= localTrophies) {
+            // Cloud has same or more — pull cloud state down to localStorage.
+            writeTournamentState({
+              ...local,
+              trophyCount: cloudTrophies,
+              tournamentsAttempted: cloudRow.tournaments_attempted || local.tournamentsAttempted || 0,
+              tournamentsCompleted: cloudRow.tournaments_completed || local.tournamentsCompleted || 0,
+              lastPlayedDate: cloudRow.last_played_date || local.lastPlayedDate,
+              lastAttemptResult: cloudRow.last_attempt_result || local.lastAttemptResult,
+            });
+          } else {
+            // Local has more — push local up to cloud.
+            await syncTrophiesToCloud(signedInUser.id);
+          }
+
+          // Stage 21: same reconciliation pattern for daily stats.
+          // Higher TOTAL events wins as a unit (we don't try to merge
+          // distributions — too risky if a sync ran partially before).
+          const cloudStats = cloudRow.daily_stats || {};
+          const localStats = readScoreStatsFromStorage();
+          const cloudTotal = totalEventsInStats(cloudStats);
+          const localTotal = totalEventsInStats(localStats);
+          if (cloudTotal > localTotal) {
+            // Cloud is more complete — pull down to local.
+            try {
+              localStorage.setItem('kick3_score_counts', JSON.stringify(cloudStats));
+              setScoreStats(cloudStats);
+            } catch {}
+          } else if (localTotal > cloudTotal) {
+            // Local is more complete — push up to cloud.
+            await pushDailyStatsToCloud();
+          }
+          // Equal totals: do nothing (already in sync).
+        } else if (!cloudRow) {
+          // No cloud row exists yet (edge case — profile but no state row).
+          // Push local up.
+          await syncTrophiesToCloud(signedInUser.id);
+          // Stage 21: also push local stats up if we have any.
+          if (totalEventsInStats(readScoreStatsFromStorage()) > 0) {
+            await pushDailyStatsToCloud();
+          }
+        }
+      } catch (syncErr) {
+        // Reconciliation failed — sign-in still succeeded. Log and continue.
+        if (typeof console !== 'undefined') {
+          console.warn('[kick3] sign-in sync failed (non-fatal):', syncErr);
+        }
+      }
+
+      // Stage 18.1: explicitly set authUser + authProfile here too. Sign-in
+      // generally works through the listener fine, but being explicit removes
+      // any race and makes the success path deterministic.
+      setAuthUser(signedInUser);
+      const signedInProfile = await fetchProfileForUser(signedInUser.id);
+      if (signedInProfile) setAuthProfile(signedInProfile);
+      // Stage 21.1: fresh plays on sign-in.
+      resetDailyPlayCounts();
+      setAuthSuccess(`Welcome back, ${handle}.`);
+      setTimeout(() => {
+        resetAuthForm();
+        setScreen('home');
+      }, 1200);
+    } catch (err) {
+      setAuthError(friendlyAuthError(err));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // ============ DAILY PLAY RESET (Phase 2, Deploy 5 / Stage 21.1) ============
+  // Wipe the solo + 1v1 daily play counters. Called at every auth event:
+  // sign-up, sign-in, sign-out, delete-account. Rationale: auth events are
+  // natural "fresh entry" moments — let players get a clean play allowance.
+  //
+  // Stage 21.2: ONCE PER DAY PER DEVICE. Without this cap, a user could
+  // sign-out / sign-in indefinitely to get unlimited plays. Now we track the
+  // last day a reset was granted on this device (by today's question.number),
+  // and skip the reset if it's already been used today. Crossing midnight
+  // restores the entitlement.
+  //
+  // NOT touched: the tournament daily cap (kick3_tournament_v1.attemptsToday
+  // and wonTodayFlag). Tournament trophies persist across auth events and
+  // sync to the cloud — resetting them would create inconsistency. Solo/1v1
+  // counters are pure localStorage with no cloud tie-in, safe to wipe.
+  //
+  // Special case: delete-account ALWAYS resets, bypassing the once-per-day
+  // cap. Account deletion is the strongest "fresh start" intent — if a user
+  // wipes their account, give them a clean board regardless. (Passed in via
+  // the `bypassDailyCap` argument.)
+  const PLAY_RESET_DAY_KEY = 'kick3_play_reset_day';
+
+  const resetDailyPlayCounts = (bypassDailyCap = false) => {
+    try {
+      // Check the once-per-day cap unless explicitly bypassed.
+      if (!bypassDailyCap) {
+        const lastResetDay = parseInt(localStorage.getItem(PLAY_RESET_DAY_KEY) || '0', 10);
+        if (lastResetDay === TODAYS_QUESTION.number) {
+          // Already used today's reset on this device. No-op.
+          return;
+        }
+      }
+      localStorage.removeItem('kick3_solo_plays');
+      localStorage.removeItem('kick3_h2h_plays');
+      localStorage.removeItem('kick3_plays_day');
+      // Stamp today's question.number so a subsequent auth event today
+      // doesn't get a second reset. Day rollover (different question.number)
+      // restores entitlement automatically.
+      localStorage.setItem(PLAY_RESET_DAY_KEY, String(TODAYS_QUESTION.number));
+      // Update React state so the home-screen buttons re-render unlocked.
+      setPlays({ solo: 0, h2h: 0, day: TODAYS_QUESTION.number });
+    } catch { /* silent */ }
+  };
+  // ============ END DAILY PLAY RESET ============
+
+  // SIGN OUT — clear Supabase session. authUser/authProfile will be cleared
+  // by the onAuthStateChange listener in the mount useEffect.
+  const submitSignOut = async () => {
+    // Stage 21.1: reset daily play counts on sign-out for fresh-start feel.
+    resetDailyPlayCounts();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] sign-out error (non-fatal):', err);
+      }
+    }
+    // Stay on whatever screen we're on; the home screen UI will re-render
+    // with the signed-out state once authUser flips to null.
+  };
+
+  // ============ CLOUD SYNC (Phase 2, Deploy 5 / Stage 19) ============
+  // Auto-sync tournament state to the cloud at end-of-attempt boundaries.
+  // Silent failure with retry-on-next-mount — the localStorage state stays
+  // authoritative; cloud is the cross-device backup.
+  //
+  // Sync points (when this gets called):
+  //   - endTournamentAttempt() — after writing localStorage, also push to cloud
+  //   - submitR3Defence() success path — after trophy increment, also push to cloud
+  //
+  // No-op when signed out (authUser is null). Game works fully without sign-in.
+  //
+  // Failure handling:
+  //   On error → set a "needs-retry" flag in localStorage.
+  //   On next page load → initAuth checks the flag, retries the sync.
+  //   On success → clear the flag.
+
+  const SYNC_RETRY_KEY = 'kick3_sync_retry_pending';
+
+  // Push the current localStorage tournament state up to the cloud.
+  // Pure function-ish — reads localStorage, writes Supabase. Doesn't touch React state.
+  // Returns true on success, false on failure.
+  const pushTournamentStateToCloud = async () => {
+    if (!authUser) return false; // No-op when signed out.
+    try {
+      const local = readTournamentState();
+      const { error } = await supabase
+        .from('tournament_state')
+        .upsert({
+          user_id: authUser.id,
+          trophy_count: local.trophyCount || 0,
+          tournaments_attempted: local.tournamentsAttempted || 0,
+          tournaments_completed: local.tournamentsCompleted || 0,
+          last_played_date: local.lastPlayedDate || null,
+          last_attempt_result: local.lastAttemptResult || null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      if (error) {
+        if (typeof console !== 'undefined') {
+          console.warn('[kick3] cloud sync failed, will retry on next load:', error);
+        }
+        try { localStorage.setItem(SYNC_RETRY_KEY, '1'); } catch {}
+        return false;
+      }
+      // Success — clear any pending retry flag.
+      try { localStorage.removeItem(SYNC_RETRY_KEY); } catch {}
+      return true;
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] cloud sync threw, will retry on next load:', err);
+      }
+      try { localStorage.setItem(SYNC_RETRY_KEY, '1'); } catch {}
+      return false;
+    }
+  };
+
+  // Retry a pending sync on mount. Called from initAuth once we know the user
+  // is signed in. Reads the flag, attempts the sync, clears the flag on success.
+  // Stays silent — the user shouldn't notice the retry happening.
+  const retryPendingSync = async () => {
+    if (!authUser) return;
+    try {
+      const pending = localStorage.getItem(SYNC_RETRY_KEY);
+      if (pending !== '1') return;
+      await pushTournamentStateToCloud();
+    } catch {}
+  };
+
+  // ============ DAILY STATS SYNC (Phase 2, Deploy 5 / Stage 21) ============
+  // Same pattern as tournament state: localStorage is authoritative, cloud is
+  // the cross-device backup. The score-distribution object lives under the
+  // 'daily_stats' jsonb column on tournament_state. We push after every score
+  // increment (fire-and-forget) and pull on sign-in (higher-total wins).
+
+  // Total number of verdicts captured in a stats distribution object.
+  // Used to decide which side wins reconciliation on sign-in.
+  const totalEventsInStats = (stats) => {
+    if (!stats || typeof stats !== 'object') return 0;
+    let total = 0;
+    for (const k of Object.keys(stats)) {
+      const v = parseInt(stats[k], 10);
+      if (!isNaN(v) && v > 0) total += v;
+    }
+    return total;
+  };
+
+  // Push the current localStorage daily stats up to the cloud.
+  // Writes to the daily_stats jsonb column on tournament_state.
+  // Silent on failure (sets the same retry flag tournament sync uses).
+  // No-op when signed out.
+  const pushDailyStatsToCloud = async () => {
+    if (!authUser) return false;
+    try {
+      const localStats = readScoreStatsFromStorage();
+      const { error } = await supabase
+        .from('tournament_state')
+        .upsert({
+          user_id: authUser.id,
+          daily_stats: localStats || {},
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      if (error) {
+        if (typeof console !== 'undefined') {
+          console.warn('[kick3] daily stats sync failed, will retry on next load:', error);
+        }
+        try { localStorage.setItem(SYNC_RETRY_KEY, '1'); } catch {}
+        return false;
+      }
+      try { localStorage.removeItem(SYNC_RETRY_KEY); } catch {}
+      return true;
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] daily stats sync threw, will retry on next load:', err);
+      }
+      try { localStorage.setItem(SYNC_RETRY_KEY, '1'); } catch {}
+      return false;
+    }
+  };
+  // ============ END DAILY STATS SYNC ============
+  // ============ END CLOUD SYNC ============
+
+  // ============ PROFILE SCREEN (Phase 2, Deploy 5 / Stage 20) ============
+  // Helpers for the profile screen: load cloud state, format "last synced"
+  // timestamp, delete account (two-tap confirm).
+
+  // Fetch the cloud tournament_state row for the current user. Used by the
+  // profile screen to show "Cloud: 5 trophies / Last synced 2 minutes ago".
+  // Sets profileCloudState on success, profileError on failure.
+  const loadProfileCloudState = async () => {
+    if (!authUser) return;
+    setProfileLoading(true);
+    setProfileError('');
+    try {
+      const { data, error } = await supabase
+        .from('tournament_state')
+        .select('*')
+        .eq('user_id', authUser.id)
+        .maybeSingle();
+      if (error) {
+        setProfileError('Couldn\u2019t load your cloud data.');
+        setProfileCloudState(null);
+      } else {
+        setProfileCloudState(data || null);
+      }
+    } catch {
+      setProfileError('Couldn\u2019t reach the server.');
+      setProfileCloudState(null);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  // Format an ISO timestamp into a relative "X minutes ago" string.
+  // Used for the "Last synced" indicator on the profile screen.
+  const formatLastSynced = (isoString) => {
+    if (!isoString) return 'Never';
+    try {
+      const then = new Date(isoString).getTime();
+      const now = Date.now();
+      const diffSec = Math.max(0, Math.floor((now - then) / 1000));
+      if (diffSec < 60) return 'Just now';
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin} ${diffMin === 1 ? 'minute' : 'minutes'} ago`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr} ${diffHr === 1 ? 'hour' : 'hours'} ago`;
+      const diffDay = Math.floor(diffHr / 24);
+      return `${diffDay} ${diffDay === 1 ? 'day' : 'days'} ago`;
+    } catch {
+      return 'Unknown';
+    }
+  };
+
+  // DELETE ACCOUNT — two-tap confirm flow.
+  // First tap: deleteConfirmStage flips to 1, button changes to "ARE YOU SURE?"
+  //            Auto-reverts to 0 after 5 seconds if no second tap.
+  // Second tap: actually deletes.
+  //
+  // What "delete" actually does:
+  //   1. Delete the tournament_state row (RLS allows user to delete their own)
+  //   2. Delete the profiles row (frees up the handle for reuse)
+  //   3. Sign out
+  // The auth.users row stays (would need a server-side endpoint with the secret
+  // key to delete). User is "logically deleted" — handle is free, profile gone.
+  const submitDeleteAccount = async () => {
+    if (!authUser) return;
+    // First tap — arm the confirm.
+    if (deleteConfirmStage === 0) {
+      setDeleteConfirmStage(1);
+      // Auto-revert after 5 seconds.
+      setTimeout(() => {
+        setDeleteConfirmStage((stage) => (stage === 1 ? 0 : stage));
+      }, 5000);
+      return;
+    }
+    // Second tap — actually delete.
+    setDeleteInProgress(true);
+    setProfileError('');
+    try {
+      // Delete tournament_state first (no dependencies).
+      const { error: stateErr } = await supabase
+        .from('tournament_state')
+        .delete()
+        .eq('user_id', authUser.id);
+      if (stateErr) {
+        setProfileError('Couldn\u2019t delete cloud data. Try again.');
+        setDeleteInProgress(false);
+        setDeleteConfirmStage(0);
+        return;
+      }
+      // Delete the profile row (frees the handle).
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', authUser.id);
+      if (profileErr) {
+        setProfileError('Couldn\u2019t delete profile. Try again.');
+        setDeleteInProgress(false);
+        setDeleteConfirmStage(0);
+        return;
+      }
+      // Sign out — clears the Supabase session and our React auth state.
+      await supabase.auth.signOut();
+      // Clear local trophy state too — the user explicitly chose to wipe.
+      try { localStorage.removeItem(TOURNAMENT_CONFIG.storageKey); } catch {}
+      try { localStorage.removeItem('kick3_sync_retry_pending'); } catch {}
+      // Stage 21.1: also wipe the daily play counters. Account deletion is
+      // the strongest "fresh start" intent — match it with the cleanest reset.
+      // Stage 21.2: pass true to bypass the once-per-day cap. Deletion is
+      // a deliberate destructive act; the user has earned a clean slate.
+      // Also clear the reset-day stamp itself so the deleted-then-signed-up
+      // user can use their once-per-day reset entitlement going forward.
+      resetDailyPlayCounts(true);
+      try { localStorage.removeItem('kick3_play_reset_day'); } catch {}
+      // Reset profile-screen state and return home.
+      setProfileCloudState(null);
+      setDeleteConfirmStage(0);
+      setDeleteInProgress(false);
+      setScreen('home');
+    } catch {
+      setProfileError('Something went wrong. Try again.');
+      setDeleteInProgress(false);
+      setDeleteConfirmStage(0);
+    }
+  };
+  // ============ END PROFILE SCREEN HELPERS ============
+  // ============ END AUTH HANDLERS ============
+
   // ============ TOURNAMENT MODE — BETA GATE ============
   // tournamentBetaActive is true if ?beta=pete is (or was) in the URL.
   // When true, the green TOURNAMENT MODE button is rendered on the home screen.
@@ -2296,6 +3089,16 @@ export default function Kick3() {
     };
   }, [screen, tournamentRound, tournamentVarResult]);
 
+  // Phase 2, Deploy 5 / Stage 20: load cloud state when entering profile screen.
+  // Re-fetches each time the screen is entered so the "last synced" timestamp
+  // is accurate. No-op when signed out (defensive — the screen requires auth).
+  useEffect(() => {
+    if (screen !== 'profile') return;
+    if (!authUser) return;
+    loadProfileCloudState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, authUser]);
+
   // ============ DAILY PLAY LIMIT (3 solo + 3 1v1 per day) ============
   // Counters reset automatically when TODAYS_QUESTION.number advances.
   // localStorage keys:
@@ -2362,6 +3165,9 @@ export default function Kick3() {
       const next = { ...prev, [s]: (prev[s] || 0) + 1 };
       localStorage.setItem('kick3_score_counts', JSON.stringify(next));
       setScoreStats(next);
+      // Stage 21: push to cloud if signed in. Fire-and-forget — UI doesn't
+      // wait. No-op when signed out (silent in pushDailyStatsToCloud).
+      pushDailyStatsToCloud();
     } catch { /* silent */ }
   };
 
@@ -2691,6 +3497,10 @@ export default function Kick3() {
       lastPlayedDate: todayDateString(),
       lastAttemptResult: resultKey,
     });
+    // Stage 19: push the just-written state up to the cloud if signed in.
+    // Fire-and-forget — we don't block the UI on the network round-trip.
+    // No-ops when signed out; silent retry-on-mount handles failures.
+    pushTournamentStateToCloud();
     // Reset tournament in-play state.
     setTournamentRound(0);
     setTournamentOpponent(null);
@@ -2845,6 +3655,10 @@ Weigh the picks, their Legacy ratings, and both arguments together. Judge betwee
         trophyCount: (state.trophyCount || 0) + (playerWon ? 1 : 0),
         wonTodayFlag: state.wonTodayFlag || playerWon,
       });
+      // Stage 19: push the new trophy state to the cloud immediately.
+      // This is the critical sync — every trophy must reach the cloud so it
+      // shows up on the player's other devices.
+      pushTournamentStateToCloud();
 
       // Wait for the VAR animation to finish (3s) before revealing verdict.
       // If the API took longer than 3s, this resolves instantly. Phase 2, Deploy 5 / Stage 1.
@@ -3388,6 +4202,100 @@ Deliver your verdict as JSON.`;
                   <div style={{ height: '1px', flex: '0 0 28px', background: colours.cream, opacity: 0.7 }} />
                 </div>
               </div>
+
+              {/* SIGN IN / SAVE TROPHIES button (Phase 2, Deploy 5 / Stage 18).
+                  Sits between the title block and the question chalkboard, per the
+                  agreed (ii) placement. Optional throughout — when signed out, shows
+                  a value-prop pitch. When signed in, shows the handle as a chip with
+                  a small sign-out option. authReady gates render so we don't flash
+                  the signed-out state for already-signed-in users. */}
+              {authReady && (
+                authUser && authProfile ? (
+                  <div style={{
+                    width: '100%',
+                    marginBottom: '18px',
+                    padding: '12px 16px',
+                    background: 'rgba(95,176,74,0.10)',
+                    border: '1px solid rgba(95,176,74,0.40)',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px'
+                  }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        ...condFont, fontSize: '10px', letterSpacing: '0.28em',
+                        color: '#5fb04a', fontWeight: 700, marginBottom: '2px'
+                      }}>
+                        SIGNED IN
+                      </div>
+                      <div style={{
+                        ...displayFont, fontSize: '18px', fontWeight: 700,
+                        color: colours.cream, letterSpacing: '0.02em',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                      }}>
+                        {authProfile.handle}
+                      </div>
+                    </div>
+                    {/* Two stacked buttons — PROFILE (Stage 20) and SIGN OUT */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flexShrink: 0 }}>
+                      <button
+                        onClick={() => { setProfileError(''); setDeleteConfirmStage(0); setScreen('profile'); }}
+                        style={{
+                          background: 'transparent', color: colours.gold,
+                          border: `1px solid ${colours.gold}`, borderRadius: '6px',
+                          ...condFont, fontSize: '11px', fontWeight: 600,
+                          letterSpacing: '0.18em', padding: '6px 11px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        PROFILE →
+                      </button>
+                      <button
+                        onClick={submitSignOut}
+                        style={{
+                          background: 'transparent', color: colours.muted,
+                          border: `1px solid ${colours.muted}`, borderRadius: '6px',
+                          ...condFont, fontSize: '11px', fontWeight: 600,
+                          letterSpacing: '0.18em', padding: '6px 11px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        SIGN OUT
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { resetAuthForm(); setAuthMode('signup'); setScreen('auth'); }}
+                    style={{
+                      width: '100%', marginBottom: '18px',
+                      padding: '14px 18px',
+                      background: 'transparent',
+                      color: colours.cream,
+                      border: `1.5px solid rgba(212,175,55,0.55)`,
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span style={{
+                      ...displayFont, fontSize: '18px', fontWeight: 700,
+                      color: colours.gold, letterSpacing: '0.08em'
+                    }}>
+                      SIGN IN WHENEVER
+                    </span>
+                    <span style={{
+                      ...condFont, fontSize: '11px', color: colours.muted,
+                      fontStyle: 'italic', letterSpacing: '0.04em'
+                    }}>
+                      Save your trophies and score history
+                    </span>
+                  </button>
+                )
+              )}
 
               {/* Question chalkboard — wooden frame around dark slate */}
               <div style={{
@@ -3953,6 +4861,96 @@ Deliver your verdict as JSON.`;
                     <div style={{ height: '1px', flex: '0 0 36px', background: colours.cream, opacity: 0.7 }} />
                   </div>
                 </div>
+
+                {/* SIGN IN / SAVE TROPHIES button (Phase 2, Deploy 5 / Stage 18).
+                    Desktop version — same logic as phone, slightly larger sizing. */}
+                {authReady && (
+                  authUser && authProfile ? (
+                    <div style={{
+                      width: '100%',
+                      marginBottom: '22px',
+                      padding: '14px 18px',
+                      background: 'rgba(95,176,74,0.10)',
+                      border: '1px solid rgba(95,176,74,0.40)',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px'
+                    }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          ...condFont, fontSize: '11px', letterSpacing: '0.3em',
+                          color: '#5fb04a', fontWeight: 700, marginBottom: '3px'
+                        }}>
+                          SIGNED IN
+                        </div>
+                        <div style={{
+                          ...displayFont, fontSize: '20px', fontWeight: 700,
+                          color: colours.cream, letterSpacing: '0.02em',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                        }}>
+                          {authProfile.handle}
+                        </div>
+                      </div>
+                      {/* Two stacked buttons — PROFILE (Stage 20) and SIGN OUT */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
+                        <button
+                          onClick={() => { setProfileError(''); setDeleteConfirmStage(0); setScreen('profile'); }}
+                          style={{
+                            background: 'transparent', color: colours.gold,
+                            border: `1px solid ${colours.gold}`, borderRadius: '7px',
+                            ...condFont, fontSize: '12px', fontWeight: 600,
+                            letterSpacing: '0.2em', padding: '7px 14px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          PROFILE →
+                        </button>
+                        <button
+                          onClick={submitSignOut}
+                          style={{
+                            background: 'transparent', color: colours.muted,
+                            border: `1px solid ${colours.muted}`, borderRadius: '7px',
+                            ...condFont, fontSize: '12px', fontWeight: 600,
+                            letterSpacing: '0.2em', padding: '7px 14px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          SIGN OUT
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { resetAuthForm(); setAuthMode('signup'); setScreen('auth'); }}
+                      style={{
+                        width: '100%', marginBottom: '22px',
+                        padding: '16px 20px',
+                        background: 'transparent',
+                        color: colours.cream,
+                        border: `1.5px solid rgba(212,175,55,0.55)`,
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <span style={{
+                        ...displayFont, fontSize: '21px', fontWeight: 700,
+                        color: colours.gold, letterSpacing: '0.08em'
+                      }}>
+                        SIGN IN WHENEVER
+                      </span>
+                      <span style={{
+                        ...condFont, fontSize: '12px', color: colours.muted,
+                        fontStyle: 'italic', letterSpacing: '0.04em'
+                      }}>
+                        Save your trophies and score history
+                      </span>
+                    </button>
+                  )
+                )}
 
                 {/* Question chalkboard — wooden frame around slate */}
                 <div style={{
@@ -5891,6 +6889,514 @@ Deliver your verdict as JSON.`;
             >
               GOT IT — TAKE ME BACK
             </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- AUTH SCREEN (sign-up / sign-in) ----------
+  // Phase 2, Deploy 5 / Stage 18. Single screen handles both new and returning
+  // users. authMode toggles between 'signup' and 'signin' — controlled by a
+  // small link at the bottom. Header sells the value (save trophies); form has
+  // inline validation; submit button changes label per mode.
+  if (screen === 'auth') {
+    const isSignUp = authMode === 'signup';
+    const headerTitle = isSignUp ? 'SAVE YOUR TROPHIES' : 'WELCOME BACK';
+    const headerSubtitle = isSignUp
+      ? 'Optional — the game works fully without it.'
+      : 'Sign in to keep your record across devices.';
+    const submitLabel = isSignUp
+      ? (authLoading ? 'CREATING ACCOUNT...' : 'CREATE ACCOUNT')
+      : (authLoading ? 'SIGNING IN...' : 'SIGN IN');
+    const toggleLabel = isSignUp
+      ? 'Already have an account? Sign in →'
+      : '\u2190 New player? Create an account';
+    const onSubmit = isSignUp ? submitSignUp : submitSignIn;
+    const canSubmit = !authLoading && authHandle.trim().length > 0 && authPassword.length > 0
+      && (!isSignUp || authPasswordConfirm.length > 0);
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '500px' }}>
+
+            {/* Back to home — small chip top-left */}
+            <button
+              onClick={() => { resetAuthForm(); setScreen('home'); }}
+              style={{
+                background: 'transparent',
+                color: colours.muted,
+                border: `1px solid ${colours.muted}`,
+                borderRadius: '5px',
+                ...condFont, fontSize: '11px', fontWeight: 600,
+                letterSpacing: '0.2em', padding: '6px 12px',
+                cursor: 'pointer', marginBottom: '24px'
+              }}
+            >
+              ← BACK
+            </button>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <h1 style={{
+                ...displayFont, fontSize: 'clamp(32px, 8vw, 44px)',
+                fontWeight: 800, color: colours.gold, margin: 0,
+                letterSpacing: '0.04em', lineHeight: 1
+              }}>
+                {headerTitle}
+              </h1>
+              <p style={{
+                ...condFont, fontSize: '13px', color: colours.muted,
+                marginTop: '12px', marginBottom: 0, lineHeight: 1.5,
+                fontStyle: 'italic'
+              }}>
+                {headerSubtitle}
+              </p>
+            </div>
+
+            {/* Value prop — only shown on sign-up.
+                Three bullet points framing why signing in is worth it. */}
+            {isSignUp && (
+              <div style={{
+                background: 'rgba(212,175,55,0.06)',
+                border: '1px solid rgba(212,175,55,0.20)',
+                padding: '14px 18px',
+                borderRadius: '8px',
+                marginBottom: '24px'
+              }}>
+                <div style={{
+                  ...condFont, fontSize: '10px', letterSpacing: '0.3em',
+                  color: colours.gold, fontWeight: 700, marginBottom: '10px'
+                }}>
+                  WHY SIGN IN
+                </div>
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: '7px',
+                  ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4
+                }}>
+                  <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Save your tournament trophies forever</div>
+                  <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Keep your daily score history</div>
+                  <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Keep your record across phone, laptop, tablet</div>
+                  <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Compete on leaderboards (coming soon)</div>
+                </div>
+              </div>
+            )}
+
+            {/* Success state — replaces form once sign-up/sign-in completes */}
+            {authSuccess && (
+              <div style={{
+                background: 'rgba(95,176,74,0.10)',
+                border: '1px solid rgba(95,176,74,0.40)',
+                padding: '20px',
+                borderRadius: '8px',
+                marginBottom: '20px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '36px', lineHeight: 1, marginBottom: '8px' }} aria-hidden="true">🎉</div>
+                <div style={{
+                  ...displayFont, fontSize: '20px', fontWeight: 700,
+                  color: colours.cream, letterSpacing: '0.02em'
+                }}>
+                  {authSuccess}
+                </div>
+                <div style={{
+                  ...condFont, fontSize: '12px', color: colours.muted,
+                  marginTop: '8px', fontStyle: 'italic'
+                }}>
+                  Taking you home...
+                </div>
+              </div>
+            )}
+
+            {/* Form — hidden after success */}
+            {!authSuccess && (
+              <>
+                {/* Handle field */}
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{
+                    ...condFont, fontSize: '11px', letterSpacing: '0.25em',
+                    color: colours.gold, fontWeight: 700, display: 'block',
+                    marginBottom: '6px'
+                  }}>
+                    HANDLE
+                  </label>
+                  <input
+                    type="text"
+                    value={authHandle}
+                    onChange={(e) => { setAuthHandle(e.target.value.slice(0, 20)); setAuthError(''); }}
+                    placeholder={isSignUp ? "Pick a name (3-20 chars)" : "Your handle"}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    style={{
+                      width: '100%', padding: '13px 14px',
+                      background: 'rgba(0,0,0,0.30)',
+                      border: `1px solid rgba(212,175,55,0.30)`,
+                      color: colours.cream,
+                      ...condFont, fontSize: '15px', fontWeight: 600,
+                      borderRadius: '6px', boxSizing: 'border-box',
+                      outline: 'none', letterSpacing: '0.02em'
+                    }}
+                  />
+                  {isSignUp && (
+                    <div style={{
+                      ...condFont, fontSize: '11px', color: colours.muted,
+                      marginTop: '5px', fontStyle: 'italic'
+                    }}>
+                      Letters, numbers, underscores. Must start with a letter.
+                    </div>
+                  )}
+                </div>
+
+                {/* Password field */}
+                <div style={{ marginBottom: isSignUp ? '14px' : '20px' }}>
+                  <label style={{
+                    ...condFont, fontSize: '11px', letterSpacing: '0.25em',
+                    color: colours.gold, fontWeight: 700, display: 'block',
+                    marginBottom: '6px'
+                  }}>
+                    PASSWORD
+                  </label>
+                  <input
+                    type="password"
+                    value={authPassword}
+                    onChange={(e) => { setAuthPassword(e.target.value); setAuthError(''); }}
+                    placeholder={isSignUp ? "8+ characters" : "Your password"}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    style={{
+                      width: '100%', padding: '13px 14px',
+                      background: 'rgba(0,0,0,0.30)',
+                      border: `1px solid rgba(212,175,55,0.30)`,
+                      color: colours.cream,
+                      ...condFont, fontSize: '15px', fontWeight: 600,
+                      borderRadius: '6px', boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Confirm password — sign-up only */}
+                {isSignUp && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{
+                      ...condFont, fontSize: '11px', letterSpacing: '0.25em',
+                      color: colours.gold, fontWeight: 700, display: 'block',
+                      marginBottom: '6px'
+                    }}>
+                      CONFIRM PASSWORD
+                    </label>
+                    <input
+                      type="password"
+                      value={authPasswordConfirm}
+                      onChange={(e) => { setAuthPasswordConfirm(e.target.value); setAuthError(''); }}
+                      placeholder="Type it again"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck="false"
+                      style={{
+                        width: '100%', padding: '13px 14px',
+                        background: 'rgba(0,0,0,0.30)',
+                        border: `1px solid rgba(212,175,55,0.30)`,
+                        color: colours.cream,
+                        ...condFont, fontSize: '15px', fontWeight: 600,
+                        borderRadius: '6px', boxSizing: 'border-box',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Error message */}
+                {authError && (
+                  <div style={{
+                    background: 'rgba(232,52,74,0.10)',
+                    border: '1px solid rgba(232,52,74,0.40)',
+                    padding: '11px 14px', borderRadius: '6px',
+                    marginBottom: '16px',
+                    ...condFont, fontSize: '13px', color: colours.accent,
+                    lineHeight: 1.4, fontWeight: 600
+                  }}>
+                    {authError}
+                  </div>
+                )}
+
+                {/* Submit button */}
+                <button
+                  onClick={onSubmit}
+                  disabled={!canSubmit}
+                  style={{
+                    width: '100%', padding: '16px',
+                    background: canSubmit ? colours.gold : '#3a3a44',
+                    color: canSubmit ? '#000' : colours.muted,
+                    border: 'none', borderRadius: '10px',
+                    ...displayFont, fontSize: '20px', fontWeight: 800,
+                    letterSpacing: '0.1em',
+                    cursor: canSubmit ? 'pointer' : 'not-allowed',
+                    boxShadow: canSubmit ? '0 4px 0 rgba(0,0,0,0.25)' : 'none',
+                    marginBottom: '16px'
+                  }}
+                >
+                  {submitLabel}
+                </button>
+
+                {/* Toggle mode link */}
+                <button
+                  onClick={() => { setAuthMode(isSignUp ? 'signin' : 'signup'); resetAuthForm(); }}
+                  disabled={authLoading}
+                  style={{
+                    width: '100%', padding: '10px',
+                    background: 'transparent',
+                    color: colours.cream,
+                    border: 'none',
+                    ...condFont, fontSize: '13px', fontWeight: 600,
+                    letterSpacing: '0.06em',
+                    cursor: authLoading ? 'not-allowed' : 'pointer',
+                    opacity: authLoading ? 0.5 : 0.85,
+                    textDecoration: 'underline',
+                    textUnderlineOffset: '3px'
+                  }}
+                >
+                  {toggleLabel}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- PROFILE SCREEN ----------
+  // Phase 2, Deploy 5 / Stage 20. Shows the signed-in user's handle, account
+  // creation date, cloud trophy state with "last synced" timestamp, and the
+  // delete-account flow (two-tap confirm).
+  if (screen === 'profile') {
+    // Defensive: if somehow on profile when signed out, route home.
+    if (!authUser || !authProfile) {
+      return (
+        <>
+          <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+          <div style={bgStyle}>
+            <div style={pitchOverlay} />
+            <div style={{ ...container, maxWidth: '500px', textAlign: 'center', paddingTop: '60px' }}>
+              <p style={{ ...condFont, color: colours.muted }}>You need to be signed in to view this page.</p>
+              <button
+                onClick={() => setScreen('home')}
+                style={{
+                  marginTop: '20px', padding: '12px 24px',
+                  background: colours.gold, color: '#000',
+                  border: 'none', borderRadius: '8px',
+                  ...displayFont, fontSize: '14px', fontWeight: 700,
+                  letterSpacing: '0.12em', cursor: 'pointer'
+                }}
+              >
+                BACK TO HOME
+              </button>
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    // Format account creation date — "Joined June 2026" style.
+    const formatJoinDate = (iso) => {
+      if (!iso) return '—';
+      try {
+        const d = new Date(iso);
+        return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+      } catch { return '—'; }
+    };
+    const joinDate = formatJoinDate(authProfile.created_at);
+    const lastSynced = profileCloudState ? formatLastSynced(profileCloudState.updated_at) : 'Never';
+    const cloudTrophies = profileCloudState ? (profileCloudState.trophy_count || 0) : 0;
+    const localTrophies = readTournamentState().trophyCount || 0;
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '500px' }}>
+
+            {/* Back chip top-left */}
+            <button
+              onClick={() => setScreen('home')}
+              style={{
+                background: 'transparent',
+                color: colours.muted,
+                border: `1px solid ${colours.muted}`,
+                borderRadius: '5px',
+                ...condFont, fontSize: '11px', fontWeight: 600,
+                letterSpacing: '0.2em', padding: '6px 12px',
+                cursor: 'pointer', marginBottom: '20px'
+              }}
+            >
+              ← BACK
+            </button>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: '#5fb04a', marginBottom: '8px', fontWeight: 700 }}>
+                YOUR PROFILE
+              </div>
+              <h1 style={{
+                ...displayFont, fontSize: 'clamp(36px, 9vw, 50px)',
+                fontWeight: 800, color: colours.gold, margin: 0,
+                letterSpacing: '0.04em', lineHeight: 1,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+              }}>
+                {authProfile.handle}
+              </h1>
+              <div style={{
+                ...condFont, fontSize: '12px', color: colours.muted,
+                marginTop: '10px', fontStyle: 'italic'
+              }}>
+                Joined {joinDate}
+              </div>
+            </div>
+
+            {/* Cloud state card */}
+            <div style={{
+              background: colours.surface,
+              padding: '18px 20px',
+              borderRadius: '8px',
+              marginBottom: '14px',
+              borderTop: `2px solid ${colours.gold}`
+            }}>
+              <div style={{
+                ...condFont, fontSize: '10px', letterSpacing: '0.3em',
+                color: colours.gold, fontWeight: 700, marginBottom: '12px'
+              }}>
+                CLOUD STATE
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '10px' }}>
+                <span style={{ ...condFont, fontSize: '13px', color: colours.cream }}>Trophies in cloud</span>
+                <span style={{ ...displayFont, fontSize: '24px', fontWeight: 700, color: colours.gold, lineHeight: 1 }}>
+                  {profileLoading ? '...' : cloudTrophies}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '10px' }}>
+                <span style={{ ...condFont, fontSize: '13px', color: colours.cream }}>Trophies on this device</span>
+                <span style={{ ...displayFont, fontSize: '24px', fontWeight: 700, color: colours.cream, lineHeight: 1 }}>
+                  {localTrophies}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <span style={{ ...condFont, fontSize: '12px', color: colours.muted }}>Last synced</span>
+                <span style={{ ...condFont, fontSize: '12px', color: colours.muted, fontWeight: 600 }}>
+                  {profileLoading ? '...' : lastSynced}
+                </span>
+              </div>
+              {/* If cloud and local differ, show a small explainer */}
+              {!profileLoading && cloudTrophies !== localTrophies && (
+                <div style={{
+                  marginTop: '12px',
+                  padding: '8px 10px',
+                  background: 'rgba(212,175,55,0.06)',
+                  borderRadius: '4px',
+                  ...condFont, fontSize: '11px', color: colours.muted,
+                  fontStyle: 'italic', lineHeight: 1.4
+                }}>
+                  {localTrophies > cloudTrophies
+                    ? 'This device has more. Cloud syncs at the end of every tournament attempt.'
+                    : 'Cloud has more (likely from another device).'
+                  }
+                </div>
+              )}
+            </div>
+
+            {/* Error display */}
+            {profileError && (
+              <div style={{
+                background: 'rgba(232,52,74,0.10)',
+                border: '1px solid rgba(232,52,74,0.40)',
+                padding: '11px 14px', borderRadius: '6px',
+                marginBottom: '14px',
+                ...condFont, fontSize: '13px', color: colours.accent,
+                lineHeight: 1.4, fontWeight: 600
+              }}>
+                {profileError}
+              </div>
+            )}
+
+            {/* Sign out button — primary action */}
+            <button
+              onClick={submitSignOut}
+              disabled={deleteInProgress}
+              style={{
+                width: '100%', padding: '14px',
+                background: 'transparent',
+                color: colours.cream,
+                border: `1.5px solid ${colours.muted}`,
+                borderRadius: '8px',
+                ...displayFont, fontSize: '16px', fontWeight: 700,
+                letterSpacing: '0.12em',
+                cursor: deleteInProgress ? 'not-allowed' : 'pointer',
+                marginBottom: '24px',
+                opacity: deleteInProgress ? 0.5 : 1
+              }}
+            >
+              SIGN OUT
+            </button>
+
+            {/* Danger zone */}
+            <div style={{
+              padding: '16px 18px',
+              background: 'rgba(232,52,74,0.06)',
+              border: '1px solid rgba(232,52,74,0.30)',
+              borderRadius: '8px',
+              marginBottom: '20px'
+            }}>
+              <div style={{
+                ...condFont, fontSize: '10px', letterSpacing: '0.3em',
+                color: colours.accent, fontWeight: 700, marginBottom: '8px'
+              }}>
+                DANGER ZONE
+              </div>
+              <p style={{
+                ...condFont, fontSize: '12px', color: colours.cream,
+                margin: '0 0 12px 0', lineHeight: 1.5
+              }}>
+                Delete your account, your cloud trophy record and score history, and your local game state on this device. Cannot be undone.
+              </p>
+              <button
+                onClick={submitDeleteAccount}
+                disabled={deleteInProgress}
+                style={{
+                  width: '100%', padding: '12px',
+                  background: deleteConfirmStage === 1 ? colours.accent : 'transparent',
+                  color: deleteConfirmStage === 1 ? colours.cream : colours.accent,
+                  border: `1.5px solid ${colours.accent}`,
+                  borderRadius: '7px',
+                  ...condFont, fontSize: '12px', fontWeight: 700,
+                  letterSpacing: '0.18em',
+                  cursor: deleteInProgress ? 'not-allowed' : 'pointer',
+                  opacity: deleteInProgress ? 0.5 : 1
+                }}
+              >
+                {deleteInProgress
+                  ? 'DELETING...'
+                  : deleteConfirmStage === 1
+                    ? 'TAP AGAIN TO CONFIRM'
+                    : 'DELETE MY ACCOUNT'
+                }
+              </button>
+              {deleteConfirmStage === 1 && !deleteInProgress && (
+                <div style={{
+                  ...condFont, fontSize: '11px', color: colours.muted,
+                  marginTop: '8px', textAlign: 'center', fontStyle: 'italic'
+                }}>
+                  Reverts in 5 seconds if you change your mind.
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <Analytics />
