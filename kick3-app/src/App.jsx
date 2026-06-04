@@ -4291,7 +4291,7 @@ Deliver your verdict as JSON.`;
                       ...condFont, fontSize: '11px', color: colours.muted,
                       fontStyle: 'italic', letterSpacing: '0.04em'
                     }}>
-                      Save your tournament trophies
+                      Save your trophies and score history
                     </span>
                   </button>
                 )
@@ -4946,7 +4946,7 @@ Deliver your verdict as JSON.`;
                         ...condFont, fontSize: '12px', color: colours.muted,
                         fontStyle: 'italic', letterSpacing: '0.04em'
                       }}>
-                        Save your tournament trophies
+                        Save your trophies and score history
                       </span>
                     </button>
                   )
@@ -6979,6 +6979,7 @@ Deliver your verdict as JSON.`;
                   ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4
                 }}>
                   <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Save your tournament trophies forever</div>
+                  <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Keep your daily score history</div>
                   <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Keep your record across phone, laptop, tablet</div>
                   <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Compete on leaderboards (coming soon)</div>
                 </div>
@@ -7363,7 +7364,7 @@ Deliver your verdict as JSON.`;
                 ...condFont, fontSize: '12px', color: colours.cream,
                 margin: '0 0 12px 0', lineHeight: 1.5
               }}>
-                Delete your account, your cloud trophy record, and your local game state on this device. Cannot be undone.
+                Delete your account, your cloud trophy record and score history, and your local game state on this device. Cannot be undone.
               </p>
               <button
                 onClick={submitDeleteAccount}
