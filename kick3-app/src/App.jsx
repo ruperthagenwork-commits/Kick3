@@ -1066,6 +1066,80 @@ const writeTournamentState = (state) => {
   } catch { /* silent */ }
 };
 
+// ============ AUTH HELPERS (Phase 2, Deploy 5 / Stage 18) ============
+// Validates a username/handle against our rules. Returns null if valid, or a
+// short user-facing error string. Rules:
+//   - 3-20 characters
+//   - Letters, numbers, and underscores only
+//   - Must start with a letter (matches the DB constraint)
+//   - Not in the profanity blocklist
+const SIMPLE_PROFANITY_LIST = [
+  // English base — common slurs and obvious profanity. Kept small and explicit
+  // so we own the list. The bad-words npm package adds breadth (Stage 18 imports
+  // it for the form-level check). This is our hard floor.
+  'fuck','shit','cunt','bitch','bastard','dick','cock','pussy','asshole','wanker',
+  'nigger','nigga','faggot','retard','spastic','paki','chink','spick','gook',
+  'kike','tranny','dyke','homo',
+  'admin','administrator','moderator','mod','support','staff','kick3','peteThe',
+  'pete','official','help','contact',
+];
+
+const isProfaneHandle = (handle) => {
+  if (!handle) return false;
+  const lower = handle.toLowerCase();
+  // Exact match against the blocklist, or contained as substring (catches
+  // "xfuckx" → "fuck"). False positives possible ("classic" contains "ass") —
+  // intentional trade-off, players can pick different names.
+  return SIMPLE_PROFANITY_LIST.some(bad => lower.includes(bad));
+};
+
+const validateHandle = (handle) => {
+  if (!handle || handle.length === 0) return 'Pick a handle';
+  if (handle.length < 3) return 'Too short — minimum 3 characters';
+  if (handle.length > 20) return 'Too long — maximum 20 characters';
+  if (!/^[a-zA-Z]/.test(handle)) return 'Must start with a letter';
+  if (!/^[a-zA-Z0-9_]+$/.test(handle)) return 'Letters, numbers, and underscores only';
+  if (isProfaneHandle(handle)) return 'Pick a different name';
+  return null;
+};
+
+const validatePassword = (password) => {
+  if (!password || password.length === 0) return 'Pick a password';
+  if (password.length < 8) return 'Too short — minimum 8 characters';
+  if (password.length > 72) return 'Too long — maximum 72 characters';
+  return null;
+};
+
+// Build a placeholder email for Supabase Auth from a handle. Supabase requires
+// an email; we use a fake .kick3.local domain that never receives mail.
+// Lowercased so case-insensitive handle uniqueness matches what Auth sees.
+const handleToPlaceholderEmail = (handle) => `${handle.toLowerCase()}@kick3.local`;
+
+// Translate Supabase Auth error messages into player-facing copy. Supabase's
+// raw errors leak implementation detail ("AuthApiError: User already registered")
+// — this maps the common ones to clean, honest messages.
+const friendlyAuthError = (err) => {
+  if (!err) return 'Something went wrong. Try again.';
+  const msg = (err.message || String(err)).toLowerCase();
+  if (msg.includes('already registered') || msg.includes('user already exists')) {
+    return 'That handle is taken. Try another.';
+  }
+  if (msg.includes('invalid login') || msg.includes('invalid credentials')) {
+    return "Handle or password doesn't match.";
+  }
+  if (msg.includes('password should be at least')) {
+    return 'Password too short — minimum 8 characters.';
+  }
+  if (msg.includes('rate limit') || msg.includes('too many')) {
+    return 'Too many attempts. Wait a minute and try again.';
+  }
+  if (msg.includes('network') || msg.includes('fetch')) {
+    return 'Connection problem. Check your internet and try again.';
+  }
+  return 'Something went wrong. Try again.';
+};
+// ============ END AUTH HELPERS ============
+
 // Phase 2, Deploy 5 / Stage 14: Tournament play allowance model.
 // Players get up to 3 attempts per day, but only 1 trophy per day.
 // Locked if: (a) attemptsToday >= 3, OR (b) they already won today.
@@ -2089,6 +2163,19 @@ export default function Kick3() {
   const [authProfile, setAuthProfile] = useState(null);
   const [authReady, setAuthReady] = useState(false);
 
+  // Sign-up / sign-in form state (Phase 2, Deploy 5 / Stage 18).
+  // authMode: 'signup' (creating account) or 'signin' (returning user).
+  // Toggled by a link on the auth screen — same screen handles both flows.
+  const [authMode, setAuthMode] = useState('signup');
+  const [authHandle, setAuthHandle] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authPasswordConfirm, setAuthPasswordConfirm] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  // Once-only success message shown after sign-up succeeds. Lets us show
+  // "Welcome, [handle]" before redirecting back to home.
+  const [authSuccess, setAuthSuccess] = useState('');
+
   // Check Supabase session once on mount; subscribe to auth state changes.
   // Session is persisted in localStorage by Supabase, so a previously signed-in
   // user is restored automatically on page reload.
@@ -2141,6 +2228,217 @@ export default function Kick3() {
       }
     };
   }, []);
+
+  // ============ AUTH HANDLERS (Phase 2, Deploy 5 / Stage 18) ============
+  // Reset all form state. Called when entering or leaving the auth screen,
+  // and when toggling between sign-up and sign-in.
+  const resetAuthForm = () => {
+    setAuthHandle('');
+    setAuthPassword('');
+    setAuthPasswordConfirm('');
+    setAuthError('');
+    setAuthSuccess('');
+  };
+
+  // Sync localStorage trophy state UP to the cloud (one-way, used at sign-up).
+  // Reads the current tournament state from localStorage and writes it as the
+  // initial row in tournament_state for the new user. Silent on failure —
+  // game continues without persistence if the network drops.
+  const syncTrophiesToCloud = async (userId) => {
+    if (!userId) return;
+    try {
+      const local = readTournamentState();
+      const { error } = await supabase
+        .from('tournament_state')
+        .upsert({
+          user_id: userId,
+          trophy_count: local.trophyCount || 0,
+          tournaments_attempted: local.tournamentsAttempted || 0,
+          tournaments_completed: local.tournamentsCompleted || 0,
+          last_played_date: local.lastPlayedDate || null,
+          last_attempt_result: local.lastAttemptResult || null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+      if (error && typeof console !== 'undefined') {
+        console.warn('[kick3] trophy sync failed (non-fatal):', error);
+      }
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] trophy sync threw (non-fatal):', err);
+      }
+    }
+  };
+
+  // SIGN UP — create account, insert profile, sync trophies, route to home.
+  const submitSignUp = async () => {
+    if (authLoading) return;
+    setAuthError('');
+    setAuthSuccess('');
+
+    const handle = authHandle.trim();
+    const handleErr = validateHandle(handle);
+    if (handleErr) { setAuthError(handleErr); return; }
+    const pwErr = validatePassword(authPassword);
+    if (pwErr) { setAuthError(pwErr); return; }
+    if (authPassword !== authPasswordConfirm) {
+      setAuthError('Passwords don\u2019t match');
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      // Step 1: create the Supabase Auth user. Email is a placeholder we never
+      // collect or send to — Supabase requires SOMETHING in the email field.
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email: handleToPlaceholderEmail(handle),
+        password: authPassword,
+      });
+      if (signUpErr) {
+        setAuthError(friendlyAuthError(signUpErr));
+        return;
+      }
+      const newUser = signUpData?.user;
+      if (!newUser) {
+        setAuthError('Sign-up succeeded but no user returned. Try signing in.');
+        return;
+      }
+
+      // Step 2: insert the profile row (links handle to user id). The DB has
+      // a unique constraint on lower(handle), so this catches the race where
+      // two people pick the same handle at the same time.
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .insert({ id: newUser.id, handle });
+      if (profileErr) {
+        // Profile insert failed — most likely "handle taken" from the unique
+        // index. The Auth user was created but is orphaned without a profile.
+        // We delete the Auth user via sign-out to keep the user table clean
+        // for retry. The user can pick a different handle and try again.
+        await supabase.auth.signOut();
+        const msg = (profileErr.message || '').toLowerCase();
+        if (msg.includes('duplicate') || msg.includes('unique')) {
+          setAuthError('That handle is taken. Try another.');
+        } else {
+          setAuthError('Couldn\u2019t save your profile. Try again.');
+        }
+        return;
+      }
+
+      // Step 3: sync any existing localStorage trophies to the new account.
+      // This is the "save my trophies" payoff — first sign-up captures whatever
+      // record the player has built up so far.
+      await syncTrophiesToCloud(newUser.id);
+
+      // Step 4: success. The auth state subscription in the mount useEffect
+      // will pick up the new session and update authUser/authProfile.
+      setAuthSuccess(`Welcome, ${handle}.`);
+      // Brief celebratory pause, then return to home.
+      setTimeout(() => {
+        resetAuthForm();
+        setScreen('home');
+      }, 1200);
+    } catch (err) {
+      setAuthError(friendlyAuthError(err));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // SIGN IN — authenticate, sync trophy counts (cloud wins if higher), home.
+  const submitSignIn = async () => {
+    if (authLoading) return;
+    setAuthError('');
+    setAuthSuccess('');
+
+    const handle = authHandle.trim();
+    if (!handle) { setAuthError('Enter your handle'); return; }
+    if (!authPassword) { setAuthError('Enter your password'); return; }
+
+    setAuthLoading(true);
+    try {
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: handleToPlaceholderEmail(handle),
+        password: authPassword,
+      });
+      if (signInErr) {
+        setAuthError(friendlyAuthError(signInErr));
+        return;
+      }
+      const signedInUser = signInData?.user;
+      if (!signedInUser) {
+        setAuthError('Sign-in failed. Try again.');
+        return;
+      }
+
+      // Reconcile localStorage trophies with cloud trophies. Higher count wins.
+      // This is a deliberate trade-off: if a player signs in on a new device
+      // with zero local state, we DON'T overwrite their cloud record. If they
+      // signed in on a device with MORE trophies than the cloud (e.g. they
+      // played offline before signing in), we keep the better record.
+      // Stage 20 wires bidirectional sync; this is the minimum honest reconcile.
+      try {
+        const local = readTournamentState();
+        const { data: cloudRow, error: fetchErr } = await supabase
+          .from('tournament_state')
+          .select('*')
+          .eq('user_id', signedInUser.id)
+          .maybeSingle();
+
+        if (!fetchErr && cloudRow) {
+          const cloudTrophies = cloudRow.trophy_count || 0;
+          const localTrophies = local.trophyCount || 0;
+          if (cloudTrophies >= localTrophies) {
+            // Cloud has same or more — pull cloud state down to localStorage.
+            writeTournamentState({
+              ...local,
+              trophyCount: cloudTrophies,
+              tournamentsAttempted: cloudRow.tournaments_attempted || local.tournamentsAttempted || 0,
+              tournamentsCompleted: cloudRow.tournaments_completed || local.tournamentsCompleted || 0,
+              lastPlayedDate: cloudRow.last_played_date || local.lastPlayedDate,
+              lastAttemptResult: cloudRow.last_attempt_result || local.lastAttemptResult,
+            });
+          } else {
+            // Local has more — push local up to cloud.
+            await syncTrophiesToCloud(signedInUser.id);
+          }
+        } else if (!cloudRow) {
+          // No cloud row exists yet (edge case — profile but no state row).
+          // Push local up.
+          await syncTrophiesToCloud(signedInUser.id);
+        }
+      } catch (syncErr) {
+        // Reconciliation failed — sign-in still succeeded. Log and continue.
+        if (typeof console !== 'undefined') {
+          console.warn('[kick3] sign-in sync failed (non-fatal):', syncErr);
+        }
+      }
+
+      setAuthSuccess(`Welcome back, ${handle}.`);
+      setTimeout(() => {
+        resetAuthForm();
+        setScreen('home');
+      }, 1200);
+    } catch (err) {
+      setAuthError(friendlyAuthError(err));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // SIGN OUT — clear Supabase session. authUser/authProfile will be cleared
+  // by the onAuthStateChange listener in the mount useEffect.
+  const submitSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] sign-out error (non-fatal):', err);
+      }
+    }
+    // Stay on whatever screen we're on; the home screen UI will re-render
+    // with the signed-out state once authUser flips to null.
+  };
+  // ============ END AUTH HANDLERS ============
 
   // ============ TOURNAMENT MODE — BETA GATE ============
   // tournamentBetaActive is true if ?beta=pete is (or was) in the URL.
@@ -3453,6 +3751,85 @@ Deliver your verdict as JSON.`;
                 </div>
               </div>
 
+              {/* SIGN IN / SAVE TROPHIES button (Phase 2, Deploy 5 / Stage 18).
+                  Sits between the title block and the question chalkboard, per the
+                  agreed (ii) placement. Optional throughout — when signed out, shows
+                  a value-prop pitch. When signed in, shows the handle as a chip with
+                  a small sign-out option. authReady gates render so we don't flash
+                  the signed-out state for already-signed-in users. */}
+              {authReady && (
+                authUser && authProfile ? (
+                  <div style={{
+                    width: '100%',
+                    marginBottom: '18px',
+                    padding: '12px 16px',
+                    background: 'rgba(95,176,74,0.10)',
+                    border: '1px solid rgba(95,176,74,0.40)',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px'
+                  }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        ...condFont, fontSize: '10px', letterSpacing: '0.28em',
+                        color: '#5fb04a', fontWeight: 700, marginBottom: '2px'
+                      }}>
+                        SIGNED IN
+                      </div>
+                      <div style={{
+                        ...displayFont, fontSize: '18px', fontWeight: 700,
+                        color: colours.cream, letterSpacing: '0.02em',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                      }}>
+                        {authProfile.handle}
+                      </div>
+                    </div>
+                    <button
+                      onClick={submitSignOut}
+                      style={{
+                        background: 'transparent', color: colours.muted,
+                        border: `1px solid ${colours.muted}`, borderRadius: '6px',
+                        ...condFont, fontSize: '11px', fontWeight: 600,
+                        letterSpacing: '0.18em', padding: '7px 11px',
+                        cursor: 'pointer', flexShrink: 0
+                      }}
+                    >
+                      SIGN OUT
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { resetAuthForm(); setAuthMode('signup'); setScreen('auth'); }}
+                    style={{
+                      width: '100%', marginBottom: '18px',
+                      padding: '14px 18px',
+                      background: 'transparent',
+                      color: colours.cream,
+                      border: `1.5px solid rgba(212,175,55,0.55)`,
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span style={{
+                      ...displayFont, fontSize: '18px', fontWeight: 700,
+                      color: colours.gold, letterSpacing: '0.08em'
+                    }}>
+                      SIGN IN WHENEVER
+                    </span>
+                    <span style={{
+                      ...condFont, fontSize: '11px', color: colours.muted,
+                      fontStyle: 'italic', letterSpacing: '0.04em'
+                    }}>
+                      Save your tournament trophies
+                    </span>
+                  </button>
+                )
+              )}
+
               {/* Question chalkboard — wooden frame around dark slate */}
               <div style={{
                 background: 'linear-gradient(135deg, #6b4423 0%, #4a2e15 50%, #5c3a1d 100%)',
@@ -4017,6 +4394,81 @@ Deliver your verdict as JSON.`;
                     <div style={{ height: '1px', flex: '0 0 36px', background: colours.cream, opacity: 0.7 }} />
                   </div>
                 </div>
+
+                {/* SIGN IN / SAVE TROPHIES button (Phase 2, Deploy 5 / Stage 18).
+                    Desktop version — same logic as phone, slightly larger sizing. */}
+                {authReady && (
+                  authUser && authProfile ? (
+                    <div style={{
+                      width: '100%',
+                      marginBottom: '22px',
+                      padding: '14px 18px',
+                      background: 'rgba(95,176,74,0.10)',
+                      border: '1px solid rgba(95,176,74,0.40)',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px'
+                    }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          ...condFont, fontSize: '11px', letterSpacing: '0.3em',
+                          color: '#5fb04a', fontWeight: 700, marginBottom: '3px'
+                        }}>
+                          SIGNED IN
+                        </div>
+                        <div style={{
+                          ...displayFont, fontSize: '20px', fontWeight: 700,
+                          color: colours.cream, letterSpacing: '0.02em',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                        }}>
+                          {authProfile.handle}
+                        </div>
+                      </div>
+                      <button
+                        onClick={submitSignOut}
+                        style={{
+                          background: 'transparent', color: colours.muted,
+                          border: `1px solid ${colours.muted}`, borderRadius: '7px',
+                          ...condFont, fontSize: '12px', fontWeight: 600,
+                          letterSpacing: '0.2em', padding: '8px 14px',
+                          cursor: 'pointer', flexShrink: 0
+                        }}
+                      >
+                        SIGN OUT
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { resetAuthForm(); setAuthMode('signup'); setScreen('auth'); }}
+                      style={{
+                        width: '100%', marginBottom: '22px',
+                        padding: '16px 20px',
+                        background: 'transparent',
+                        color: colours.cream,
+                        border: `1.5px solid rgba(212,175,55,0.55)`,
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <span style={{
+                        ...displayFont, fontSize: '21px', fontWeight: 700,
+                        color: colours.gold, letterSpacing: '0.08em'
+                      }}>
+                        SIGN IN WHENEVER
+                      </span>
+                      <span style={{
+                        ...condFont, fontSize: '12px', color: colours.muted,
+                        fontStyle: 'italic', letterSpacing: '0.04em'
+                      }}>
+                        Save your tournament trophies
+                      </span>
+                    </button>
+                  )
+                )}
 
                 {/* Question chalkboard — wooden frame around slate */}
                 <div style={{
@@ -5955,6 +6407,282 @@ Deliver your verdict as JSON.`;
             >
               GOT IT — TAKE ME BACK
             </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
+  // ---------- AUTH SCREEN (sign-up / sign-in) ----------
+  // Phase 2, Deploy 5 / Stage 18. Single screen handles both new and returning
+  // users. authMode toggles between 'signup' and 'signin' — controlled by a
+  // small link at the bottom. Header sells the value (save trophies); form has
+  // inline validation; submit button changes label per mode.
+  if (screen === 'auth') {
+    const isSignUp = authMode === 'signup';
+    const headerTitle = isSignUp ? 'SAVE YOUR TROPHIES' : 'WELCOME BACK';
+    const headerSubtitle = isSignUp
+      ? 'Optional — the game works fully without it.'
+      : 'Sign in to keep your record across devices.';
+    const submitLabel = isSignUp
+      ? (authLoading ? 'CREATING ACCOUNT...' : 'CREATE ACCOUNT')
+      : (authLoading ? 'SIGNING IN...' : 'SIGN IN');
+    const toggleLabel = isSignUp
+      ? 'Already have an account? Sign in →'
+      : '\u2190 New player? Create an account';
+    const onSubmit = isSignUp ? submitSignUp : submitSignIn;
+    const canSubmit = !authLoading && authHandle.trim().length > 0 && authPassword.length > 0
+      && (!isSignUp || authPasswordConfirm.length > 0);
+
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '500px' }}>
+
+            {/* Back to home — small chip top-left */}
+            <button
+              onClick={() => { resetAuthForm(); setScreen('home'); }}
+              style={{
+                background: 'transparent',
+                color: colours.muted,
+                border: `1px solid ${colours.muted}`,
+                borderRadius: '5px',
+                ...condFont, fontSize: '11px', fontWeight: 600,
+                letterSpacing: '0.2em', padding: '6px 12px',
+                cursor: 'pointer', marginBottom: '24px'
+              }}
+            >
+              ← BACK
+            </button>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <h1 style={{
+                ...displayFont, fontSize: 'clamp(32px, 8vw, 44px)',
+                fontWeight: 800, color: colours.gold, margin: 0,
+                letterSpacing: '0.04em', lineHeight: 1
+              }}>
+                {headerTitle}
+              </h1>
+              <p style={{
+                ...condFont, fontSize: '13px', color: colours.muted,
+                marginTop: '12px', marginBottom: 0, lineHeight: 1.5,
+                fontStyle: 'italic'
+              }}>
+                {headerSubtitle}
+              </p>
+            </div>
+
+            {/* Value prop — only shown on sign-up.
+                Three bullet points framing why signing in is worth it. */}
+            {isSignUp && (
+              <div style={{
+                background: 'rgba(212,175,55,0.06)',
+                border: '1px solid rgba(212,175,55,0.20)',
+                padding: '14px 18px',
+                borderRadius: '8px',
+                marginBottom: '24px'
+              }}>
+                <div style={{
+                  ...condFont, fontSize: '10px', letterSpacing: '0.3em',
+                  color: colours.gold, fontWeight: 700, marginBottom: '10px'
+                }}>
+                  WHY SIGN IN
+                </div>
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: '7px',
+                  ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4
+                }}>
+                  <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Save your tournament trophies forever</div>
+                  <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Keep your record across phone, laptop, tablet</div>
+                  <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Compete on leaderboards (coming soon)</div>
+                </div>
+              </div>
+            )}
+
+            {/* Success state — replaces form once sign-up/sign-in completes */}
+            {authSuccess && (
+              <div style={{
+                background: 'rgba(95,176,74,0.10)',
+                border: '1px solid rgba(95,176,74,0.40)',
+                padding: '20px',
+                borderRadius: '8px',
+                marginBottom: '20px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '36px', lineHeight: 1, marginBottom: '8px' }} aria-hidden="true">🎉</div>
+                <div style={{
+                  ...displayFont, fontSize: '20px', fontWeight: 700,
+                  color: colours.cream, letterSpacing: '0.02em'
+                }}>
+                  {authSuccess}
+                </div>
+                <div style={{
+                  ...condFont, fontSize: '12px', color: colours.muted,
+                  marginTop: '8px', fontStyle: 'italic'
+                }}>
+                  Taking you home...
+                </div>
+              </div>
+            )}
+
+            {/* Form — hidden after success */}
+            {!authSuccess && (
+              <>
+                {/* Handle field */}
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{
+                    ...condFont, fontSize: '11px', letterSpacing: '0.25em',
+                    color: colours.gold, fontWeight: 700, display: 'block',
+                    marginBottom: '6px'
+                  }}>
+                    HANDLE
+                  </label>
+                  <input
+                    type="text"
+                    value={authHandle}
+                    onChange={(e) => { setAuthHandle(e.target.value.slice(0, 20)); setAuthError(''); }}
+                    placeholder={isSignUp ? "Pick a name (3-20 chars)" : "Your handle"}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    style={{
+                      width: '100%', padding: '13px 14px',
+                      background: 'rgba(0,0,0,0.30)',
+                      border: `1px solid rgba(212,175,55,0.30)`,
+                      color: colours.cream,
+                      ...condFont, fontSize: '15px', fontWeight: 600,
+                      borderRadius: '6px', boxSizing: 'border-box',
+                      outline: 'none', letterSpacing: '0.02em'
+                    }}
+                  />
+                  {isSignUp && (
+                    <div style={{
+                      ...condFont, fontSize: '11px', color: colours.muted,
+                      marginTop: '5px', fontStyle: 'italic'
+                    }}>
+                      Letters, numbers, underscores. Must start with a letter.
+                    </div>
+                  )}
+                </div>
+
+                {/* Password field */}
+                <div style={{ marginBottom: isSignUp ? '14px' : '20px' }}>
+                  <label style={{
+                    ...condFont, fontSize: '11px', letterSpacing: '0.25em',
+                    color: colours.gold, fontWeight: 700, display: 'block',
+                    marginBottom: '6px'
+                  }}>
+                    PASSWORD
+                  </label>
+                  <input
+                    type="password"
+                    value={authPassword}
+                    onChange={(e) => { setAuthPassword(e.target.value); setAuthError(''); }}
+                    placeholder={isSignUp ? "8+ characters" : "Your password"}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    style={{
+                      width: '100%', padding: '13px 14px',
+                      background: 'rgba(0,0,0,0.30)',
+                      border: `1px solid rgba(212,175,55,0.30)`,
+                      color: colours.cream,
+                      ...condFont, fontSize: '15px', fontWeight: 600,
+                      borderRadius: '6px', boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Confirm password — sign-up only */}
+                {isSignUp && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{
+                      ...condFont, fontSize: '11px', letterSpacing: '0.25em',
+                      color: colours.gold, fontWeight: 700, display: 'block',
+                      marginBottom: '6px'
+                    }}>
+                      CONFIRM PASSWORD
+                    </label>
+                    <input
+                      type="password"
+                      value={authPasswordConfirm}
+                      onChange={(e) => { setAuthPasswordConfirm(e.target.value); setAuthError(''); }}
+                      placeholder="Type it again"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck="false"
+                      style={{
+                        width: '100%', padding: '13px 14px',
+                        background: 'rgba(0,0,0,0.30)',
+                        border: `1px solid rgba(212,175,55,0.30)`,
+                        color: colours.cream,
+                        ...condFont, fontSize: '15px', fontWeight: 600,
+                        borderRadius: '6px', boxSizing: 'border-box',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Error message */}
+                {authError && (
+                  <div style={{
+                    background: 'rgba(232,52,74,0.10)',
+                    border: '1px solid rgba(232,52,74,0.40)',
+                    padding: '11px 14px', borderRadius: '6px',
+                    marginBottom: '16px',
+                    ...condFont, fontSize: '13px', color: colours.accent,
+                    lineHeight: 1.4, fontWeight: 600
+                  }}>
+                    {authError}
+                  </div>
+                )}
+
+                {/* Submit button */}
+                <button
+                  onClick={onSubmit}
+                  disabled={!canSubmit}
+                  style={{
+                    width: '100%', padding: '16px',
+                    background: canSubmit ? colours.gold : '#3a3a44',
+                    color: canSubmit ? '#000' : colours.muted,
+                    border: 'none', borderRadius: '10px',
+                    ...displayFont, fontSize: '20px', fontWeight: 800,
+                    letterSpacing: '0.1em',
+                    cursor: canSubmit ? 'pointer' : 'not-allowed',
+                    boxShadow: canSubmit ? '0 4px 0 rgba(0,0,0,0.25)' : 'none',
+                    marginBottom: '16px'
+                  }}
+                >
+                  {submitLabel}
+                </button>
+
+                {/* Toggle mode link */}
+                <button
+                  onClick={() => { setAuthMode(isSignUp ? 'signin' : 'signup'); resetAuthForm(); }}
+                  disabled={authLoading}
+                  style={{
+                    width: '100%', padding: '10px',
+                    background: 'transparent',
+                    color: colours.cream,
+                    border: 'none',
+                    ...condFont, fontSize: '13px', fontWeight: 600,
+                    letterSpacing: '0.06em',
+                    cursor: authLoading ? 'not-allowed' : 'pointer',
+                    opacity: authLoading ? 0.5 : 0.85,
+                    textDecoration: 'underline',
+                    textUnderlineOffset: '3px'
+                  }}
+                >
+                  {toggleLabel}
+                </button>
+              </>
+            )}
           </div>
         </div>
         <Analytics />
