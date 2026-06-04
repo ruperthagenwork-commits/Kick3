@@ -2230,30 +2230,42 @@ export default function Kick3() {
           // Fetch matching profile row (handle, etc.). Safe if missing.
           const profile = await fetchProfileForUser(session.user.id);
           if (cancelled) return;
-          setAuthProfile(profile);
-          // Stage 19: if a previous sync failed, retry now that we know we're online.
-          // Inline retry rather than calling retryPendingSync() because authUser
-          // isn't set in React state yet — we'd race with React's update.
-          try {
-            const pending = localStorage.getItem('kick3_sync_retry_pending');
-            if (pending === '1' && !cancelled) {
-              const local = readTournamentState();
-              const { error: retryErr } = await supabase
-                .from('tournament_state')
-                .upsert({
-                  user_id: session.user.id,
-                  trophy_count: local.trophyCount || 0,
-                  tournaments_attempted: local.tournamentsAttempted || 0,
-                  tournaments_completed: local.tournamentsCompleted || 0,
-                  last_played_date: local.lastPlayedDate || null,
-                  last_attempt_result: local.lastAttemptResult || null,
-                  updated_at: new Date().toISOString(),
-                }, { onConflict: 'user_id' });
-              if (!retryErr) {
-                try { localStorage.removeItem('kick3_sync_retry_pending'); } catch {}
+          // Stage 20.2: orphaned-session defence on mount. If we restored a
+          // session but the profile row is gone (account was deleted between
+          // sessions), sign back out cleanly so the home screen renders the
+          // signed-out state, not a confusing half-signed-in state.
+          if (!profile) {
+            try { await supabase.auth.signOut(); } catch {}
+            setAuthUser(null);
+            setAuthProfile(null);
+          } else {
+            setAuthProfile(profile);
+            // Stage 19: if a previous sync failed, retry now that we know we're online.
+            // Inline retry rather than calling retryPendingSync() because authUser
+            // isn't set in React state yet — we'd race with React's update.
+            // Stage 20.2: gated behind the profile check — no point retrying
+            // a sync for an account that no longer exists.
+            try {
+              const pending = localStorage.getItem('kick3_sync_retry_pending');
+              if (pending === '1' && !cancelled) {
+                const local = readTournamentState();
+                const { error: retryErr } = await supabase
+                  .from('tournament_state')
+                  .upsert({
+                    user_id: session.user.id,
+                    trophy_count: local.trophyCount || 0,
+                    tournaments_attempted: local.tournamentsAttempted || 0,
+                    tournaments_completed: local.tournamentsCompleted || 0,
+                    last_played_date: local.lastPlayedDate || null,
+                    last_attempt_result: local.lastAttemptResult || null,
+                    updated_at: new Date().toISOString(),
+                  }, { onConflict: 'user_id' });
+                if (!retryErr) {
+                  try { localStorage.removeItem('kick3_sync_retry_pending'); } catch {}
+                }
               }
-            }
-          } catch {}
+            } catch {}
+          }
         }
       } catch (err) {
         // Network errors are non-fatal — the game still works signed-out.
@@ -2437,6 +2449,25 @@ export default function Kick3() {
       const signedInUser = signInData?.user;
       if (!signedInUser) {
         setAuthError('Sign-in failed. Try again.');
+        return;
+      }
+
+      // Stage 20.2: Check for orphaned sign-in (auth shell exists but profile
+      // was deleted via the Delete Account flow). The auth.users row stays
+      // because we can't delete it from the front-end — but the profile is
+      // gone, which means there's no handle to display and the home screen
+      // would render in a confusingly half-signed-in state.
+      //
+      // The right behaviour: treat the deleted account as deleted. Sign the
+      // user back out immediately and show an honest error. The auth shell
+      // stays (we can't help that), but the front-end no longer ghosts.
+      const orphanCheck = await fetchProfileForUser(signedInUser.id);
+      if (!orphanCheck) {
+        // No profile row exists for this auth user → deleted account.
+        // Sign back out so we don't leave a session hanging, then show the
+        // honest error and let the user sign up with a different handle.
+        try { await supabase.auth.signOut(); } catch {}
+        setAuthError('That account was deleted. Sign up to start fresh.');
         return;
       }
 
