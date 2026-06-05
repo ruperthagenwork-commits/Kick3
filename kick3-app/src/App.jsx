@@ -7866,7 +7866,7 @@ Deliver your verdict as JSON.`;
                 <span style={{ width: '34px' }}>RANK</span>
                 <span style={{ flex: 1, minWidth: 0 }}>PLAYER</span>
                 <span style={{ width: '52px', textAlign: 'right' }}>TROPHIES</span>
-                <span style={{ width: '46px', textAlign: 'right' }}>ATTEMPTS</span>
+                <span style={{ width: '52px', textAlign: 'right', marginLeft: '14px' }}>ATTEMPTS</span>
               </div>
 
               {/* Empty state */}
@@ -7953,7 +7953,7 @@ Deliver your verdict as JSON.`;
                     </span>
                     {/* Attempts (quieter) */}
                     <span style={{
-                      width: '46px', textAlign: 'right',
+                      width: '52px', textAlign: 'right', marginLeft: '14px',
                       ...condFont, fontSize: '12px', color: colours.muted
                     }}>
                       {row.tournaments_attempted}
