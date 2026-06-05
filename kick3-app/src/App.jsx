@@ -4848,17 +4848,16 @@ Deliver your verdict as JSON.`;
                 )}
               </button>
 
-              {/* Stage 22.10: MY DAILY QUESTION STATS — restyled as white pill
-                  with black text. Emoji removed (now lives on LEADERBOARDS pill). */}
+              {/* Stage 22.11: MY DAILY QUESTION STATS — light blue fill + outline, black text, emoji back. */}
               <button
                 onClick={() => setScreen('stats')}
                 className="kick3-button-hover"
                 style={{
                   width: '100%',
                   padding: '13px 20px',
-                  background: '#ffffff',
+                  background: '#8ec8e8',
                   color: '#000000',
-                  border: '1.5px solid #ffffff',
+                  border: '1.5px solid #8ec8e8',
                   borderRadius: '10px',
                   ...displayFont,
                   fontSize: 'clamp(13px, 3.6vw, 15px)',
@@ -4868,20 +4867,22 @@ Deliver your verdict as JSON.`;
                   marginBottom: '20px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  gap: '10px'
                 }}
               >
+                <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📊</span>
                 <span>MY DAILY QUESTION STATS</span>
               </button>
 
-              {/* Stage 22.10: HOW TO PLAY — white pill with light blue border. */}
+              {/* Stage 22.11: HOW TO PLAY — light blue fill + outline, black text. */}
               <button
                 onClick={() => setScreen('howto')}
                 style={{
                   width: '100%',
                   marginTop: '24px',
                   padding: '14px 20px',
-                  background: '#ffffff',
+                  background: '#8ec8e8',
                   color: '#000000',
                   border: '1.5px solid #8ec8e8',
                   borderRadius: '8px',
@@ -5526,16 +5527,16 @@ Deliver your verdict as JSON.`;
                   )}
                 </button>
 
-                {/* Stage 22.10 (desktop): MY DAILY QUESTION STATS — white pill, no emoji. */}
+                {/* Stage 22.11 (desktop): MY DAILY QUESTION STATS — blue fill + outline, emoji back. */}
                 <button
                   onClick={() => setScreen('stats')}
                   className="kick3-button-hover"
                   style={{
                     width: '100%',
                     padding: '15px 24px',
-                    background: '#ffffff',
+                    background: '#8ec8e8',
                     color: '#000000',
-                    border: '1.5px solid #ffffff',
+                    border: '1.5px solid #8ec8e8',
                     borderRadius: '12px',
                     ...displayFont,
                     fontSize: 'clamp(14px, 1.3vw, 17px)',
@@ -5545,20 +5546,22 @@ Deliver your verdict as JSON.`;
                     marginBottom: '24px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    gap: '12px'
                   }}
                 >
+                  <span style={{ fontSize: '16px', letterSpacing: 0 }} aria-hidden="true">📊</span>
                   <span>MY DAILY QUESTION STATS</span>
                 </button>
 
-                {/* Stage 22.10 (desktop): HOW TO PLAY — white pill with light blue border. */}
+                {/* Stage 22.11 (desktop): HOW TO PLAY — blue fill + outline, black text. */}
                 <button
                   onClick={() => setScreen('howto')}
                   style={{
                     width: '100%',
                     marginTop: '28px',
                     padding: '16px 22px',
-                    background: '#ffffff',
+                    background: '#8ec8e8',
                     color: '#000000',
                     border: '1.5px solid #8ec8e8',
                     borderRadius: '10px',
