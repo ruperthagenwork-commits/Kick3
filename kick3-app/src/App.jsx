@@ -4547,9 +4547,8 @@ Deliver your verdict as JSON.`;
                 </button>
               )}
 
-              {/* Stage 22.10: split pills beneath the tournament button.
-                  Two thin pills side-by-side: 📊 LEADERBOARDS on left,
-                  🏆 N TROPHIES on right. Inherits the muted top-row style. */}
+              {/* Stage 22.12: split pills below tournament — tournament green fill,
+                  dark text, hover animation matched to other green buttons. */}
               <div style={{
                 display: 'flex',
                 flexDirection: 'row',
@@ -4559,17 +4558,18 @@ Deliver your verdict as JSON.`;
                 <button
                   onClick={() => setScreen('leaderboard')}
                   aria-label="View leaderboard"
+                  className="kick3-button-hover"
                   style={{
                     flex: 1,
-                    background: 'rgba(20,20,30,0.85)',
-                    color: colours.gold,
+                    background: '#5fb04a',
+                    color: '#0a1a08',
                     ...condFont,
                     fontSize: '11px',
                     fontWeight: 700,
                     letterSpacing: '0.2em',
                     padding: '8px 10px',
                     borderRadius: '5px',
-                    border: `1px solid ${colours.gold}`,
+                    border: '1px solid #5fb04a',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -4584,17 +4584,18 @@ Deliver your verdict as JSON.`;
                 <button
                   onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
                   aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
+                  className="kick3-button-hover"
                   style={{
                     flex: 1,
-                    background: 'rgba(20,20,30,0.85)',
-                    color: colours.gold,
+                    background: '#5fb04a',
+                    color: '#0a1a08',
                     ...condFont,
                     fontSize: '11px',
                     fontWeight: 700,
                     letterSpacing: '0.2em',
                     padding: '8px 10px',
                     borderRadius: '5px',
-                    border: `1px solid ${colours.gold}`,
+                    border: '1px solid #5fb04a',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -4604,7 +4605,7 @@ Deliver your verdict as JSON.`;
                   }}
                 >
                   <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
-                  <span>TROPHIES {homeTrophyCount}</span>
+                  <span>TROPHIES = {homeTrophyCount}</span>
                 </button>
               </div>
 
@@ -4855,9 +4856,9 @@ Deliver your verdict as JSON.`;
                 style={{
                   width: '100%',
                   padding: '13px 20px',
-                  background: '#8ec8e8',
+                  background: '#4a90d4',
                   color: '#000000',
-                  border: '1.5px solid #8ec8e8',
+                  border: '1.5px solid #4a90d4',
                   borderRadius: '10px',
                   ...displayFont,
                   fontSize: 'clamp(13px, 3.6vw, 15px)',
@@ -4875,21 +4876,22 @@ Deliver your verdict as JSON.`;
                 <span>MY DAILY QUESTION STATS</span>
               </button>
 
-              {/* Stage 22.11: HOW TO PLAY — light blue fill + outline, black text. */}
+              {/* Stage 22.12: HOW TO PLAY — darker blue, hover animation, matched displayFont. */}
               <button
                 onClick={() => setScreen('howto')}
+                className="kick3-button-hover"
                 style={{
                   width: '100%',
                   marginTop: '24px',
                   padding: '14px 20px',
-                  background: '#8ec8e8',
+                  background: '#4a90d4',
                   color: '#000000',
-                  border: '1.5px solid #8ec8e8',
+                  border: '1.5px solid #4a90d4',
                   borderRadius: '8px',
-                  ...condFont,
-                  fontSize: '13px',
+                  ...displayFont,
+                  fontSize: 'clamp(13px, 3.6vw, 15px)',
                   fontWeight: 700,
-                  letterSpacing: '0.25em',
+                  letterSpacing: '0.12em',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -5229,7 +5231,7 @@ Deliver your verdict as JSON.`;
                   </button>
                 )}
 
-                {/* Stage 22.10 (desktop): split pills beneath the tournament button. */}
+                {/* Stage 22.12 (desktop): split pills — tournament green fill, dark text, hover. */}
                 <div style={{
                   display: 'flex',
                   flexDirection: 'row',
@@ -5239,17 +5241,18 @@ Deliver your verdict as JSON.`;
                   <button
                     onClick={() => setScreen('leaderboard')}
                     aria-label="View leaderboard"
+                    className="kick3-button-hover"
                     style={{
                       flex: 1,
-                      background: 'rgba(20,20,30,0.85)',
-                      color: colours.gold,
+                      background: '#5fb04a',
+                      color: '#0a1a08',
                       ...condFont,
                       fontSize: '13px',
                       fontWeight: 700,
                       letterSpacing: '0.25em',
                       padding: '10px 14px',
                       borderRadius: '6px',
-                      border: `1px solid ${colours.gold}`,
+                      border: '1px solid #5fb04a',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -5264,17 +5267,18 @@ Deliver your verdict as JSON.`;
                   <button
                     onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
                     aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
+                    className="kick3-button-hover"
                     style={{
                       flex: 1,
-                      background: 'rgba(20,20,30,0.85)',
-                      color: colours.gold,
+                      background: '#5fb04a',
+                      color: '#0a1a08',
                       ...condFont,
                       fontSize: '13px',
                       fontWeight: 700,
                       letterSpacing: '0.25em',
                       padding: '10px 14px',
                       borderRadius: '6px',
-                      border: `1px solid ${colours.gold}`,
+                      border: '1px solid #5fb04a',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -5284,7 +5288,7 @@ Deliver your verdict as JSON.`;
                     }}
                   >
                     <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
-                    <span>TROPHIES {homeTrophyCount}</span>
+                    <span>TROPHIES = {homeTrophyCount}</span>
                   </button>
                 </div>
 
@@ -5534,9 +5538,9 @@ Deliver your verdict as JSON.`;
                   style={{
                     width: '100%',
                     padding: '15px 24px',
-                    background: '#8ec8e8',
+                    background: '#4a90d4',
                     color: '#000000',
-                    border: '1.5px solid #8ec8e8',
+                    border: '1.5px solid #4a90d4',
                     borderRadius: '12px',
                     ...displayFont,
                     fontSize: 'clamp(14px, 1.3vw, 17px)',
@@ -5554,21 +5558,22 @@ Deliver your verdict as JSON.`;
                   <span>MY DAILY QUESTION STATS</span>
                 </button>
 
-                {/* Stage 22.11 (desktop): HOW TO PLAY — blue fill + outline, black text. */}
+                {/* Stage 22.12 (desktop): HOW TO PLAY — darker blue, hover, matched displayFont. */}
                 <button
                   onClick={() => setScreen('howto')}
+                  className="kick3-button-hover"
                   style={{
                     width: '100%',
                     marginTop: '28px',
                     padding: '16px 22px',
-                    background: '#8ec8e8',
+                    background: '#4a90d4',
                     color: '#000000',
-                    border: '1.5px solid #8ec8e8',
+                    border: '1.5px solid #4a90d4',
                     borderRadius: '10px',
-                    ...condFont,
-                    fontSize: '14px',
+                    ...displayFont,
+                    fontSize: 'clamp(14px, 1.3vw, 17px)',
                     fontWeight: 700,
-                    letterSpacing: '0.28em',
+                    letterSpacing: '0.14em',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
