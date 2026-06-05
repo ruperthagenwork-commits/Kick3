@@ -4421,8 +4421,8 @@ Deliver your verdict as JSON.`;
                       <button
                         onClick={submitSignOut}
                         style={{
-                          background: 'transparent', color: colours.muted,
-                          border: `1px solid ${colours.muted}`, borderRadius: '6px',
+                          background: 'transparent', color: colours.accent,
+                          border: `1px solid ${colours.accent}`, borderRadius: '6px',
                           ...condFont, fontSize: '11px', fontWeight: 600,
                           letterSpacing: '0.18em', padding: '6px 11px',
                           cursor: 'pointer'
@@ -4561,8 +4561,8 @@ Deliver your verdict as JSON.`;
                   className="kick3-button-hover"
                   style={{
                     flex: 1,
-                    background: '#ffffff',
-                    color: '#000000',
+                    background: 'transparent',
+                    color: colours.cream,
                     ...displayFont,
                     fontSize: '12px',
                     fontWeight: 700,
@@ -4587,15 +4587,15 @@ Deliver your verdict as JSON.`;
                   className="kick3-button-hover"
                   style={{
                     flex: 1,
-                    background: '#ffffff',
-                    color: '#000000',
+                    background: 'transparent',
+                    color: colours.cream,
                     ...displayFont,
                     fontSize: '12px',
                     fontWeight: 700,
                     letterSpacing: '0.14em',
                     padding: '8px 10px',
                     borderRadius: '5px',
-                    border: '1.5px solid #5fb04a',
+                    border: `1.5px solid ${colours.gold}`,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -5106,8 +5106,8 @@ Deliver your verdict as JSON.`;
                         <button
                           onClick={submitSignOut}
                           style={{
-                            background: 'transparent', color: colours.muted,
-                            border: `1px solid ${colours.muted}`, borderRadius: '7px',
+                            background: 'transparent', color: colours.accent,
+                            border: `1px solid ${colours.accent}`, borderRadius: '7px',
                             ...condFont, fontSize: '12px', fontWeight: 600,
                             letterSpacing: '0.2em', padding: '7px 14px',
                             cursor: 'pointer'
@@ -5244,8 +5244,8 @@ Deliver your verdict as JSON.`;
                     className="kick3-button-hover"
                     style={{
                       flex: 1,
-                      background: '#ffffff',
-                      color: '#000000',
+                      background: 'transparent',
+                      color: colours.cream,
                       ...displayFont,
                       fontSize: '14px',
                       fontWeight: 700,
@@ -5270,15 +5270,15 @@ Deliver your verdict as JSON.`;
                     className="kick3-button-hover"
                     style={{
                       flex: 1,
-                      background: '#ffffff',
-                      color: '#000000',
+                      background: 'transparent',
+                      color: colours.cream,
                       ...displayFont,
                       fontSize: '14px',
                       fontWeight: 700,
                       letterSpacing: '0.16em',
                       padding: '10px 14px',
                       borderRadius: '6px',
-                      border: '1.5px solid #5fb04a',
+                      border: `1.5px solid ${colours.gold}`,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
