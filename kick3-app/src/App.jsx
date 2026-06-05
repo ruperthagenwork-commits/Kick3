@@ -2215,6 +2215,22 @@ export default function Kick3() {
   const [deleteConfirmStage, setDeleteConfirmStage] = useState(0);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
 
+  // Leaderboard state (Stage 22.4 — data layer for leaderboard screen).
+  // leaderboardRows: array of { handle, trophy_count, tournaments_attempted, distinct_days_played }
+  //   from the leaderboard_view, top 50 ordered by (trophy_count desc, attempts desc).
+  // leaderboardUserRank: { rank, row } | null — the signed-in user's position,
+  //   even if outside top 50. null if user has no trophies.
+  // leaderboardLastFetched: timestamp of last successful fetch (used for
+  //   the "Updated Xs ago" display).
+  // leaderboardLoading: true during the very first fetch (so the placeholder
+  //   doesn't flash). Subsequent polling refreshes are silent.
+  // leaderboardError: human-readable error string, or '' if no error.
+  const [leaderboardRows, setLeaderboardRows] = useState([]);
+  const [leaderboardUserRank, setLeaderboardUserRank] = useState(null);
+  const [leaderboardLastFetched, setLeaderboardLastFetched] = useState(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState('');
+
   // Check Supabase session once on mount; subscribe to auth state changes.
   // Session is persisted in localStorage by Supabase, so a previously signed-in
   // user is restored automatically on page reload.
@@ -2336,6 +2352,9 @@ export default function Kick3() {
           last_played_date: local.lastPlayedDate || null,
           last_attempt_result: local.lastAttemptResult || null,
           daily_stats: localStats,
+          // Stage 22: include the days-played counter so first sign-up
+          // captures the full local state in one round-trip.
+          distinct_days_played: parseInt(localStorage.getItem('kick3_distinct_days') || '0', 10) || 0,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
       if (error && typeof console !== 'undefined') {
@@ -2528,6 +2547,19 @@ export default function Kick3() {
             await pushDailyStatsToCloud();
           }
           // Equal totals: do nothing (already in sync).
+
+          // Stage 22: reconcile distinct_days_played counter. Same higher-wins
+          // pattern as trophies — both sides are monotonic, so higher = more
+          // complete. Updates localStorage if cloud is higher.
+          const cloudDays = cloudRow.distinct_days_played || 0;
+          const localDays = parseInt(localStorage.getItem('kick3_distinct_days') || '0', 10) || 0;
+          if (cloudDays > localDays) {
+            try { localStorage.setItem('kick3_distinct_days', String(cloudDays)); } catch {}
+          } else if (localDays > cloudDays) {
+            // Local has more — push up. pushTournamentStateToCloud reads the
+            // current localStorage value and upserts.
+            await pushTournamentStateToCloud();
+          }
         } else if (!cloudRow) {
           // No cloud row exists yet (edge case — profile but no state row).
           // Push local up.
@@ -2659,6 +2691,9 @@ export default function Kick3() {
           tournaments_completed: local.tournamentsCompleted || 0,
           last_played_date: local.lastPlayedDate || null,
           last_attempt_result: local.lastAttemptResult || null,
+          // Stage 22 (leaderboard build): include the days-played counter.
+          // Stored locally under kick3_distinct_days; see recordPlayDay() below.
+          distinct_days_played: parseInt(localStorage.getItem('kick3_distinct_days') || '0', 10) || 0,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
       if (error) {
@@ -2743,6 +2778,180 @@ export default function Kick3() {
     }
   };
   // ============ END DAILY STATS SYNC ============
+
+  // ============ DISTINCT DAYS PLAYED (Stage 22 — leaderboard loyalty badge) ============
+  // Tracks the number of distinct days the player has logged at least one play
+  // of any mode (solo, 1v1, OR tournament attempt). Used by the loyalty-badge
+  // tier system on the leaderboard.
+  //
+  // Mechanism:
+  //   - localStorage key 'kick3_distinct_days' stores the integer count.
+  //   - localStorage key 'kick3_last_play_day' stores the question.number of
+  //     the day the last play was recorded.
+  //   - On every play, recordPlayDay() checks the stamp. If today's number
+  //     differs from the stored one (or it's unset), increment the count and
+  //     update the stamp. Otherwise no-op.
+  //   - Synced to cloud as part of pushTournamentStateToCloud's upsert.
+  //
+  // Tier thresholds (matches Kick3_Leaderboards_Spec.docx):
+  //   0-6   = no badge
+  //   7-13  = BRONZE
+  //   14-20 = SILVER
+  //   21-27 = GOLD
+  //   28+   = DIAMOND
+  const DISTINCT_DAYS_KEY = 'kick3_distinct_days';
+  const LAST_PLAY_DAY_KEY = 'kick3_last_play_day';
+
+  // Call this after every play (solo, 1v1, OR tournament attempt completion).
+  // Idempotent within a single day — only increments on the FIRST play of a
+  // new question.number. No-op if the same question is already stamped.
+  const recordPlayDay = () => {
+    try {
+      const todayNum = TODAYS_QUESTION.number;
+      const lastNum = parseInt(localStorage.getItem(LAST_PLAY_DAY_KEY) || '0', 10);
+      if (lastNum === todayNum) return; // Already counted today.
+      // New day — increment and stamp.
+      const current = parseInt(localStorage.getItem(DISTINCT_DAYS_KEY) || '0', 10) || 0;
+      localStorage.setItem(DISTINCT_DAYS_KEY, String(current + 1));
+      localStorage.setItem(LAST_PLAY_DAY_KEY, String(todayNum));
+    } catch { /* silent */ }
+  };
+
+  // Helper: derive loyalty tier from a day count. Returns one of:
+  //   { tier: 'NONE'|'BRONZE'|'SILVER'|'GOLD'|'DIAMOND', label, color, daysToNext }
+  // Used by both the leaderboard rendering and the profile screen.
+  const loyaltyTierFor = (days) => {
+    const d = parseInt(days, 10) || 0;
+    if (d >= 28) return { tier: 'DIAMOND', label: 'DIAMOND', color: '#b9f2ff', textColor: '#0a1a1f', daysToNext: null };
+    if (d >= 21) return { tier: 'GOLD',    label: 'GOLD',    color: '#d4af37', textColor: '#1a1408', daysToNext: 28 - d };
+    if (d >= 14) return { tier: 'SILVER',  label: 'SILVER',  color: '#c0c0c0', textColor: '#1a1a1a', daysToNext: 21 - d };
+    if (d >= 7)  return { tier: 'BRONZE',  label: 'BRONZE',  color: '#cd7f32', textColor: '#ffffff', daysToNext: 14 - d };
+    return { tier: 'NONE', label: '', color: null, textColor: null, daysToNext: 7 - d };
+  };
+  // ============ END DISTINCT DAYS PLAYED ============
+
+  // ============ LEADERBOARD FETCH (Stage 22.4 — data layer) ============
+  // Reads from the leaderboard_view created in Stage A.
+  // View is granted SELECT to authenticated users only — signed-out queries
+  // will fail with a permission error, which is correct (leaderboard requires
+  // sign-in per the locked design rule).
+  //
+  // Two main helpers:
+  //   - fetchLeaderboardTop50() → array of rows, ordered by view definition
+  //     (trophy_count desc, tournaments_attempted desc).
+  //   - fetchUserRank(handle) → { rank: N, row } | null. The view is already
+  //     ordered, but Supabase doesn't expose row_number(), so we count rows
+  //     above the user instead. Cheap at our scale.
+  //
+  // Both return promises. Errors are caught and surfaced via leaderboardError.
+
+  const fetchLeaderboardTop50 = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('leaderboard_view')
+        .select('handle, trophy_count, tournaments_attempted, distinct_days_played')
+        .limit(50);
+      if (error) {
+        if (typeof console !== 'undefined') {
+          console.warn('[kick3] leaderboard top50 fetch failed:', error);
+        }
+        return { rows: [], error };
+      }
+      return { rows: data || [], error: null };
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] leaderboard top50 fetch threw:', err);
+      }
+      return { rows: [], error: err };
+    }
+  };
+
+  // Find a specific handle's rank. Strategy: count rows in the view that
+  // rank ABOVE the given handle (i.e. higher trophy_count, or same trophies
+  // with more attempts). Add 1 = the rank. No row_number() needed.
+  // Returns { rank, row } if found, or null if the handle isn't in the view
+  // (e.g. user with 0 trophies — they're filtered out by the view itself).
+  const fetchUserRank = async (handle) => {
+    if (!handle) return null;
+    try {
+      // Step 1: get the user's own row from the view.
+      const { data: ownData, error: ownErr } = await supabase
+        .from('leaderboard_view')
+        .select('handle, trophy_count, tournaments_attempted, distinct_days_played')
+        .eq('handle', handle)
+        .maybeSingle();
+      if (ownErr || !ownData) {
+        // User isn't in the view yet — probably has zero trophies.
+        return null;
+      }
+      // Step 2: count rows that beat the user's row. The view's ORDER BY is
+      // (trophy_count desc, tournaments_attempted desc), so "beat" means:
+      //   trophy_count > userTrophies
+      //   OR (trophy_count == userTrophies AND attempts > userAttempts)
+      // Two queries; results summed = rows above the user.
+      const userTrophies = ownData.trophy_count;
+      const userAttempts = ownData.tournaments_attempted;
+
+      // (a) Rows with strictly more trophies.
+      const { count: higherTrophyCount, error: higherErr } = await supabase
+        .from('leaderboard_view')
+        .select('*', { count: 'exact', head: true })
+        .gt('trophy_count', userTrophies);
+      if (higherErr) return null;
+
+      // (b) Rows with same trophies AND more attempts.
+      const { count: sameTrophyMoreAttempts, error: sameErr } = await supabase
+        .from('leaderboard_view')
+        .select('*', { count: 'exact', head: true })
+        .eq('trophy_count', userTrophies)
+        .gt('tournaments_attempted', userAttempts);
+      if (sameErr) return null;
+
+      const rank = (higherTrophyCount || 0) + (sameTrophyMoreAttempts || 0) + 1;
+      return { rank, row: ownData };
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] user rank fetch threw:', err);
+      }
+      return null;
+    }
+  };
+
+  // Combined leaderboard refresh — called by the screen's polling effect AND
+  // by the manual REFRESH button. Wraps both fetches and updates all state.
+  // Silent on success (no flicker). Sets error on failure.
+  const refreshLeaderboard = async (isFirstFetch = false) => {
+    if (!authUser) return;
+    if (isFirstFetch) setLeaderboardLoading(true);
+    try {
+      const { rows, error: top50Err } = await fetchLeaderboardTop50();
+      if (top50Err) {
+        setLeaderboardError('Couldn\u2019t load the leaderboard. Try again.');
+        if (isFirstFetch) setLeaderboardLoading(false);
+        return;
+      }
+      setLeaderboardRows(rows);
+      setLeaderboardError('');
+      setLeaderboardLastFetched(Date.now());
+
+      // Find the signed-in user's rank. Need their handle from authProfile.
+      const myHandle = authProfile && authProfile.handle;
+      if (myHandle) {
+        const userRank = await fetchUserRank(myHandle);
+        setLeaderboardUserRank(userRank);
+      } else {
+        setLeaderboardUserRank(null);
+      }
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] refreshLeaderboard threw:', err);
+      }
+      setLeaderboardError('Network error. Try again.');
+    } finally {
+      if (isFirstFetch) setLeaderboardLoading(false);
+    }
+  };
+  // ============ END LEADERBOARD FETCH ============
   // ============ END CLOUD SYNC ============
 
   // ============ PROFILE SCREEN (Phase 2, Deploy 5 / Stage 20) ============
@@ -3099,6 +3308,24 @@ export default function Kick3() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, authUser]);
 
+  // Stage 22.4: leaderboard fetch + 30-second polling.
+  // Fires when entering the leaderboard screen (signed in only).
+  // On mount: immediate fetch. Then every 30s while screen is open.
+  // Cleanup on unmount cancels the interval (no leaked timers).
+  // No-op when signed out — the screen's own gate handles the prompt.
+  useEffect(() => {
+    if (screen !== 'leaderboard') return;
+    if (!authUser) return;
+    // Initial fetch with the loading flag set.
+    refreshLeaderboard(true);
+    // Then poll every 30s. Subsequent fetches don't set loading (silent).
+    const intervalId = setInterval(() => {
+      refreshLeaderboard(false);
+    }, 30000);
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, authUser, authProfile]);
+
   // ============ DAILY PLAY LIMIT (3 solo + 3 1v1 per day) ============
   // Counters reset automatically when TODAYS_QUESTION.number advances.
   // localStorage keys:
@@ -3165,9 +3392,14 @@ export default function Kick3() {
       const next = { ...prev, [s]: (prev[s] || 0) + 1 };
       localStorage.setItem('kick3_score_counts', JSON.stringify(next));
       setScoreStats(next);
+      // Stage 22: a play happened today — bump the days-played counter.
+      // (Idempotent within a single day; safe to call from every play path.)
+      recordPlayDay();
       // Stage 21: push to cloud if signed in. Fire-and-forget — UI doesn't
       // wait. No-op when signed out (silent in pushDailyStatsToCloud).
+      // pushTournamentStateToCloud also pulls the days counter into its upsert.
       pushDailyStatsToCloud();
+      pushTournamentStateToCloud();
     } catch { /* silent */ }
   };
 
@@ -3497,6 +3729,9 @@ export default function Kick3() {
       lastPlayedDate: todayDateString(),
       lastAttemptResult: resultKey,
     });
+    // Stage 22: a tournament attempt counts as a play today — bump the
+    // days-played counter (idempotent within a day).
+    recordPlayDay();
     // Stage 19: push the just-written state up to the cloud if signed in.
     // Fire-and-forget — we don't block the UI on the network round-trip.
     // No-ops when signed out; silent retry-on-mount handles failures.
@@ -3655,6 +3890,9 @@ Weigh the picks, their Legacy ratings, and both arguments together. Judge betwee
         trophyCount: (state.trophyCount || 0) + (playerWon ? 1 : 0),
         wonTodayFlag: state.wonTodayFlag || playerWon,
       });
+      // Stage 22: a play happened today — bump the days-played counter
+      // (idempotent within a day).
+      recordPlayDay();
       // Stage 19: push the new trophy state to the cloud immediately.
       // This is the critical sync — every trophy must reach the cloud so it
       // shows up on the player's other devices.
@@ -4090,80 +4328,8 @@ Deliver your verdict as JSON.`;
                   alt="Pete the Pundit asleep in his study"
                 />
               </picture>
-              {/* DAY badge — top-left corner of illustration */}
-              <div style={{
-                position: 'absolute',
-                top: '14px',
-                left: '14px',
-                background: 'rgba(20,20,30,0.85)',
-                color: colours.gold,
-                ...condFont,
-                fontSize: '11px',
-                fontWeight: 700,
-                letterSpacing: '0.3em',
-                padding: '6px 10px',
-                borderRadius: '4px',
-                border: `1px solid ${colours.gold}`
-              }}>
-                DAY {TODAYS_QUESTION.number}
-              </div>
-              {/* Top-right: TROPHIES pill (Stage 16) + STATS button.
-                  TROPHIES displays the lifetime tournament trophy count and routes
-                  to the tournament-record screen. Setting recordReturnScreen='home'
-                  so the back button there returns here, not to tournament-home. */}
-              <div style={{
-                position: 'absolute',
-                top: '14px',
-                right: '14px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-end',
-                gap: '6px'
-              }}>
-                <button
-                  onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
-                  aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
-                  style={{
-                    background: 'rgba(20,20,30,0.85)',
-                    color: colours.gold,
-                    ...condFont,
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    letterSpacing: '0.3em',
-                    padding: '6px 10px',
-                    borderRadius: '4px',
-                    border: `1px solid ${colours.gold}`,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
-                  <span>{homeTrophyCount}</span>
-                </button>
-                <button
-                  onClick={() => setScreen('stats')}
-                  style={{
-                    background: 'rgba(20,20,30,0.85)',
-                    color: colours.gold,
-                    ...condFont,
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    letterSpacing: '0.3em',
-                    padding: '6px 10px',
-                    borderRadius: '4px',
-                    border: `1px solid ${colours.gold}`,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <span style={{ fontSize: '12px', letterSpacing: 0 }} aria-hidden="true">📊</span>
-                  <span>STATS</span>
-                </button>
-              </div>
+              {/* Stage 22.10: top status row removed. DAY moved into chalkboard.
+                  LEADERBOARDS + TROPHIES moved beneath the TOURNAMENT MODE button. */}
             </div>
 
             {/* Navy UI panel below illustration */}
@@ -4255,8 +4421,8 @@ Deliver your verdict as JSON.`;
                       <button
                         onClick={submitSignOut}
                         style={{
-                          background: 'transparent', color: colours.muted,
-                          border: `1px solid ${colours.muted}`, borderRadius: '6px',
+                          background: 'transparent', color: colours.accent,
+                          border: `1px solid ${colours.accent}`, borderRadius: '6px',
                           ...condFont, fontSize: '11px', fontWeight: 600,
                           letterSpacing: '0.18em', padding: '6px 11px',
                           cursor: 'pointer'
@@ -4297,79 +4463,8 @@ Deliver your verdict as JSON.`;
                 )
               )}
 
-              {/* Question chalkboard — wooden frame around dark slate */}
-              <div style={{
-                background: 'linear-gradient(135deg, #6b4423 0%, #4a2e15 50%, #5c3a1d 100%)',
-                padding: '10px',
-                borderRadius: '6px',
-                marginBottom: '22px',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1)'
-              }}>
-                <div style={{
-                  background: '#1a1d23',
-                  borderRadius: '3px',
-                  padding: '18px 18px 16px 18px',
-                  textAlign: 'center',
-                  boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.6)',
-                  position: 'relative'
-                }}>
-                  {/* Subtle chalk-dust texture using radial gradients */}
-                  <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    borderRadius: '3px',
-                    pointerEvents: 'none',
-                    background: 'radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.025) 0%, transparent 50%), radial-gradient(ellipse at 80% 70%, rgba(255,255,255,0.02) 0%, transparent 50%)'
-                  }} />
-                  <div style={{
-                    ...condFont,
-                    fontSize: '11px',
-                    letterSpacing: '0.3em',
-                    color: colours.gold,
-                    fontWeight: 600,
-                    marginBottom: '4px',
-                    position: 'relative'
-                  }}>
-                    TODAY&apos;S QUESTION
-                  </div>
-                  <div style={{
-                    width: '36px',
-                    height: '2px',
-                    background: colours.gold,
-                    margin: '0 auto 14px auto',
-                    opacity: 0.7,
-                    position: 'relative'
-                  }} />
-                  <p style={{
-                    fontFamily: "'Permanent Marker', 'Teko', cursive",
-                    fontSize: 'clamp(20px, 5.4vw, 26px)',
-                    lineHeight: '1.18',
-                    margin: 0,
-                    color: '#f5f0e1',
-                    letterSpacing: '0.02em',
-                    textTransform: 'uppercase',
-                    textShadow: '0 1px 0 rgba(0,0,0,0.3)',
-                    position: 'relative'
-                  }}>
-                    {TODAYS_QUESTION.text}
-                  </p>
-                  <div style={{ width: '50%', height: '1px', background: '#f5f0e1', opacity: 0.3, margin: '14px auto 8px auto', position: 'relative' }} />
-                  <div style={{
-                    ...condFont,
-                    fontSize: '10px',
-                    letterSpacing: '0.25em',
-                    color: CATEGORY_COLOURS[TODAYS_QUESTION.category] || colours.muted,
-                    fontWeight: 600,
-                    position: 'relative'
-                  }}>
-                    ● {TODAYS_QUESTION.category.toUpperCase()}
-                  </div>
-                </div>
-              </div>
-
-              {/* TOURNAMENT MODE — green when unlocked, locked/greyed for general public pre-launch.
-                  Phase 2, Deploy 5 / Stage 15: button now ALWAYS renders. Locked state
-                  shows a 🔒 emoji and "OPENS 11 JUNE" subtitle, fully unclickable. */}
+              {/* Stage 22.7: TOURNAMENT MODE moved ABOVE the chalkboard for prominence
+                  during the World Cup window. Same button code as before, just relocated. */}
               {tournamentUnlocked ? (
                 <button
                   onClick={() => setScreen('tournament-home')}
@@ -4390,7 +4485,7 @@ Deliver your verdict as JSON.`;
                     justifyContent: 'center',
                     gap: '12px',
                     cursor: 'pointer',
-                    marginBottom: '12px',
+                    marginBottom: '18px',
                     boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
                     position: 'relative'
                   }}
@@ -4430,7 +4525,7 @@ Deliver your verdict as JSON.`;
                     justifyContent: 'center',
                     gap: '4px',
                     cursor: 'not-allowed',
-                    marginBottom: '12px',
+                    marginBottom: '18px',
                     boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
                     opacity: 0.75
                   }}
@@ -4451,6 +4546,184 @@ Deliver your verdict as JSON.`;
                   </span>
                 </button>
               )}
+
+              {/* Stage 22.12: split pills below tournament — tournament green fill,
+                  dark text, hover animation matched to other green buttons. */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'row',
+                gap: '8px',
+                marginBottom: '20px'
+              }}>
+                <button
+                  onClick={() => setScreen('leaderboard')}
+                  aria-label="View leaderboard"
+                  className="kick3-button-hover"
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    color: colours.cream,
+                    ...displayFont,
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    letterSpacing: '0.14em',
+                    padding: '8px 10px',
+                    borderRadius: '5px',
+                    border: '1.5px solid #5fb04a',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">📊</span>
+                  <span>LEADERBOARDS</span>
+                </button>
+                <button
+                  onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
+                  aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
+                  className="kick3-button-hover"
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    color: colours.cream,
+                    ...displayFont,
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    letterSpacing: '0.14em',
+                    padding: '8px 10px',
+                    borderRadius: '5px',
+                    border: `1.5px solid ${colours.gold}`,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
+                  <span>{homeTrophyCount}</span>
+                </button>
+              </div>
+
+              {/* Stage 22.9: PICTURE FRAME enclosing all daily-question content.
+                  Thin wooden border + gold inner accent line, transparent interior
+                  (page background shows through). Contains: chalkboard question,
+                  three play/stats buttons, countdown, Pete's quote, HOW TO PLAY. */}
+              <div style={{
+                border: '5px solid #5c3a1d',
+                outline: '1px solid rgba(212,175,55,0.55)',
+                outlineOffset: '-9px',
+                background: 'transparent',
+                borderRadius: '8px',
+                padding: '18px 12px 16px 12px',
+                marginBottom: '20px',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.06)'
+              }}>
+                {/* Inner chalkboard slate */}
+                <div style={{
+                  background: '#1a1d23',
+                  borderRadius: '3px',
+                  padding: '18px 18px 16px 18px',
+                  textAlign: 'center',
+                  boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.6)',
+                  position: 'relative'
+                }}>
+                  {/* Subtle chalk-dust texture using radial gradients */}
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: '3px',
+                    pointerEvents: 'none',
+                    background: 'radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.025) 0%, transparent 50%), radial-gradient(ellipse at 80% 70%, rgba(255,255,255,0.02) 0%, transparent 50%)'
+                  }} />
+                  <div style={{
+                    ...condFont,
+                    fontSize: '11px',
+                    letterSpacing: '0.3em',
+                    color: colours.gold,
+                    fontWeight: 600,
+                    marginBottom: '4px',
+                    position: 'relative'
+                  }}>
+                    DAY {TODAYS_QUESTION.number}: TODAY&apos;S QUESTION
+                  </div>
+                  <div style={{
+                    width: '36px',
+                    height: '2px',
+                    background: colours.gold,
+                    margin: '0 auto 14px auto',
+                    opacity: 0.7,
+                    position: 'relative'
+                  }} />
+                  <p style={{
+                    fontFamily: "'Permanent Marker', 'Teko', cursive",
+                    fontSize: 'clamp(20px, 5.4vw, 26px)',
+                    lineHeight: '1.18',
+                    margin: 0,
+                    color: '#f5f0e1',
+                    letterSpacing: '0.02em',
+                    textTransform: 'uppercase',
+                    textShadow: '0 1px 0 rgba(0,0,0,0.3)',
+                    position: 'relative'
+                  }}>
+                    {TODAYS_QUESTION.text}
+                  </p>
+                  <div style={{ width: '50%', height: '1px', background: '#f5f0e1', opacity: 0.3, margin: '14px auto 8px auto', position: 'relative' }} />
+                  <div style={{
+                    ...condFont,
+                    fontSize: '10px',
+                    letterSpacing: '0.25em',
+                    color: CATEGORY_COLOURS[TODAYS_QUESTION.category] || colours.muted,
+                    fontWeight: 600,
+                    position: 'relative'
+                  }}>
+                    ● {TODAYS_QUESTION.category.toUpperCase()}
+                  </div>
+                </div>
+
+                {/* Spacer between chalkboard slate and the play buttons.
+                    Same picture frame contains both. */}
+                <div style={{ height: '14px' }} />
+
+              {/* Pete's italic intro quote — moved up in Stage 22.10 */}
+              <p style={{
+                ...condFont,
+                fontStyle: 'italic',
+                fontSize: '13px',
+                color: colours.muted,
+                textAlign: 'center',
+                margin: '0 0 12px 0',
+                padding: '0 8px',
+                lineHeight: '1.5',
+                opacity: 0.85
+              }}>
+                &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
+              </p>
+
+              {/* Countdown — moved up in Stage 22.10 to sit beneath Pete quote */}
+              <div style={{
+                ...condFont,
+                fontSize: '11px',
+                letterSpacing: '0.06em',
+                color: colours.cream,
+                fontWeight: 700,
+                textAlign: 'center',
+                marginBottom: '18px'
+              }}>
+                NEXT QUESTION IN{' '}
+                <span style={{
+                  color: colours.gold,
+                  fontWeight: 800,
+                  fontVariantNumeric: 'tabular-nums',
+                  marginLeft: '4px'
+                }}>
+                  {timeUntilNext}
+                </span>
+              </div>
 
               {/* PLAY TODAY — yellow */}
               <button
@@ -4522,15 +4795,15 @@ Deliver your verdict as JSON.`;
                 className="kick3-button-hover"
                 style={{
                   width: '100%',
-                  padding: '15px 20px',
+                  padding: '18px 20px',
                   background: h2hLocked ? '#3a3a44' : colours.accent,
                   color: h2hLocked ? colours.muted : colours.cream,
                   border: 'none',
                   borderRadius: '10px',
                   ...displayFont,
-                  fontSize: 'clamp(16px, 4.4vw, 19px)',
-                  fontWeight: 700,
-                  letterSpacing: '0.12em',
+                  fontSize: 'clamp(20px, 5.4vw, 24px)',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
                   cursor: h2hLocked ? 'not-allowed' : 'pointer',
                   marginBottom: '20px',
                   boxShadow: h2hLocked ? 'none' : '0 4px 0 rgba(0,0,0,0.25)',
@@ -4576,57 +4849,49 @@ Deliver your verdict as JSON.`;
                 )}
               </button>
 
-              {/* Countdown */}
-              <div style={{
-                ...condFont,
-                fontSize: '11px',
-                letterSpacing: '0.06em',
-                color: colours.cream,
-                fontWeight: 700,
-                textAlign: 'center',
-                marginBottom: '18px'
-              }}>
-                NEXT QUESTION IN{' '}
-                <span style={{
-                  color: colours.gold,
-                  fontWeight: 800,
-                  fontVariantNumeric: 'tabular-nums',
-                  marginLeft: '4px'
-                }}>
-                  {timeUntilNext}
-                </span>
-              </div>
+              {/* Stage 22.18: MY DAILY QUESTION STATS — blue fill, black text. */}
+              <button
+                onClick={() => setScreen('stats')}
+                className="kick3-button-hover"
+                style={{
+                  width: '100%',
+                  padding: '13px 20px',
+                  background: '#4a90d4',
+                  color: '#000000',
+                  border: '1.5px solid #4a90d4',
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(13px, 3.6vw, 15px)',
+                  fontWeight: 700,
+                  letterSpacing: '0.12em',
+                  cursor: 'pointer',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px'
+                }}
+              >
+                <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📊</span>
+                <span>MY DAILY QUESTION STATS</span>
+              </button>
 
-              {/* Pete's italic intro quote */}
-              <p style={{
-                ...condFont,
-                fontStyle: 'italic',
-                fontSize: '13px',
-                color: colours.muted,
-                textAlign: 'center',
-                margin: 0,
-                padding: '0 8px',
-                lineHeight: '1.5',
-                opacity: 0.85
-              }}>
-                &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
-              </p>
-
-              {/* HOW TO PLAY — secondary button, visible in bottom third of home */}
+              {/* Stage 22.17: HOW TO PLAY — purple fill, white (cream) text. */}
               <button
                 onClick={() => setScreen('howto')}
+                className="kick3-button-hover"
                 style={{
                   width: '100%',
                   marginTop: '24px',
                   padding: '14px 20px',
-                  background: 'transparent',
-                  color: colours.gold,
-                  border: `1.5px solid ${colours.gold}`,
+                  background: '#7a4eb8',
+                  color: colours.cream,
+                  border: '1.5px solid #7a4eb8',
                   borderRadius: '8px',
-                  ...condFont,
-                  fontSize: '13px',
+                  ...displayFont,
+                  fontSize: 'clamp(13px, 3.6vw, 15px)',
                   fontWeight: 700,
-                  letterSpacing: '0.25em',
+                  letterSpacing: '0.12em',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -4637,6 +4902,7 @@ Deliver your verdict as JSON.`;
                 <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📖</span>
                 <span>HOW TO PLAY</span>
               </button>
+              </div>{/* /Stage 22.9 daily-question picture frame */}
 
               {/* Contact footer */}
               <div style={{
@@ -4751,78 +5017,8 @@ Deliver your verdict as JSON.`;
                     alt="Pete the Pundit asleep in his study"
                   />
                 </picture>
-                {/* DAY badge */}
-                <div style={{
-                  position: 'absolute',
-                  top: '18px',
-                  left: '18px',
-                  background: 'rgba(20,20,30,0.85)',
-                  color: colours.gold,
-                  ...condFont,
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  letterSpacing: '0.3em',
-                  padding: '8px 14px',
-                  borderRadius: '4px',
-                  border: `1px solid ${colours.gold}`
-                }}>
-                  DAY {TODAYS_QUESTION.number}
-                </div>
-                {/* Top-right: TROPHIES pill (Stage 16) + STATS button.
-                    Same pattern as the phone layout, slightly larger sizing. */}
-                <div style={{
-                  position: 'absolute',
-                  top: '18px',
-                  right: '18px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-end',
-                  gap: '8px'
-                }}>
-                  <button
-                    onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
-                    aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
-                    style={{
-                      background: 'rgba(20,20,30,0.85)',
-                      color: colours.gold,
-                      ...condFont,
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      letterSpacing: '0.3em',
-                      padding: '8px 14px',
-                      borderRadius: '4px',
-                      border: `1px solid ${colours.gold}`,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
-                    <span>{homeTrophyCount}</span>
-                  </button>
-                  <button
-                    onClick={() => setScreen('stats')}
-                    style={{
-                      background: 'rgba(20,20,30,0.85)',
-                      color: colours.gold,
-                      ...condFont,
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      letterSpacing: '0.3em',
-                      padding: '8px 14px',
-                      borderRadius: '4px',
-                      border: `1px solid ${colours.gold}`,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📊</span>
-                    <span>STATS</span>
-                  </button>
-                </div>
+                {/* Stage 22.10: top status row removed (desktop). DAY moved into
+                    chalkboard. LEADERBOARDS + TROPHIES moved beneath TOURNAMENT. */}
               </div>
 
               {/* Navy UI panel below */}
@@ -4910,8 +5106,8 @@ Deliver your verdict as JSON.`;
                         <button
                           onClick={submitSignOut}
                           style={{
-                            background: 'transparent', color: colours.muted,
-                            border: `1px solid ${colours.muted}`, borderRadius: '7px',
+                            background: 'transparent', color: colours.accent,
+                            border: `1px solid ${colours.accent}`, borderRadius: '7px',
                             ...condFont, fontSize: '12px', fontWeight: 600,
                             letterSpacing: '0.2em', padding: '7px 14px',
                             cursor: 'pointer'
@@ -4952,77 +5148,7 @@ Deliver your verdict as JSON.`;
                   )
                 )}
 
-                {/* Question chalkboard — wooden frame around slate */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #6b4423 0%, #4a2e15 50%, #5c3a1d 100%)',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  marginBottom: '26px',
-                  boxShadow: '0 3px 8px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1)'
-                }}>
-                  <div style={{
-                    background: '#1a1d23',
-                    borderRadius: '4px',
-                    padding: '22px 24px 20px 24px',
-                    textAlign: 'center',
-                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.6)',
-                    position: 'relative'
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      inset: 0,
-                      borderRadius: '4px',
-                      pointerEvents: 'none',
-                      background: 'radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.025) 0%, transparent 50%), radial-gradient(ellipse at 80% 70%, rgba(255,255,255,0.02) 0%, transparent 50%)'
-                    }} />
-                    <div style={{
-                      ...condFont,
-                      fontSize: '13px',
-                      letterSpacing: '0.3em',
-                      color: colours.gold,
-                      fontWeight: 600,
-                      marginBottom: '6px',
-                      position: 'relative'
-                    }}>
-                      TODAY&apos;S QUESTION
-                    </div>
-                    <div style={{
-                      width: '44px',
-                      height: '2px',
-                      background: colours.gold,
-                      margin: '0 auto 16px auto',
-                      opacity: 0.7,
-                      position: 'relative'
-                    }} />
-                    <p style={{
-                      fontFamily: "'Permanent Marker', 'Teko', cursive",
-                      fontSize: 'clamp(24px, 2.4vw, 32px)',
-                      lineHeight: '1.2',
-                      margin: 0,
-                      color: '#f5f0e1',
-                      letterSpacing: '0.02em',
-                      textTransform: 'uppercase',
-                      textShadow: '0 1px 0 rgba(0,0,0,0.3)',
-                      position: 'relative'
-                    }}>
-                      {TODAYS_QUESTION.text}
-                    </p>
-                    <div style={{ width: '50%', height: '1px', background: '#f5f0e1', opacity: 0.3, margin: '16px auto 10px auto', position: 'relative' }} />
-                    <div style={{
-                      ...condFont,
-                      fontSize: '12px',
-                      letterSpacing: '0.25em',
-                      color: CATEGORY_COLOURS[TODAYS_QUESTION.category] || colours.muted,
-                      fontWeight: 600,
-                      position: 'relative'
-                    }}>
-                      ● {TODAYS_QUESTION.category.toUpperCase()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* TOURNAMENT MODE — green when unlocked, locked/greyed for general public pre-launch.
-                    Phase 2, Deploy 5 / Stage 15: button now ALWAYS renders. */}
+                {/* Stage 22.7: TOURNAMENT MODE moved above chalkboard for prominence. */}
                 {tournamentUnlocked ? (
                   <button
                     onClick={() => setScreen('tournament-home')}
@@ -5043,7 +5169,7 @@ Deliver your verdict as JSON.`;
                       justifyContent: 'center',
                       gap: '14px',
                       cursor: 'pointer',
-                      marginBottom: '14px',
+                      marginBottom: '20px',
                       boxShadow: '0 5px 0 rgba(0,0,0,0.25)',
                       position: 'relative'
                     }}
@@ -5083,7 +5209,7 @@ Deliver your verdict as JSON.`;
                       justifyContent: 'center',
                       gap: '6px',
                       cursor: 'not-allowed',
-                      marginBottom: '14px',
+                      marginBottom: '20px',
                       boxShadow: '0 5px 0 rgba(0,0,0,0.25)',
                       opacity: 0.75
                     }}
@@ -5104,6 +5230,182 @@ Deliver your verdict as JSON.`;
                     </span>
                   </button>
                 )}
+
+                {/* Stage 22.12 (desktop): split pills — tournament green fill, dark text, hover. */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  gap: '12px',
+                  marginBottom: '24px'
+                }}>
+                  <button
+                    onClick={() => setScreen('leaderboard')}
+                    aria-label="View leaderboard"
+                    className="kick3-button-hover"
+                    style={{
+                      flex: 1,
+                      background: 'transparent',
+                      color: colours.cream,
+                      ...displayFont,
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      letterSpacing: '0.16em',
+                      padding: '10px 14px',
+                      borderRadius: '6px',
+                      border: '1.5px solid #5fb04a',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">📊</span>
+                    <span>LEADERBOARDS</span>
+                  </button>
+                  <button
+                    onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
+                    aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
+                    className="kick3-button-hover"
+                    style={{
+                      flex: 1,
+                      background: 'transparent',
+                      color: colours.cream,
+                      ...displayFont,
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      letterSpacing: '0.16em',
+                      padding: '10px 14px',
+                      borderRadius: '6px',
+                      border: `1.5px solid ${colours.gold}`,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
+                    <span>{homeTrophyCount}</span>
+                  </button>
+                </div>
+
+                {/* Stage 22.9: PICTURE FRAME enclosing all daily-question content
+                    on desktop. Same approach as phone — thin wooden border + gold
+                    inner accent line, transparent interior. */}
+                <div style={{
+                  border: '7px solid #5c3a1d',
+                  outline: '1px solid rgba(212,175,55,0.55)',
+                  outlineOffset: '-12px',
+                  background: 'transparent',
+                  borderRadius: '10px',
+                  padding: '22px 16px 20px 16px',
+                  marginBottom: '24px',
+                  boxShadow: '0 3px 8px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.06)'
+                }}>
+                  {/* Inner chalkboard slate */}
+                  <div style={{
+                    background: '#1a1d23',
+                    borderRadius: '4px',
+                    padding: '22px 24px 20px 24px',
+                    textAlign: 'center',
+                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.6)',
+                    position: 'relative'
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      borderRadius: '4px',
+                      pointerEvents: 'none',
+                      background: 'radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.025) 0%, transparent 50%), radial-gradient(ellipse at 80% 70%, rgba(255,255,255,0.02) 0%, transparent 50%)'
+                    }} />
+                    <div style={{
+                      ...condFont,
+                      fontSize: '13px',
+                      letterSpacing: '0.3em',
+                      color: colours.gold,
+                      fontWeight: 600,
+                      marginBottom: '6px',
+                      position: 'relative'
+                    }}>
+                      DAY {TODAYS_QUESTION.number}: TODAY&apos;S QUESTION
+                    </div>
+                    <div style={{
+                      width: '44px',
+                      height: '2px',
+                      background: colours.gold,
+                      margin: '0 auto 16px auto',
+                      opacity: 0.7,
+                      position: 'relative'
+                    }} />
+                    <p style={{
+                      fontFamily: "'Permanent Marker', 'Teko', cursive",
+                      fontSize: 'clamp(24px, 2.4vw, 32px)',
+                      lineHeight: '1.2',
+                      margin: 0,
+                      color: '#f5f0e1',
+                      letterSpacing: '0.02em',
+                      textTransform: 'uppercase',
+                      textShadow: '0 1px 0 rgba(0,0,0,0.3)',
+                      position: 'relative'
+                    }}>
+                      {TODAYS_QUESTION.text}
+                    </p>
+                    <div style={{ width: '50%', height: '1px', background: '#f5f0e1', opacity: 0.3, margin: '16px auto 10px auto', position: 'relative' }} />
+                    <div style={{
+                      ...condFont,
+                      fontSize: '12px',
+                      letterSpacing: '0.25em',
+                      color: CATEGORY_COLOURS[TODAYS_QUESTION.category] || colours.muted,
+                      fontWeight: 600,
+                      position: 'relative'
+                    }}>
+                      ● {TODAYS_QUESTION.category.toUpperCase()}
+                    </div>
+                  </div>
+
+                  {/* Spacer between chalkboard slate and the play buttons. */}
+                  <div style={{ height: '18px' }} />
+
+                {/* Pete's italic intro quote — moved up in Stage 22.10 */}
+                <p style={{
+                  ...condFont,
+                  fontStyle: 'italic',
+                  fontSize: '15px',
+                  color: colours.muted,
+                  textAlign: 'center',
+                  margin: '0 0 14px 0',
+                  padding: '0 10px',
+                  lineHeight: '1.5',
+                  opacity: 0.85
+                }}>
+                  &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
+                </p>
+
+                {/* Countdown — moved up in Stage 22.10 to sit beneath Pete quote */}
+                <div style={{
+                  ...condFont,
+                  fontSize: '13px',
+                  letterSpacing: '0.06em',
+                  color: colours.cream,
+                  fontWeight: 700,
+                  textAlign: 'center',
+                  marginBottom: '20px'
+                }}>
+                  NEXT QUESTION IN{' '}
+                  <span style={{
+                    color: colours.gold,
+                    fontWeight: 800,
+                    fontVariantNumeric: 'tabular-nums',
+                    marginLeft: '4px'
+                  }}>
+                    {timeUntilNext}
+                  </span>
+                </div>
+
+                {/* TOURNAMENT MODE moved above chalkboard in Stage 22.7 */}
 
                 {/* PLAY TODAY — yellow */}
                 <button
@@ -5175,15 +5477,15 @@ Deliver your verdict as JSON.`;
                   className="kick3-button-hover"
                   style={{
                     width: '100%',
-                    padding: '18px 24px',
+                    padding: '22px 24px',
                     background: h2hLocked ? '#3a3a44' : colours.accent,
                     color: h2hLocked ? colours.muted : colours.cream,
                     border: 'none',
                     borderRadius: '12px',
                     ...displayFont,
-                    fontSize: 'clamp(18px, 1.8vw, 22px)',
-                    fontWeight: 700,
-                    letterSpacing: '0.12em',
+                    fontSize: 'clamp(24px, 2.4vw, 30px)',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
                     cursor: h2hLocked ? 'not-allowed' : 'pointer',
                     marginBottom: '24px',
                     boxShadow: h2hLocked ? 'none' : '0 5px 0 rgba(0,0,0,0.25)',
@@ -5191,7 +5493,7 @@ Deliver your verdict as JSON.`;
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '12px',
+                    gap: '14px',
                     position: 'relative'
                   }}
                 >
@@ -5229,57 +5531,49 @@ Deliver your verdict as JSON.`;
                   )}
                 </button>
 
-                {/* Countdown */}
-                <div style={{
-                  ...condFont,
-                  fontSize: '13px',
-                  letterSpacing: '0.06em',
-                  color: colours.cream,
-                  fontWeight: 700,
-                  textAlign: 'center',
-                  marginBottom: '20px'
-                }}>
-                  NEXT QUESTION IN{' '}
-                  <span style={{
-                    color: colours.gold,
-                    fontWeight: 800,
-                    fontVariantNumeric: 'tabular-nums',
-                    marginLeft: '4px'
-                  }}>
-                    {timeUntilNext}
-                  </span>
-                </div>
+                {/* Stage 22.18 (desktop): MY DAILY QUESTION STATS — blue fill, black text. */}
+                <button
+                  onClick={() => setScreen('stats')}
+                  className="kick3-button-hover"
+                  style={{
+                    width: '100%',
+                    padding: '15px 24px',
+                    background: '#4a90d4',
+                    color: '#000000',
+                    border: '1.5px solid #4a90d4',
+                    borderRadius: '12px',
+                    ...displayFont,
+                    fontSize: 'clamp(14px, 1.3vw, 17px)',
+                    fontWeight: 700,
+                    letterSpacing: '0.14em',
+                    cursor: 'pointer',
+                    marginBottom: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px'
+                  }}
+                >
+                  <span style={{ fontSize: '16px', letterSpacing: 0 }} aria-hidden="true">📊</span>
+                  <span>MY DAILY QUESTION STATS</span>
+                </button>
 
-                {/* Pete's italic intro quote */}
-                <p style={{
-                  ...condFont,
-                  fontStyle: 'italic',
-                  fontSize: '15px',
-                  color: colours.muted,
-                  textAlign: 'center',
-                  margin: 0,
-                  padding: '0 10px',
-                  lineHeight: '1.5',
-                  opacity: 0.85
-                }}>
-                  &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
-                </p>
-
-                {/* HOW TO PLAY — secondary button, visible in bottom third of home */}
+                {/* Stage 22.17 (desktop): HOW TO PLAY — purple fill, white (cream) text. */}
                 <button
                   onClick={() => setScreen('howto')}
+                  className="kick3-button-hover"
                   style={{
                     width: '100%',
                     marginTop: '28px',
                     padding: '16px 22px',
-                    background: 'transparent',
-                    color: colours.gold,
-                    border: `1.5px solid ${colours.gold}`,
+                    background: '#7a4eb8',
+                    color: colours.cream,
+                    border: '1.5px solid #7a4eb8',
                     borderRadius: '10px',
-                    ...condFont,
-                    fontSize: '14px',
+                    ...displayFont,
+                    fontSize: 'clamp(14px, 1.3vw, 17px)',
                     fontWeight: 700,
-                    letterSpacing: '0.28em',
+                    letterSpacing: '0.14em',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -5290,6 +5584,7 @@ Deliver your verdict as JSON.`;
                   <span style={{ fontSize: '16px', letterSpacing: 0 }} aria-hidden="true">📖</span>
                   <span>HOW TO PLAY</span>
                 </button>
+                </div>{/* /Stage 22.9 daily-question picture frame */}
 
                 {/* Contact footer */}
                 <div style={{
@@ -7218,6 +7513,13 @@ Deliver your verdict as JSON.`;
     const cloudTrophies = profileCloudState ? (profileCloudState.trophy_count || 0) : 0;
     const localTrophies = readTournamentState().trophyCount || 0;
 
+    // Stage 22.6: loyalty data. Prefer cloud value (might be ahead if user
+    // played on another device), fall back to localStorage if cloud unavailable.
+    const localDays = parseInt(localStorage.getItem('kick3_distinct_days') || '0', 10) || 0;
+    const cloudDays = profileCloudState ? (profileCloudState.distinct_days_played || 0) : 0;
+    const profileDays = Math.max(localDays, cloudDays);
+    const profileTier = loyaltyTierFor(profileDays);
+
     return (
       <>
         <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -7308,6 +7610,89 @@ Deliver your verdict as JSON.`;
                     ? 'This device has more. Cloud syncs at the end of every tournament attempt.'
                     : 'Cloud has more (likely from another device).'
                   }
+                </div>
+              )}
+            </div>
+
+            {/* Stage 22.6: LOYALTY card. Sits below Cloud State. Shows the
+                player's current tier as a coloured pill, days-played counter,
+                and progress-to-next-tier line. */}
+            <div style={{
+              background: colours.surface,
+              padding: '18px 20px',
+              borderRadius: '8px',
+              marginBottom: '14px',
+              borderTop: `2px solid ${profileTier.color || colours.muted}`
+            }}>
+              <div style={{
+                ...condFont, fontSize: '10px', letterSpacing: '0.3em',
+                color: profileTier.color || colours.muted,
+                fontWeight: 700, marginBottom: '14px'
+              }}>
+                LOYALTY
+              </div>
+              {/* Tier display — big pill, or "no badge yet" line */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                marginBottom: '12px'
+              }}>
+                <span style={{ ...condFont, fontSize: '13px', color: colours.cream }}>
+                  Current tier
+                </span>
+                {profileTier.tier !== 'NONE' ? (
+                  <span style={{
+                    background: profileTier.color,
+                    color: profileTier.textColor,
+                    ...condFont, fontSize: '12px', fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    padding: '5px 12px', borderRadius: '4px'
+                  }}>
+                    {profileTier.label}
+                  </span>
+                ) : (
+                  <span style={{ ...condFont, fontSize: '12px', color: colours.muted, fontStyle: 'italic' }}>
+                    No tier yet
+                  </span>
+                )}
+              </div>
+              {/* Days played */}
+              <div style={{
+                display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                marginBottom: '12px'
+              }}>
+                <span style={{ ...condFont, fontSize: '13px', color: colours.cream }}>
+                  Days played
+                </span>
+                <span style={{
+                  ...displayFont, fontSize: '20px', fontWeight: 700,
+                  color: colours.cream, lineHeight: 1
+                }}>
+                  {profileDays}
+                </span>
+              </div>
+              {/* Progress to next tier — only when not at DIAMOND */}
+              {profileTier.daysToNext !== null && (
+                <div style={{
+                  paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)',
+                  ...condFont, fontSize: '11px', color: colours.muted,
+                  textAlign: 'center', fontStyle: 'italic', lineHeight: 1.4
+                }}>
+                  {profileTier.daysToNext === 1
+                    ? '1 day until '
+                    : `${profileTier.daysToNext} days until `}
+                  {profileTier.tier === 'NONE'   && 'BRONZE'}
+                  {profileTier.tier === 'BRONZE' && 'SILVER'}
+                  {profileTier.tier === 'SILVER' && 'GOLD'}
+                  {profileTier.tier === 'GOLD'   && 'DIAMOND'}
+                </div>
+              )}
+              {profileTier.tier === 'DIAMOND' && (
+                <div style={{
+                  paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)',
+                  ...condFont, fontSize: '11px', color: '#b9f2ff',
+                  textAlign: 'center', fontStyle: 'italic', lineHeight: 1.4
+                }}>
+                  Top tier reached. Living legend.
                 </div>
               )}
             </div>
@@ -7404,6 +7789,368 @@ Deliver your verdict as JSON.`;
     );
   }
 
+  // ---------- LEADERBOARD (placeholder — full build in Stage C) ----------
+  // Stage 22.1: route exists, button is wired, screen renders. The real
+  // leaderboard fetch + table + your-rank panel come in Stage C.
+  //
+  // Sign-in gate: locked per Friday morning decision — leaderboards require
+  // authentication. Signed-out players see a prompt-to-sign-in screen.
+  if (screen === 'leaderboard') {
+    // Signed-out: show sign-in prompt instead of the leaderboard.
+    if (!authUser) {
+      return (
+        <>
+          <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+          <div style={bgStyle}>
+            <div style={pitchOverlay} />
+            <div style={{ ...container, maxWidth: '500px', paddingTop: '40px' }}>
+              {/* Back chip top-left */}
+              <button
+                onClick={() => setScreen('home')}
+                style={{
+                  background: 'transparent', color: colours.muted,
+                  border: `1px solid ${colours.muted}`, borderRadius: '5px',
+                  ...condFont, fontSize: '11px', fontWeight: 600,
+                  letterSpacing: '0.2em', padding: '6px 12px',
+                  cursor: 'pointer', marginBottom: '32px'
+                }}
+              >
+                ← BACK
+              </button>
+              <div style={{ textAlign: 'center', padding: '40px 16px' }}>
+                <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.gold, marginBottom: '14px', fontWeight: 700 }}>
+                  LEADERBOARD
+                </div>
+                <h1 style={{
+                  ...displayFont, fontSize: 'clamp(28px, 7vw, 36px)',
+                  fontWeight: 800, color: colours.cream, margin: '0 0 14px 0',
+                  letterSpacing: '0.02em', lineHeight: 1.1
+                }}>
+                  Sign in to see the leaderboard
+                </h1>
+                <p style={{
+                  ...condFont, fontSize: '14px', color: colours.muted,
+                  marginBottom: '28px', lineHeight: 1.5
+                }}>
+                  The World Cup leaderboard tracks tournament trophies across the 39-day window. Available to signed-in players only.
+                </p>
+                <button
+                  onClick={() => { resetAuthForm(); setAuthMode('signup'); setScreen('auth'); }}
+                  style={{
+                    padding: '14px 28px', background: colours.gold, color: '#000',
+                    border: 'none', borderRadius: '8px',
+                    ...displayFont, fontSize: '15px', fontWeight: 700,
+                    letterSpacing: '0.12em', cursor: 'pointer'
+                  }}
+                >
+                  SIGN IN →
+                </button>
+              </div>
+            </div>
+          </div>
+          <Analytics />
+        </>
+      );
+    }
+
+    // Signed-in: placeholder. Real leaderboard table renders in Stage C.
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '700px', paddingTop: '40px' }}>
+            {/* Back chip top-left */}
+            <button
+              onClick={() => setScreen('home')}
+              style={{
+                background: 'transparent', color: colours.muted,
+                border: `1px solid ${colours.muted}`, borderRadius: '5px',
+                ...condFont, fontSize: '11px', fontWeight: 600,
+                letterSpacing: '0.2em', padding: '6px 12px',
+                cursor: 'pointer', marginBottom: '24px'
+              }}
+            >
+              ← BACK
+            </button>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.gold, marginBottom: '8px', fontWeight: 700 }}>
+                WORLD CUP LEADERBOARD
+              </div>
+              <h1 style={{
+                ...displayFont, fontSize: 'clamp(32px, 8vw, 44px)',
+                fontWeight: 800, color: colours.cream, margin: 0,
+                letterSpacing: '0.02em', lineHeight: 1
+              }}>
+                11 June &mdash; 19 July 2026
+              </h1>
+            </div>
+
+            {/* Stage 22.5 polished leaderboard table.
+                Data fetched + polled in 22.4. This is the visual layer:
+                - Ranked rows with handle, loyalty badge, trophies, attempts
+                - Own row highlighted in gold
+                - Striped rows for readability
+                - Loyalty badge pill inline next to each handle */}
+
+            {/* Refresh + last-fetched timestamp (unchanged from 22.4) */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: '14px', padding: '10px 14px',
+              background: colours.surface, borderRadius: '6px'
+            }}>
+              <div style={{ ...condFont, fontSize: '11px', color: colours.muted, letterSpacing: '0.05em' }}>
+                {leaderboardLoading
+                  ? 'Loading\u2026'
+                  : leaderboardLastFetched
+                    ? `Updated ${Math.floor((Date.now() - leaderboardLastFetched) / 1000)}s ago`
+                    : 'Not yet fetched'}
+              </div>
+              <button
+                onClick={() => refreshLeaderboard(false)}
+                style={{
+                  background: 'transparent', color: colours.gold,
+                  border: `1px solid ${colours.gold}`, borderRadius: '5px',
+                  ...condFont, fontSize: '11px', fontWeight: 600,
+                  letterSpacing: '0.2em', padding: '6px 12px',
+                  cursor: 'pointer'
+                }}
+              >
+                REFRESH
+              </button>
+            </div>
+
+            {/* Error display if fetch failed */}
+            {leaderboardError && (
+              <div style={{
+                background: 'rgba(232,52,74,0.10)',
+                border: '1px solid rgba(232,52,74,0.40)',
+                padding: '11px 14px', borderRadius: '6px',
+                marginBottom: '14px',
+                ...condFont, fontSize: '13px', color: colours.accent,
+                lineHeight: 1.4, fontWeight: 600
+              }}>
+                {leaderboardError}
+              </div>
+            )}
+
+            {/* Main leaderboard table — top 50.
+                Empty state shown when fetch returned zero rows.
+                Own-row detection: compare row.handle to authProfile.handle.
+                Loyalty badge inline using loyaltyTierFor(). */}
+            <div style={{
+              background: colours.surface,
+              borderRadius: '10px',
+              marginBottom: '14px',
+              overflow: 'hidden',
+              borderTop: `2px solid ${colours.gold}`
+            }}>
+              {/* Column headers */}
+              <div style={{
+                display: 'flex', alignItems: 'center',
+                padding: '10px 14px',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                ...condFont, fontSize: '10px', letterSpacing: '0.25em',
+                color: colours.gold, fontWeight: 700
+              }}>
+                <span style={{ width: '34px' }}>RANK</span>
+                <span style={{ flex: 1, minWidth: 0 }}>PLAYER</span>
+                <span style={{ width: '52px', textAlign: 'right' }}>TROPHIES</span>
+                <span style={{ width: '52px', textAlign: 'right', marginLeft: '14px' }}>ATTEMPTS</span>
+              </div>
+
+              {/* Empty state */}
+              {leaderboardRows.length === 0 && !leaderboardLoading && (
+                <div style={{
+                  padding: '32px 16px', textAlign: 'center',
+                  ...condFont, fontSize: '13px', color: colours.muted,
+                  fontStyle: 'italic', lineHeight: 1.6
+                }}>
+                  No trophies won yet.<br/>Be the first.
+                </div>
+              )}
+
+              {/* Loading state */}
+              {leaderboardLoading && leaderboardRows.length === 0 && (
+                <div style={{
+                  padding: '32px 16px', textAlign: 'center',
+                  ...condFont, fontSize: '12px', color: colours.muted, letterSpacing: '0.15em'
+                }}>
+                  Loading…
+                </div>
+              )}
+
+              {/* Ranked rows */}
+              {leaderboardRows.map((row, i) => {
+                const tier = loyaltyTierFor(row.distinct_days_played);
+                const isMe = authProfile && authProfile.handle === row.handle;
+                const rank = i + 1;
+                return (
+                  <div key={row.handle} style={{
+                    display: 'flex', alignItems: 'center',
+                    padding: '10px 14px',
+                    background: isMe
+                      ? 'rgba(212,175,55,0.10)'
+                      : (i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'),
+                    borderLeft: isMe ? `3px solid ${colours.gold}` : '3px solid transparent',
+                    borderBottom: i < leaderboardRows.length - 1
+                      ? '1px solid rgba(255,255,255,0.04)'
+                      : 'none'
+                  }}>
+                    {/* Rank */}
+                    <span style={{
+                      width: '34px',
+                      ...displayFont, fontSize: '15px', fontWeight: 700,
+                      color: rank <= 3 ? colours.gold : colours.muted
+                    }}>
+                      {rank}
+                    </span>
+                    {/* Handle + loyalty badge */}
+                    <span style={{
+                      flex: 1, minWidth: 0,
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      overflow: 'hidden'
+                    }}>
+                      <span style={{
+                        ...condFont, fontSize: '13px', fontWeight: 600,
+                        color: colours.cream,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        flex: '0 1 auto', minWidth: 0
+                      }}>
+                        {row.handle}
+                      </span>
+                      {tier.tier !== 'NONE' && (
+                        <span style={{
+                          background: tier.color,
+                          color: tier.textColor,
+                          ...condFont, fontSize: '8px', fontWeight: 700,
+                          letterSpacing: '0.12em',
+                          padding: '2px 5px', borderRadius: '3px',
+                          flexShrink: 0,
+                          textTransform: 'uppercase'
+                        }}>
+                          {tier.label}
+                        </span>
+                      )}
+                    </span>
+                    {/* Trophies (emphasised) */}
+                    <span style={{
+                      width: '52px', textAlign: 'right',
+                      ...displayFont, fontSize: '17px', fontWeight: 700,
+                      color: colours.gold
+                    }}>
+                      {row.trophy_count}
+                    </span>
+                    {/* Attempts (quieter) */}
+                    <span style={{
+                      width: '52px', textAlign: 'right', marginLeft: '14px',
+                      ...condFont, fontSize: '12px', color: colours.muted
+                    }}>
+                      {row.tournaments_attempted}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Your-rank panel — appears when signed-in user has a position
+                AND isn't already visible in the top 50. If they're in the
+                top 50, no separate panel needed (their row is highlighted). */}
+            {leaderboardUserRank && leaderboardUserRank.rank > 50 && (() => {
+              const myTier = loyaltyTierFor(leaderboardUserRank.row.distinct_days_played);
+              return (
+                <div style={{
+                  padding: '14px 16px',
+                  background: 'rgba(212,175,55,0.08)',
+                  border: `1px solid rgba(212,175,55,0.40)`,
+                  borderRadius: '10px',
+                  marginBottom: '14px'
+                }}>
+                  <div style={{
+                    ...condFont, fontSize: '10px', letterSpacing: '0.28em',
+                    color: colours.gold, fontWeight: 700, marginBottom: '10px'
+                  }}>
+                    YOUR RANK
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span style={{
+                      width: '50px',
+                      ...displayFont, fontSize: '20px', fontWeight: 700,
+                      color: colours.gold
+                    }}>
+                      #{leaderboardUserRank.rank}
+                    </span>
+                    <span style={{
+                      flex: 1, minWidth: 0,
+                      display: 'flex', alignItems: 'center', gap: '6px'
+                    }}>
+                      <span style={{
+                        ...condFont, fontSize: '14px', fontWeight: 600,
+                        color: colours.cream,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                      }}>
+                        {leaderboardUserRank.row.handle}
+                      </span>
+                      {myTier.tier !== 'NONE' && (
+                        <span style={{
+                          background: myTier.color,
+                          color: myTier.textColor,
+                          ...condFont, fontSize: '8px', fontWeight: 700,
+                          letterSpacing: '0.12em',
+                          padding: '2px 5px', borderRadius: '3px',
+                          flexShrink: 0
+                        }}>
+                          {myTier.label}
+                        </span>
+                      )}
+                    </span>
+                    <span style={{
+                      ...displayFont, fontSize: '18px', fontWeight: 700,
+                      color: colours.gold, marginLeft: '10px'
+                    }}>
+                      {leaderboardUserRank.row.trophy_count}
+                    </span>
+                    <span style={{
+                      ...condFont, fontSize: '11px', color: colours.muted,
+                      marginLeft: '8px', minWidth: '34px', textAlign: 'right'
+                    }}>
+                      🏆
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Signed-in, in top 50 → small confirmation note */}
+            {leaderboardUserRank && leaderboardUserRank.rank <= 50 && (
+              <div style={{
+                padding: '10px 14px', background: 'rgba(212,175,55,0.04)',
+                borderRadius: '6px', marginBottom: '14px',
+                ...condFont, fontSize: '12px', color: colours.muted,
+                fontStyle: 'italic', textAlign: 'center'
+              }}>
+                You’re #{leaderboardUserRank.rank} — see your row above.
+              </div>
+            )}
+
+            {/* Signed-in but no trophies yet → invitation to play */}
+            {!leaderboardUserRank && !leaderboardLoading && authProfile && (
+              <div style={{
+                padding: '14px 16px', background: colours.surface,
+                borderRadius: '8px', marginBottom: '14px',
+                ...condFont, fontSize: '12px', color: colours.muted,
+                fontStyle: 'italic', textAlign: 'center', lineHeight: 1.5
+              }}>
+                Win your first tournament trophy to appear on the leaderboard.
+              </div>
+            )}
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
   // ---------- MY STATS ----------
   if (screen === 'stats') {
     // Compute total plays + max count for bar scaling + weighted average
@@ -7460,8 +8207,8 @@ Deliver your verdict as JSON.`;
                 <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px' }}>
                   ALL-TIME RECORD
                 </div>
-                <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
-                  MY STATS
+                <h1 style={{ ...displayFont, fontSize: 'clamp(28px, 7vw, 40px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.03em', lineHeight: 1 }}>
+                  MY DAILY QUESTION STATS
                 </h1>
               </div>
 
@@ -7952,6 +8699,32 @@ Deliver your verdict as JSON.`;
                 )}
               </button>
 
+              {/* Stage 22: LEADERBOARDS button between PLAY NOW and RECORD.
+                  Same visual rhythm as RECORD (gold outline transparent fill).
+                  Routes to 'leaderboard' screen — sign-in gate handled inside. */}
+              <button
+                onClick={() => setScreen('leaderboard')}
+                className="kick3-button-hover"
+                style={{
+                  width: '100%',
+                  padding: '15px 20px',
+                  background: 'transparent',
+                  color: colours.gold,
+                  border: `2px solid ${colours.gold}`,
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(16px, 4.4vw, 19px)',
+                  fontWeight: 700,
+                  letterSpacing: '0.12em',
+                  cursor: 'pointer',
+                  marginBottom: '14px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
+                }}
+              >
+                <span style={{ fontSize: '16px' }} aria-hidden="true">📊</span>
+                <span>LEADERBOARD</span>
+              </button>
+
               {/* RECORD — gold outline, active (opens tournament-record screen) */}
               <button
                 onClick={() => { setRecordReturnScreen('tournament-home'); setScreen('tournament-record'); }}
@@ -8100,6 +8873,31 @@ Deliver your verdict as JSON.`;
                       <span style={{ fontSize: '26px', lineHeight: 1 }}>→</span>
                     </>
                   )}
+                </button>
+
+                {/* Stage 22: LEADERBOARDS button (desktop) between PLAY NOW
+                    and RECORD. Sign-in gate handled inside the leaderboard route. */}
+                <button
+                  onClick={() => setScreen('leaderboard')}
+                  className="kick3-button-hover"
+                  style={{
+                    width: '100%',
+                    padding: '18px 24px',
+                    background: 'transparent',
+                    color: colours.gold,
+                    border: `2px solid ${colours.gold}`,
+                    borderRadius: '12px',
+                    ...displayFont,
+                    fontSize: 'clamp(18px, 1.8vw, 22px)',
+                    fontWeight: 700,
+                    letterSpacing: '0.12em',
+                    cursor: 'pointer',
+                    marginBottom: '16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }} aria-hidden="true">📊</span>
+                  <span>LEADERBOARD</span>
                 </button>
 
                 {/* RECORD — gold outline, active */}
