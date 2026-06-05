@@ -4171,36 +4171,86 @@ Deliver your verdict as JSON.`;
                   alt="Pete the Pundit asleep in his study"
                 />
               </picture>
-              {/* DAY badge — top-left corner of illustration */}
+              {/* Stage 22 top status row — single horizontal row spanning the
+                  top of the Pete illustration with FOUR evenly-spaced pills:
+                  DAY · LEADERBOARDS · STATS · TROPHIES.
+                  - DAY is a label (not tappable)
+                  - LEADERBOARDS routes to 'leaderboard' screen
+                  - STATS routes to 'stats' screen
+                  - TROPHIES routes to tournament-record screen
+                  Letter-spacing tightened from 0.3em to 0.18em and font-size
+                  dropped to 10px so all four fit comfortably on a 360px phone.
+                  whiteSpace: nowrap on each pill prevents two-line wrap. */}
               <div style={{
                 position: 'absolute',
                 top: '14px',
-                left: '14px',
-                background: 'rgba(20,20,30,0.85)',
-                color: colours.gold,
-                ...condFont,
-                fontSize: '11px',
-                fontWeight: 700,
-                letterSpacing: '0.3em',
-                padding: '6px 10px',
-                borderRadius: '4px',
-                border: `1px solid ${colours.gold}`
-              }}>
-                DAY {TODAYS_QUESTION.number}
-              </div>
-              {/* Top-right: TROPHIES pill (Stage 16) + STATS button.
-                  TROPHIES displays the lifetime tournament trophy count and routes
-                  to the tournament-record screen. Setting recordReturnScreen='home'
-                  so the back button there returns here, not to tournament-home. */}
-              <div style={{
-                position: 'absolute',
-                top: '14px',
-                right: '14px',
+                left: '12px',
+                right: '12px',
                 display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-end',
-                gap: '6px'
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '6px',
+                zIndex: 2
               }}>
+                {/* DAY pill — non-tappable label */}
+                <div style={{
+                  background: 'rgba(20,20,30,0.85)',
+                  color: colours.gold,
+                  ...condFont,
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  letterSpacing: '0.18em',
+                  padding: '6px 8px',
+                  borderRadius: '4px',
+                  border: `1px solid ${colours.gold}`,
+                  whiteSpace: 'nowrap'
+                }}>
+                  DAY {TODAYS_QUESTION.number}
+                </div>
+                {/* LEADERBOARDS pill — Stage 22. Tap routes to leaderboard.
+                    Signed-out tap prompts sign-in (handled in the leaderboard
+                    route itself). Always visible. */}
+                <button
+                  onClick={() => setScreen('leaderboard')}
+                  aria-label="View leaderboard"
+                  style={{
+                    background: 'rgba(20,20,30,0.85)',
+                    color: colours.gold,
+                    ...condFont,
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    padding: '6px 8px',
+                    borderRadius: '4px',
+                    border: `1px solid ${colours.gold}`,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  LEADERS
+                </button>
+                {/* STATS pill */}
+                <button
+                  onClick={() => setScreen('stats')}
+                  aria-label="View stats"
+                  style={{
+                    background: 'rgba(20,20,30,0.85)',
+                    color: colours.gold,
+                    ...condFont,
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    padding: '6px 8px',
+                    borderRadius: '4px',
+                    border: `1px solid ${colours.gold}`,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  STATS
+                </button>
+                {/* TROPHIES pill */}
                 <button
                   onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
                   aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
@@ -4208,41 +4258,21 @@ Deliver your verdict as JSON.`;
                     background: 'rgba(20,20,30,0.85)',
                     color: colours.gold,
                     ...condFont,
-                    fontSize: '11px',
+                    fontSize: '10px',
                     fontWeight: 700,
-                    letterSpacing: '0.3em',
-                    padding: '6px 10px',
+                    letterSpacing: '0.18em',
+                    padding: '6px 8px',
                     borderRadius: '4px',
                     border: `1px solid ${colours.gold}`,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px'
+                    gap: '4px',
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
+                  <span style={{ fontSize: '12px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
                   <span>{homeTrophyCount}</span>
-                </button>
-                <button
-                  onClick={() => setScreen('stats')}
-                  style={{
-                    background: 'rgba(20,20,30,0.85)',
-                    color: colours.gold,
-                    ...condFont,
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    letterSpacing: '0.3em',
-                    padding: '6px 10px',
-                    borderRadius: '4px',
-                    border: `1px solid ${colours.gold}`,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <span style={{ fontSize: '12px', letterSpacing: 0 }} aria-hidden="true">📊</span>
-                  <span>STATS</span>
                 </button>
               </div>
             </div>
@@ -4832,34 +4862,81 @@ Deliver your verdict as JSON.`;
                     alt="Pete the Pundit asleep in his study"
                   />
                 </picture>
-                {/* DAY badge */}
+                {/* Stage 22 top status row — desktop variant of the same
+                    four-pill row used on phone. Larger font, more breathing
+                    room. Same routing logic. */}
                 <div style={{
                   position: 'absolute',
                   top: '18px',
                   left: '18px',
-                  background: 'rgba(20,20,30,0.85)',
-                  color: colours.gold,
-                  ...condFont,
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  letterSpacing: '0.3em',
-                  padding: '8px 14px',
-                  borderRadius: '4px',
-                  border: `1px solid ${colours.gold}`
-                }}>
-                  DAY {TODAYS_QUESTION.number}
-                </div>
-                {/* Top-right: TROPHIES pill (Stage 16) + STATS button.
-                    Same pattern as the phone layout, slightly larger sizing. */}
-                <div style={{
-                  position: 'absolute',
-                  top: '18px',
                   right: '18px',
                   display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-end',
-                  gap: '8px'
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px',
+                  zIndex: 2
                 }}>
+                  {/* DAY pill — non-tappable label */}
+                  <div style={{
+                    background: 'rgba(20,20,30,0.85)',
+                    color: colours.gold,
+                    ...condFont,
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    letterSpacing: '0.3em',
+                    padding: '8px 14px',
+                    borderRadius: '4px',
+                    border: `1px solid ${colours.gold}`,
+                    whiteSpace: 'nowrap'
+                  }}>
+                    DAY {TODAYS_QUESTION.number}
+                  </div>
+                  {/* LEADERBOARDS pill */}
+                  <button
+                    onClick={() => setScreen('leaderboard')}
+                    aria-label="View leaderboard"
+                    style={{
+                      background: 'rgba(20,20,30,0.85)',
+                      color: colours.gold,
+                      ...condFont,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      letterSpacing: '0.3em',
+                      padding: '8px 14px',
+                      borderRadius: '4px',
+                      border: `1px solid ${colours.gold}`,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    LEADERBOARDS
+                  </button>
+                  {/* STATS pill */}
+                  <button
+                    onClick={() => setScreen('stats')}
+                    aria-label="View stats"
+                    style={{
+                      background: 'rgba(20,20,30,0.85)',
+                      color: colours.gold,
+                      ...condFont,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      letterSpacing: '0.3em',
+                      padding: '8px 14px',
+                      borderRadius: '4px',
+                      border: `1px solid ${colours.gold}`,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📊</span>
+                    <span>STATS</span>
+                  </button>
+                  {/* TROPHIES pill */}
                   <button
                     onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
                     aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
@@ -4876,32 +4953,12 @@ Deliver your verdict as JSON.`;
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '8px'
+                      gap: '8px',
+                      whiteSpace: 'nowrap'
                     }}
                   >
                     <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
                     <span>{homeTrophyCount}</span>
-                  </button>
-                  <button
-                    onClick={() => setScreen('stats')}
-                    style={{
-                      background: 'rgba(20,20,30,0.85)',
-                      color: colours.gold,
-                      ...condFont,
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      letterSpacing: '0.3em',
-                      padding: '8px 14px',
-                      borderRadius: '4px',
-                      border: `1px solid ${colours.gold}`,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📊</span>
-                    <span>STATS</span>
                   </button>
                 </div>
               </div>
@@ -7485,6 +7542,124 @@ Deliver your verdict as JSON.`;
     );
   }
 
+  // ---------- LEADERBOARD (placeholder — full build in Stage C) ----------
+  // Stage 22.1: route exists, button is wired, screen renders. The real
+  // leaderboard fetch + table + your-rank panel come in Stage C.
+  //
+  // Sign-in gate: locked per Friday morning decision — leaderboards require
+  // authentication. Signed-out players see a prompt-to-sign-in screen.
+  if (screen === 'leaderboard') {
+    // Signed-out: show sign-in prompt instead of the leaderboard.
+    if (!authUser) {
+      return (
+        <>
+          <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+          <div style={bgStyle}>
+            <div style={pitchOverlay} />
+            <div style={{ ...container, maxWidth: '500px', paddingTop: '40px' }}>
+              {/* Back chip top-left */}
+              <button
+                onClick={() => setScreen('home')}
+                style={{
+                  background: 'transparent', color: colours.muted,
+                  border: `1px solid ${colours.muted}`, borderRadius: '5px',
+                  ...condFont, fontSize: '11px', fontWeight: 600,
+                  letterSpacing: '0.2em', padding: '6px 12px',
+                  cursor: 'pointer', marginBottom: '32px'
+                }}
+              >
+                ← BACK
+              </button>
+              <div style={{ textAlign: 'center', padding: '40px 16px' }}>
+                <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.gold, marginBottom: '14px', fontWeight: 700 }}>
+                  LEADERBOARD
+                </div>
+                <h1 style={{
+                  ...displayFont, fontSize: 'clamp(28px, 7vw, 36px)',
+                  fontWeight: 800, color: colours.cream, margin: '0 0 14px 0',
+                  letterSpacing: '0.02em', lineHeight: 1.1
+                }}>
+                  Sign in to see the leaderboard
+                </h1>
+                <p style={{
+                  ...condFont, fontSize: '14px', color: colours.muted,
+                  marginBottom: '28px', lineHeight: 1.5
+                }}>
+                  The World Cup leaderboard tracks tournament trophies across the 39-day window. Available to signed-in players only.
+                </p>
+                <button
+                  onClick={() => { resetAuthForm(); setAuthMode('signup'); setScreen('auth'); }}
+                  style={{
+                    padding: '14px 28px', background: colours.gold, color: '#000',
+                    border: 'none', borderRadius: '8px',
+                    ...displayFont, fontSize: '15px', fontWeight: 700,
+                    letterSpacing: '0.12em', cursor: 'pointer'
+                  }}
+                >
+                  SIGN IN →
+                </button>
+              </div>
+            </div>
+          </div>
+          <Analytics />
+        </>
+      );
+    }
+
+    // Signed-in: placeholder. Real leaderboard table renders in Stage C.
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '700px', paddingTop: '40px' }}>
+            {/* Back chip top-left */}
+            <button
+              onClick={() => setScreen('home')}
+              style={{
+                background: 'transparent', color: colours.muted,
+                border: `1px solid ${colours.muted}`, borderRadius: '5px',
+                ...condFont, fontSize: '11px', fontWeight: 600,
+                letterSpacing: '0.2em', padding: '6px 12px',
+                cursor: 'pointer', marginBottom: '24px'
+              }}
+            >
+              ← BACK
+            </button>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.gold, marginBottom: '8px', fontWeight: 700 }}>
+                WORLD CUP LEADERBOARD
+              </div>
+              <h1 style={{
+                ...displayFont, fontSize: 'clamp(32px, 8vw, 44px)',
+                fontWeight: 800, color: colours.cream, margin: 0,
+                letterSpacing: '0.02em', lineHeight: 1
+              }}>
+                11 June &mdash; 19 July 2026
+              </h1>
+            </div>
+            <div style={{
+              padding: '40px 20px', background: colours.surface,
+              borderRadius: '12px', textAlign: 'center',
+              border: `1px dashed ${colours.muted}`
+            }}>
+              <div style={{
+                ...condFont, fontSize: '13px', color: colours.muted,
+                fontStyle: 'italic', lineHeight: 1.6
+              }}>
+                Leaderboard coming soon.<br/>
+                Win tournament trophies to climb the ranks.<br/>
+                <br/>
+                Loyalty badges and live rankings activate before launch on 11 June.
+              </div>
+            </div>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
   // ---------- MY STATS ----------
   if (screen === 'stats') {
     // Compute total plays + max count for bar scaling + weighted average
@@ -8033,6 +8208,32 @@ Deliver your verdict as JSON.`;
                 )}
               </button>
 
+              {/* Stage 22: LEADERBOARDS button between PLAY NOW and RECORD.
+                  Same visual rhythm as RECORD (gold outline transparent fill).
+                  Routes to 'leaderboard' screen — sign-in gate handled inside. */}
+              <button
+                onClick={() => setScreen('leaderboard')}
+                className="kick3-button-hover"
+                style={{
+                  width: '100%',
+                  padding: '15px 20px',
+                  background: 'transparent',
+                  color: colours.gold,
+                  border: `2px solid ${colours.gold}`,
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(16px, 4.4vw, 19px)',
+                  fontWeight: 700,
+                  letterSpacing: '0.12em',
+                  cursor: 'pointer',
+                  marginBottom: '14px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
+                }}
+              >
+                <span style={{ fontSize: '16px' }} aria-hidden="true">📊</span>
+                <span>LEADERBOARD</span>
+              </button>
+
               {/* RECORD — gold outline, active (opens tournament-record screen) */}
               <button
                 onClick={() => { setRecordReturnScreen('tournament-home'); setScreen('tournament-record'); }}
@@ -8181,6 +8382,31 @@ Deliver your verdict as JSON.`;
                       <span style={{ fontSize: '26px', lineHeight: 1 }}>→</span>
                     </>
                   )}
+                </button>
+
+                {/* Stage 22: LEADERBOARDS button (desktop) between PLAY NOW
+                    and RECORD. Sign-in gate handled inside the leaderboard route. */}
+                <button
+                  onClick={() => setScreen('leaderboard')}
+                  className="kick3-button-hover"
+                  style={{
+                    width: '100%',
+                    padding: '18px 24px',
+                    background: 'transparent',
+                    color: colours.gold,
+                    border: `2px solid ${colours.gold}`,
+                    borderRadius: '12px',
+                    ...displayFont,
+                    fontSize: 'clamp(18px, 1.8vw, 22px)',
+                    fontWeight: 700,
+                    letterSpacing: '0.12em',
+                    cursor: 'pointer',
+                    marginBottom: '16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px'
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }} aria-hidden="true">📊</span>
+                  <span>LEADERBOARD</span>
                 </button>
 
                 {/* RECORD — gold outline, active */}
