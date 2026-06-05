@@ -4795,15 +4795,15 @@ Deliver your verdict as JSON.`;
                 className="kick3-button-hover"
                 style={{
                   width: '100%',
-                  padding: '15px 20px',
+                  padding: '18px 20px',
                   background: h2hLocked ? '#3a3a44' : colours.accent,
                   color: h2hLocked ? colours.muted : colours.cream,
                   border: 'none',
                   borderRadius: '10px',
                   ...displayFont,
-                  fontSize: 'clamp(16px, 4.4vw, 19px)',
-                  fontWeight: 700,
-                  letterSpacing: '0.12em',
+                  fontSize: 'clamp(20px, 5.4vw, 24px)',
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
                   cursor: h2hLocked ? 'not-allowed' : 'pointer',
                   marginBottom: '20px',
                   boxShadow: h2hLocked ? 'none' : '0 4px 0 rgba(0,0,0,0.25)',
@@ -4849,7 +4849,7 @@ Deliver your verdict as JSON.`;
                 )}
               </button>
 
-              {/* Stage 22.13: MY DAILY QUESTION STATS — blue fill, white text (cream). */}
+              {/* Stage 22.18: MY DAILY QUESTION STATS — blue fill, black text. */}
               <button
                 onClick={() => setScreen('stats')}
                 className="kick3-button-hover"
@@ -4857,7 +4857,7 @@ Deliver your verdict as JSON.`;
                   width: '100%',
                   padding: '13px 20px',
                   background: '#4a90d4',
-                  color: colours.cream,
+                  color: '#000000',
                   border: '1.5px solid #4a90d4',
                   borderRadius: '10px',
                   ...displayFont,
@@ -5477,15 +5477,15 @@ Deliver your verdict as JSON.`;
                   className="kick3-button-hover"
                   style={{
                     width: '100%',
-                    padding: '18px 24px',
+                    padding: '22px 24px',
                     background: h2hLocked ? '#3a3a44' : colours.accent,
                     color: h2hLocked ? colours.muted : colours.cream,
                     border: 'none',
                     borderRadius: '12px',
                     ...displayFont,
-                    fontSize: 'clamp(18px, 1.8vw, 22px)',
-                    fontWeight: 700,
-                    letterSpacing: '0.12em',
+                    fontSize: 'clamp(24px, 2.4vw, 30px)',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
                     cursor: h2hLocked ? 'not-allowed' : 'pointer',
                     marginBottom: '24px',
                     boxShadow: h2hLocked ? 'none' : '0 5px 0 rgba(0,0,0,0.25)',
@@ -5493,7 +5493,7 @@ Deliver your verdict as JSON.`;
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '12px',
+                    gap: '14px',
                     position: 'relative'
                   }}
                 >
@@ -5531,7 +5531,7 @@ Deliver your verdict as JSON.`;
                   )}
                 </button>
 
-                {/* Stage 22.13 (desktop): MY DAILY QUESTION STATS — blue fill, white text (cream). */}
+                {/* Stage 22.18 (desktop): MY DAILY QUESTION STATS — blue fill, black text. */}
                 <button
                   onClick={() => setScreen('stats')}
                   className="kick3-button-hover"
@@ -5539,7 +5539,7 @@ Deliver your verdict as JSON.`;
                     width: '100%',
                     padding: '15px 24px',
                     background: '#4a90d4',
-                    color: colours.cream,
+                    color: '#000000',
                     border: '1.5px solid #4a90d4',
                     borderRadius: '12px',
                     ...displayFont,
