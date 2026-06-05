@@ -4561,15 +4561,15 @@ Deliver your verdict as JSON.`;
                   className="kick3-button-hover"
                   style={{
                     flex: 1,
-                    background: '#5fb04a',
-                    color: '#0a1a08',
+                    background: '#ffffff',
+                    color: '#000000',
                     ...displayFont,
                     fontSize: '12px',
                     fontWeight: 700,
                     letterSpacing: '0.14em',
                     padding: '8px 10px',
                     borderRadius: '5px',
-                    border: `1.5px solid ${colours.gold}`,
+                    border: '1.5px solid #5fb04a',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -4587,15 +4587,15 @@ Deliver your verdict as JSON.`;
                   className="kick3-button-hover"
                   style={{
                     flex: 1,
-                    background: '#5fb04a',
-                    color: '#0a1a08',
+                    background: '#ffffff',
+                    color: '#000000',
                     ...displayFont,
                     fontSize: '12px',
                     fontWeight: 700,
                     letterSpacing: '0.14em',
                     padding: '8px 10px',
                     borderRadius: '5px',
-                    border: `1.5px solid ${colours.gold}`,
+                    border: '1.5px solid #5fb04a',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -4605,7 +4605,7 @@ Deliver your verdict as JSON.`;
                   }}
                 >
                   <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
-                  <span>TROPHIES = {homeTrophyCount}</span>
+                  <span>{homeTrophyCount}</span>
                 </button>
               </div>
 
@@ -4876,7 +4876,7 @@ Deliver your verdict as JSON.`;
                 <span>MY DAILY QUESTION STATS</span>
               </button>
 
-              {/* Stage 22.13: HOW TO PLAY — blue fill, white text (cream). */}
+              {/* Stage 22.15: HOW TO PLAY — blue fill, black text. */}
               <button
                 onClick={() => setScreen('howto')}
                 className="kick3-button-hover"
@@ -4885,7 +4885,7 @@ Deliver your verdict as JSON.`;
                   marginTop: '24px',
                   padding: '14px 20px',
                   background: '#4a90d4',
-                  color: colours.cream,
+                  color: '#000000',
                   border: '1.5px solid #4a90d4',
                   borderRadius: '8px',
                   ...displayFont,
@@ -5244,15 +5244,15 @@ Deliver your verdict as JSON.`;
                     className="kick3-button-hover"
                     style={{
                       flex: 1,
-                      background: '#5fb04a',
-                      color: '#0a1a08',
+                      background: '#ffffff',
+                      color: '#000000',
                       ...displayFont,
                       fontSize: '14px',
                       fontWeight: 700,
                       letterSpacing: '0.16em',
                       padding: '10px 14px',
                       borderRadius: '6px',
-                      border: `1.5px solid ${colours.gold}`,
+                      border: '1.5px solid #5fb04a',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -5270,15 +5270,15 @@ Deliver your verdict as JSON.`;
                     className="kick3-button-hover"
                     style={{
                       flex: 1,
-                      background: '#5fb04a',
-                      color: '#0a1a08',
+                      background: '#ffffff',
+                      color: '#000000',
                       ...displayFont,
                       fontSize: '14px',
                       fontWeight: 700,
                       letterSpacing: '0.16em',
                       padding: '10px 14px',
                       borderRadius: '6px',
-                      border: `1.5px solid ${colours.gold}`,
+                      border: '1.5px solid #5fb04a',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -5288,7 +5288,7 @@ Deliver your verdict as JSON.`;
                     }}
                   >
                     <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
-                    <span>TROPHIES = {homeTrophyCount}</span>
+                    <span>{homeTrophyCount}</span>
                   </button>
                 </div>
 
@@ -5558,7 +5558,7 @@ Deliver your verdict as JSON.`;
                   <span>MY DAILY QUESTION STATS</span>
                 </button>
 
-                {/* Stage 22.13 (desktop): HOW TO PLAY — blue fill, white text (cream). */}
+                {/* Stage 22.15 (desktop): HOW TO PLAY — blue fill, black text. */}
                 <button
                   onClick={() => setScreen('howto')}
                   className="kick3-button-hover"
@@ -5567,7 +5567,7 @@ Deliver your verdict as JSON.`;
                     marginTop: '28px',
                     padding: '16px 22px',
                     background: '#4a90d4',
-                    color: colours.cream,
+                    color: '#000000',
                     border: '1.5px solid #4a90d4',
                     borderRadius: '10px',
                     ...displayFont,
