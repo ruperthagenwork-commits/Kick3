@@ -7513,6 +7513,13 @@ Deliver your verdict as JSON.`;
     const cloudTrophies = profileCloudState ? (profileCloudState.trophy_count || 0) : 0;
     const localTrophies = readTournamentState().trophyCount || 0;
 
+    // Stage 22.6: loyalty data. Prefer cloud value (might be ahead if user
+    // played on another device), fall back to localStorage if cloud unavailable.
+    const localDays = parseInt(localStorage.getItem('kick3_distinct_days') || '0', 10) || 0;
+    const cloudDays = profileCloudState ? (profileCloudState.distinct_days_played || 0) : 0;
+    const profileDays = Math.max(localDays, cloudDays);
+    const profileTier = loyaltyTierFor(profileDays);
+
     return (
       <>
         <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -7603,6 +7610,89 @@ Deliver your verdict as JSON.`;
                     ? 'This device has more. Cloud syncs at the end of every tournament attempt.'
                     : 'Cloud has more (likely from another device).'
                   }
+                </div>
+              )}
+            </div>
+
+            {/* Stage 22.6: LOYALTY card. Sits below Cloud State. Shows the
+                player's current tier as a coloured pill, days-played counter,
+                and progress-to-next-tier line. */}
+            <div style={{
+              background: colours.surface,
+              padding: '18px 20px',
+              borderRadius: '8px',
+              marginBottom: '14px',
+              borderTop: `2px solid ${profileTier.color || colours.muted}`
+            }}>
+              <div style={{
+                ...condFont, fontSize: '10px', letterSpacing: '0.3em',
+                color: profileTier.color || colours.muted,
+                fontWeight: 700, marginBottom: '14px'
+              }}>
+                LOYALTY
+              </div>
+              {/* Tier display — big pill, or "no badge yet" line */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                marginBottom: '12px'
+              }}>
+                <span style={{ ...condFont, fontSize: '13px', color: colours.cream }}>
+                  Current tier
+                </span>
+                {profileTier.tier !== 'NONE' ? (
+                  <span style={{
+                    background: profileTier.color,
+                    color: profileTier.textColor,
+                    ...condFont, fontSize: '12px', fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    padding: '5px 12px', borderRadius: '4px'
+                  }}>
+                    {profileTier.label}
+                  </span>
+                ) : (
+                  <span style={{ ...condFont, fontSize: '12px', color: colours.muted, fontStyle: 'italic' }}>
+                    No tier yet
+                  </span>
+                )}
+              </div>
+              {/* Days played */}
+              <div style={{
+                display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                marginBottom: '12px'
+              }}>
+                <span style={{ ...condFont, fontSize: '13px', color: colours.cream }}>
+                  Days played
+                </span>
+                <span style={{
+                  ...displayFont, fontSize: '20px', fontWeight: 700,
+                  color: colours.cream, lineHeight: 1
+                }}>
+                  {profileDays}
+                </span>
+              </div>
+              {/* Progress to next tier — only when not at DIAMOND */}
+              {profileTier.daysToNext !== null && (
+                <div style={{
+                  paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)',
+                  ...condFont, fontSize: '11px', color: colours.muted,
+                  textAlign: 'center', fontStyle: 'italic', lineHeight: 1.4
+                }}>
+                  {profileTier.daysToNext === 1
+                    ? '1 day until '
+                    : `${profileTier.daysToNext} days until `}
+                  {profileTier.tier === 'NONE'   && 'BRONZE'}
+                  {profileTier.tier === 'BRONZE' && 'SILVER'}
+                  {profileTier.tier === 'SILVER' && 'GOLD'}
+                  {profileTier.tier === 'GOLD'   && 'DIAMOND'}
+                </div>
+              )}
+              {profileTier.tier === 'DIAMOND' && (
+                <div style={{
+                  paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)',
+                  ...condFont, fontSize: '11px', color: '#b9f2ff',
+                  textAlign: 'center', fontStyle: 'italic', lineHeight: 1.4
+                }}>
+                  Top tier reached. Living legend.
                 </div>
               )}
             </div>
