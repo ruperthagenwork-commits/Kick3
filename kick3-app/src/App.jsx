@@ -4697,7 +4697,11 @@ Deliver your verdict as JSON.`;
                     ● {TODAYS_QUESTION.category.toUpperCase()}
                   </div>
                 </div>
-              </div>
+
+                {/* Stage 22.8: keep wooden frame open. Buttons sit inside the
+                    same chalkboard frame to visually group everything that
+                    relates to the daily question. */}
+                <div style={{ height: '14px' }} />
 
               {/* PLAY TODAY — yellow */}
               <button
@@ -4852,6 +4856,7 @@ Deliver your verdict as JSON.`;
                 <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📊</span>
                 <span>MY DAILY QUESTION STATS</span>
               </button>
+              </div>{/* /Stage 22.8 daily-question chalkboard frame */}
 
               {/* Countdown */}
               <div style={{
@@ -5382,7 +5387,9 @@ Deliver your verdict as JSON.`;
                       ● {TODAYS_QUESTION.category.toUpperCase()}
                     </div>
                   </div>
-                </div>
+
+                  {/* Stage 22.8: wooden frame stays open. Buttons sit inside. */}
+                  <div style={{ height: '18px' }} />
 
                 {/* TOURNAMENT MODE moved above chalkboard in Stage 22.7 */}
 
@@ -5537,6 +5544,7 @@ Deliver your verdict as JSON.`;
                   <span style={{ fontSize: '16px', letterSpacing: 0 }} aria-hidden="true">📊</span>
                   <span>MY DAILY QUESTION STATS</span>
                 </button>
+                </div>{/* /Stage 22.8 daily-question chalkboard frame */}
 
                 {/* Countdown */}
                 <div style={{
