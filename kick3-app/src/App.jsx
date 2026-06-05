@@ -7796,17 +7796,20 @@ Deliver your verdict as JSON.`;
               </h1>
             </div>
 
-            {/* Stage 22.4 diagnostic block — replaces the placeholder with a
-                bare display of fetched data. Stage 22.5 turns this into a
-                proper leaderboard table. For now it proves the fetch works. */}
+            {/* Stage 22.5 polished leaderboard table.
+                Data fetched + polled in 22.4. This is the visual layer:
+                - Ranked rows with handle, loyalty badge, trophies, attempts
+                - Own row highlighted in gold
+                - Striped rows for readability
+                - Loyalty badge pill inline next to each handle */}
 
-            {/* Refresh + last-fetched timestamp */}
+            {/* Refresh + last-fetched timestamp (unchanged from 22.4) */}
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               marginBottom: '14px', padding: '10px 14px',
               background: colours.surface, borderRadius: '6px'
             }}>
-              <div style={{ ...condFont, fontSize: '11px', color: colours.muted }}>
+              <div style={{ ...condFont, fontSize: '11px', color: colours.muted, letterSpacing: '0.05em' }}>
                 {leaderboardLoading
                   ? 'Loading\u2026'
                   : leaderboardLastFetched
@@ -7841,95 +7844,216 @@ Deliver your verdict as JSON.`;
               </div>
             )}
 
-            {/* Top 50 — bare list for 22.4 diagnostic, real table in 22.5 */}
+            {/* Main leaderboard table — top 50.
+                Empty state shown when fetch returned zero rows.
+                Own-row detection: compare row.handle to authProfile.handle.
+                Loyalty badge inline using loyaltyTierFor(). */}
             <div style={{
-              padding: '14px 16px', background: colours.surface,
-              borderRadius: '8px', marginBottom: '14px'
+              background: colours.surface,
+              borderRadius: '10px',
+              marginBottom: '14px',
+              overflow: 'hidden',
+              borderTop: `2px solid ${colours.gold}`
             }}>
+              {/* Column headers */}
               <div style={{
-                ...condFont, fontSize: '10px', letterSpacing: '0.3em',
-                color: colours.gold, fontWeight: 700, marginBottom: '10px'
+                display: 'flex', alignItems: 'center',
+                padding: '10px 14px',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                ...condFont, fontSize: '10px', letterSpacing: '0.25em',
+                color: colours.gold, fontWeight: 700
               }}>
-                TOP 50 ({leaderboardRows.length} {leaderboardRows.length === 1 ? 'PLAYER' : 'PLAYERS'})
+                <span style={{ width: '34px' }}>RANK</span>
+                <span style={{ flex: 1, minWidth: 0 }}>PLAYER</span>
+                <span style={{ width: '52px', textAlign: 'right' }}>TROPHIES</span>
+                <span style={{ width: '46px', textAlign: 'right' }}>ATTEMPTS</span>
               </div>
+
+              {/* Empty state */}
               {leaderboardRows.length === 0 && !leaderboardLoading && (
-                <div style={{ ...condFont, fontSize: '12px', color: colours.muted, fontStyle: 'italic' }}>
-                  No trophies won yet. Be the first.
+                <div style={{
+                  padding: '32px 16px', textAlign: 'center',
+                  ...condFont, fontSize: '13px', color: colours.muted,
+                  fontStyle: 'italic', lineHeight: 1.6
+                }}>
+                  No trophies won yet.<br/>Be the first.
                 </div>
               )}
-              {leaderboardRows.map((row, i) => (
-                <div key={row.handle} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '8px 0',
-                  borderBottom: i < leaderboardRows.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                  ...condFont, fontSize: '13px', color: colours.cream
+
+              {/* Loading state */}
+              {leaderboardLoading && leaderboardRows.length === 0 && (
+                <div style={{
+                  padding: '32px 16px', textAlign: 'center',
+                  ...condFont, fontSize: '12px', color: colours.muted, letterSpacing: '0.15em'
                 }}>
-                  <span style={{ minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <span style={{ color: colours.muted, marginRight: '10px' }}>#{i + 1}</span>
-                    {row.handle}
-                    <span style={{ color: colours.muted, fontSize: '11px', marginLeft: '8px' }}>
-                      ({row.distinct_days_played}d)
-                    </span>
-                  </span>
-                  <span style={{ color: colours.gold, fontWeight: 700, marginLeft: '12px' }}>
-                    🏆 {row.trophy_count}
-                  </span>
-                  <span style={{ color: colours.muted, fontSize: '11px', marginLeft: '8px', minWidth: '40px', textAlign: 'right' }}>
-                    {row.tournaments_attempted}a
-                  </span>
+                  Loading…
                 </div>
-              ))}
+              )}
+
+              {/* Ranked rows */}
+              {leaderboardRows.map((row, i) => {
+                const tier = loyaltyTierFor(row.distinct_days_played);
+                const isMe = authProfile && authProfile.handle === row.handle;
+                const rank = i + 1;
+                return (
+                  <div key={row.handle} style={{
+                    display: 'flex', alignItems: 'center',
+                    padding: '10px 14px',
+                    background: isMe
+                      ? 'rgba(212,175,55,0.10)'
+                      : (i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'),
+                    borderLeft: isMe ? `3px solid ${colours.gold}` : '3px solid transparent',
+                    borderBottom: i < leaderboardRows.length - 1
+                      ? '1px solid rgba(255,255,255,0.04)'
+                      : 'none'
+                  }}>
+                    {/* Rank */}
+                    <span style={{
+                      width: '34px',
+                      ...displayFont, fontSize: '15px', fontWeight: 700,
+                      color: rank <= 3 ? colours.gold : colours.muted
+                    }}>
+                      {rank}
+                    </span>
+                    {/* Handle + loyalty badge */}
+                    <span style={{
+                      flex: 1, minWidth: 0,
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      overflow: 'hidden'
+                    }}>
+                      <span style={{
+                        ...condFont, fontSize: '13px', fontWeight: 600,
+                        color: colours.cream,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        flex: '0 1 auto', minWidth: 0
+                      }}>
+                        {row.handle}
+                      </span>
+                      {tier.tier !== 'NONE' && (
+                        <span style={{
+                          background: tier.color,
+                          color: tier.textColor,
+                          ...condFont, fontSize: '8px', fontWeight: 700,
+                          letterSpacing: '0.12em',
+                          padding: '2px 5px', borderRadius: '3px',
+                          flexShrink: 0,
+                          textTransform: 'uppercase'
+                        }}>
+                          {tier.label}
+                        </span>
+                      )}
+                    </span>
+                    {/* Trophies (emphasised) */}
+                    <span style={{
+                      width: '52px', textAlign: 'right',
+                      ...displayFont, fontSize: '17px', fontWeight: 700,
+                      color: colours.gold
+                    }}>
+                      {row.trophy_count}
+                    </span>
+                    {/* Attempts (quieter) */}
+                    <span style={{
+                      width: '46px', textAlign: 'right',
+                      ...condFont, fontSize: '12px', color: colours.muted
+                    }}>
+                      {row.tournaments_attempted}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
 
-            {/* Your-rank panel — only when user has data */}
-            {leaderboardUserRank && (
-              <div style={{
-                padding: '14px 16px', background: 'rgba(212,175,55,0.06)',
-                border: '1px solid rgba(212,175,55,0.30)', borderRadius: '8px',
-                marginBottom: '14px'
-              }}>
+            {/* Your-rank panel — appears when signed-in user has a position
+                AND isn't already visible in the top 50. If they're in the
+                top 50, no separate panel needed (their row is highlighted). */}
+            {leaderboardUserRank && leaderboardUserRank.rank > 50 && (() => {
+              const myTier = loyaltyTierFor(leaderboardUserRank.row.distinct_days_played);
+              return (
                 <div style={{
-                  ...condFont, fontSize: '10px', letterSpacing: '0.3em',
-                  color: colours.gold, fontWeight: 700, marginBottom: '8px'
+                  padding: '14px 16px',
+                  background: 'rgba(212,175,55,0.08)',
+                  border: `1px solid rgba(212,175,55,0.40)`,
+                  borderRadius: '10px',
+                  marginBottom: '14px'
                 }}>
-                  YOUR RANK
-                </div>
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  ...condFont, fontSize: '14px', color: colours.cream
-                }}>
-                  <span>
-                    <span style={{ color: colours.gold, marginRight: '10px', fontWeight: 700 }}>
+                  <div style={{
+                    ...condFont, fontSize: '10px', letterSpacing: '0.28em',
+                    color: colours.gold, fontWeight: 700, marginBottom: '10px'
+                  }}>
+                    YOUR RANK
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span style={{
+                      width: '50px',
+                      ...displayFont, fontSize: '20px', fontWeight: 700,
+                      color: colours.gold
+                    }}>
                       #{leaderboardUserRank.rank}
                     </span>
-                    {leaderboardUserRank.row.handle}
-                  </span>
-                  <span style={{ color: colours.gold, fontWeight: 700 }}>
-                    🏆 {leaderboardUserRank.row.trophy_count}
-                  </span>
+                    <span style={{
+                      flex: 1, minWidth: 0,
+                      display: 'flex', alignItems: 'center', gap: '6px'
+                    }}>
+                      <span style={{
+                        ...condFont, fontSize: '14px', fontWeight: 600,
+                        color: colours.cream,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                      }}>
+                        {leaderboardUserRank.row.handle}
+                      </span>
+                      {myTier.tier !== 'NONE' && (
+                        <span style={{
+                          background: myTier.color,
+                          color: myTier.textColor,
+                          ...condFont, fontSize: '8px', fontWeight: 700,
+                          letterSpacing: '0.12em',
+                          padding: '2px 5px', borderRadius: '3px',
+                          flexShrink: 0
+                        }}>
+                          {myTier.label}
+                        </span>
+                      )}
+                    </span>
+                    <span style={{
+                      ...displayFont, fontSize: '18px', fontWeight: 700,
+                      color: colours.gold, marginLeft: '10px'
+                    }}>
+                      {leaderboardUserRank.row.trophy_count}
+                    </span>
+                    <span style={{
+                      ...condFont, fontSize: '11px', color: colours.muted,
+                      marginLeft: '8px', minWidth: '34px', textAlign: 'right'
+                    }}>
+                      🏆
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
-            {!leaderboardUserRank && !leaderboardLoading && authProfile && (
+              );
+            })()}
+
+            {/* Signed-in, in top 50 → small confirmation note */}
+            {leaderboardUserRank && leaderboardUserRank.rank <= 50 && (
               <div style={{
-                padding: '12px 14px', background: colours.surface,
-                borderRadius: '8px', marginBottom: '14px',
+                padding: '10px 14px', background: 'rgba(212,175,55,0.04)',
+                borderRadius: '6px', marginBottom: '14px',
                 ...condFont, fontSize: '12px', color: colours.muted,
                 fontStyle: 'italic', textAlign: 'center'
               }}>
-                Win a tournament trophy to appear on the leaderboard.
+                You’re #{leaderboardUserRank.rank} — see your row above.
               </div>
             )}
 
-            {/* Note for testing */}
-            <div style={{
-              padding: '10px 14px', background: 'rgba(20,20,30,0.4)',
-              borderRadius: '6px',
-              ...condFont, fontSize: '10px', color: colours.muted,
-              fontStyle: 'italic', textAlign: 'center', letterSpacing: '0.05em'
-            }}>
-              Stage 22.4 diagnostic view. Polished table coming in Stage 22.5.
-            </div>
+            {/* Signed-in but no trophies yet → invitation to play */}
+            {!leaderboardUserRank && !leaderboardLoading && authProfile && (
+              <div style={{
+                padding: '14px 16px', background: colours.surface,
+                borderRadius: '8px', marginBottom: '14px',
+                ...condFont, fontSize: '12px', color: colours.muted,
+                fontStyle: 'italic', textAlign: 'center', lineHeight: 1.5
+              }}>
+                Win your first tournament trophy to appear on the leaderboard.
+              </div>
+            )}
           </div>
         </div>
         <Analytics />
