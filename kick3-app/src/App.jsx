@@ -4228,7 +4228,7 @@ Deliver your verdict as JSON.`;
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  LEADERS
+                  LEADERBOARDS
                 </button>
                 {/* STATS pill */}
                 <button
