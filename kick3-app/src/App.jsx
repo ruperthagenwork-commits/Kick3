@@ -2336,6 +2336,9 @@ export default function Kick3() {
           last_played_date: local.lastPlayedDate || null,
           last_attempt_result: local.lastAttemptResult || null,
           daily_stats: localStats,
+          // Stage 22: include the days-played counter so first sign-up
+          // captures the full local state in one round-trip.
+          distinct_days_played: parseInt(localStorage.getItem('kick3_distinct_days') || '0', 10) || 0,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
       if (error && typeof console !== 'undefined') {
@@ -2528,6 +2531,19 @@ export default function Kick3() {
             await pushDailyStatsToCloud();
           }
           // Equal totals: do nothing (already in sync).
+
+          // Stage 22: reconcile distinct_days_played counter. Same higher-wins
+          // pattern as trophies — both sides are monotonic, so higher = more
+          // complete. Updates localStorage if cloud is higher.
+          const cloudDays = cloudRow.distinct_days_played || 0;
+          const localDays = parseInt(localStorage.getItem('kick3_distinct_days') || '0', 10) || 0;
+          if (cloudDays > localDays) {
+            try { localStorage.setItem('kick3_distinct_days', String(cloudDays)); } catch {}
+          } else if (localDays > cloudDays) {
+            // Local has more — push up. pushTournamentStateToCloud reads the
+            // current localStorage value and upserts.
+            await pushTournamentStateToCloud();
+          }
         } else if (!cloudRow) {
           // No cloud row exists yet (edge case — profile but no state row).
           // Push local up.
@@ -2659,6 +2675,9 @@ export default function Kick3() {
           tournaments_completed: local.tournamentsCompleted || 0,
           last_played_date: local.lastPlayedDate || null,
           last_attempt_result: local.lastAttemptResult || null,
+          // Stage 22 (leaderboard build): include the days-played counter.
+          // Stored locally under kick3_distinct_days; see recordPlayDay() below.
+          distinct_days_played: parseInt(localStorage.getItem('kick3_distinct_days') || '0', 10) || 0,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' });
       if (error) {
@@ -2743,6 +2762,57 @@ export default function Kick3() {
     }
   };
   // ============ END DAILY STATS SYNC ============
+
+  // ============ DISTINCT DAYS PLAYED (Stage 22 — leaderboard loyalty badge) ============
+  // Tracks the number of distinct days the player has logged at least one play
+  // of any mode (solo, 1v1, OR tournament attempt). Used by the loyalty-badge
+  // tier system on the leaderboard.
+  //
+  // Mechanism:
+  //   - localStorage key 'kick3_distinct_days' stores the integer count.
+  //   - localStorage key 'kick3_last_play_day' stores the question.number of
+  //     the day the last play was recorded.
+  //   - On every play, recordPlayDay() checks the stamp. If today's number
+  //     differs from the stored one (or it's unset), increment the count and
+  //     update the stamp. Otherwise no-op.
+  //   - Synced to cloud as part of pushTournamentStateToCloud's upsert.
+  //
+  // Tier thresholds (matches Kick3_Leaderboards_Spec.docx):
+  //   0-6   = no badge
+  //   7-13  = BRONZE
+  //   14-20 = SILVER
+  //   21-27 = GOLD
+  //   28+   = DIAMOND
+  const DISTINCT_DAYS_KEY = 'kick3_distinct_days';
+  const LAST_PLAY_DAY_KEY = 'kick3_last_play_day';
+
+  // Call this after every play (solo, 1v1, OR tournament attempt completion).
+  // Idempotent within a single day — only increments on the FIRST play of a
+  // new question.number. No-op if the same question is already stamped.
+  const recordPlayDay = () => {
+    try {
+      const todayNum = TODAYS_QUESTION.number;
+      const lastNum = parseInt(localStorage.getItem(LAST_PLAY_DAY_KEY) || '0', 10);
+      if (lastNum === todayNum) return; // Already counted today.
+      // New day — increment and stamp.
+      const current = parseInt(localStorage.getItem(DISTINCT_DAYS_KEY) || '0', 10) || 0;
+      localStorage.setItem(DISTINCT_DAYS_KEY, String(current + 1));
+      localStorage.setItem(LAST_PLAY_DAY_KEY, String(todayNum));
+    } catch { /* silent */ }
+  };
+
+  // Helper: derive loyalty tier from a day count. Returns one of:
+  //   { tier: 'NONE'|'BRONZE'|'SILVER'|'GOLD'|'DIAMOND', label, color, daysToNext }
+  // Used by both the leaderboard rendering and the profile screen.
+  const loyaltyTierFor = (days) => {
+    const d = parseInt(days, 10) || 0;
+    if (d >= 28) return { tier: 'DIAMOND', label: 'DIAMOND', color: '#b9f2ff', textColor: '#0a1a1f', daysToNext: null };
+    if (d >= 21) return { tier: 'GOLD',    label: 'GOLD',    color: '#d4af37', textColor: '#1a1408', daysToNext: 28 - d };
+    if (d >= 14) return { tier: 'SILVER',  label: 'SILVER',  color: '#c0c0c0', textColor: '#1a1a1a', daysToNext: 21 - d };
+    if (d >= 7)  return { tier: 'BRONZE',  label: 'BRONZE',  color: '#cd7f32', textColor: '#ffffff', daysToNext: 14 - d };
+    return { tier: 'NONE', label: '', color: null, textColor: null, daysToNext: 7 - d };
+  };
+  // ============ END DISTINCT DAYS PLAYED ============
   // ============ END CLOUD SYNC ============
 
   // ============ PROFILE SCREEN (Phase 2, Deploy 5 / Stage 20) ============
@@ -3165,9 +3235,14 @@ export default function Kick3() {
       const next = { ...prev, [s]: (prev[s] || 0) + 1 };
       localStorage.setItem('kick3_score_counts', JSON.stringify(next));
       setScoreStats(next);
+      // Stage 22: a play happened today — bump the days-played counter.
+      // (Idempotent within a single day; safe to call from every play path.)
+      recordPlayDay();
       // Stage 21: push to cloud if signed in. Fire-and-forget — UI doesn't
       // wait. No-op when signed out (silent in pushDailyStatsToCloud).
+      // pushTournamentStateToCloud also pulls the days counter into its upsert.
       pushDailyStatsToCloud();
+      pushTournamentStateToCloud();
     } catch { /* silent */ }
   };
 
@@ -3497,6 +3572,9 @@ export default function Kick3() {
       lastPlayedDate: todayDateString(),
       lastAttemptResult: resultKey,
     });
+    // Stage 22: a tournament attempt counts as a play today — bump the
+    // days-played counter (idempotent within a day).
+    recordPlayDay();
     // Stage 19: push the just-written state up to the cloud if signed in.
     // Fire-and-forget — we don't block the UI on the network round-trip.
     // No-ops when signed out; silent retry-on-mount handles failures.
@@ -3655,6 +3733,9 @@ Weigh the picks, their Legacy ratings, and both arguments together. Judge betwee
         trophyCount: (state.trophyCount || 0) + (playerWon ? 1 : 0),
         wonTodayFlag: state.wonTodayFlag || playerWon,
       });
+      // Stage 22: a play happened today — bump the days-played counter
+      // (idempotent within a day).
+      recordPlayDay();
       // Stage 19: push the new trophy state to the cloud immediately.
       // This is the critical sync — every trophy must reach the cloud so it
       // shows up on the player's other devices.
