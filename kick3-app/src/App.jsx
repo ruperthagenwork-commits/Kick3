@@ -4876,7 +4876,7 @@ Deliver your verdict as JSON.`;
                 <span>MY DAILY QUESTION STATS</span>
               </button>
 
-              {/* Stage 22.15: HOW TO PLAY — blue fill, black text. */}
+              {/* Stage 22.17: HOW TO PLAY — purple fill, white (cream) text. */}
               <button
                 onClick={() => setScreen('howto')}
                 className="kick3-button-hover"
@@ -4884,9 +4884,9 @@ Deliver your verdict as JSON.`;
                   width: '100%',
                   marginTop: '24px',
                   padding: '14px 20px',
-                  background: '#4a90d4',
-                  color: '#000000',
-                  border: '1.5px solid #4a90d4',
+                  background: '#7a4eb8',
+                  color: colours.cream,
+                  border: '1.5px solid #7a4eb8',
                   borderRadius: '8px',
                   ...displayFont,
                   fontSize: 'clamp(13px, 3.6vw, 15px)',
@@ -5558,7 +5558,7 @@ Deliver your verdict as JSON.`;
                   <span>MY DAILY QUESTION STATS</span>
                 </button>
 
-                {/* Stage 22.15 (desktop): HOW TO PLAY — blue fill, black text. */}
+                {/* Stage 22.17 (desktop): HOW TO PLAY — purple fill, white (cream) text. */}
                 <button
                   onClick={() => setScreen('howto')}
                   className="kick3-button-hover"
@@ -5566,9 +5566,9 @@ Deliver your verdict as JSON.`;
                     width: '100%',
                     marginTop: '28px',
                     padding: '16px 22px',
-                    background: '#4a90d4',
-                    color: '#000000',
-                    border: '1.5px solid #4a90d4',
+                    background: '#7a4eb8',
+                    color: colours.cream,
+                    border: '1.5px solid #7a4eb8',
                     borderRadius: '10px',
                     ...displayFont,
                     fontSize: 'clamp(14px, 1.3vw, 17px)',
