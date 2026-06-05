@@ -4387,26 +4387,6 @@ Deliver your verdict as JSON.`;
                 >
                   LEADERBOARDS
                 </button>
-                {/* STATS pill */}
-                <button
-                  onClick={() => setScreen('stats')}
-                  aria-label="View stats"
-                  style={{
-                    background: 'rgba(20,20,30,0.85)',
-                    color: colours.gold,
-                    ...condFont,
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    letterSpacing: '0.18em',
-                    padding: '6px 8px',
-                    borderRadius: '4px',
-                    border: `1px solid ${colours.gold}`,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  STATS
-                </button>
                 {/* TROPHIES pill */}
                 <button
                   onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
@@ -4565,6 +4545,90 @@ Deliver your verdict as JSON.`;
                 )
               )}
 
+              {/* Stage 22.7: TOURNAMENT MODE moved ABOVE the chalkboard for prominence
+                  during the World Cup window. Same button code as before, just relocated. */}
+              {tournamentUnlocked ? (
+                <button
+                  onClick={() => setScreen('tournament-home')}
+                  className="kick3-button-hover kick3-pulse-gold"
+                  style={{
+                    width: '100%',
+                    padding: '18px 20px',
+                    background: '#5fb04a',
+                    color: '#0a1a08',
+                    border: 'none',
+                    borderRadius: '10px',
+                    ...displayFont,
+                    fontSize: 'clamp(20px, 5.4vw, 24px)',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px',
+                    cursor: 'pointer',
+                    marginBottom: '18px',
+                    boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                    position: 'relative'
+                  }}
+                  aria-label="Open tournament mode"
+                >
+                  <span>TOURNAMENT MODE</span>
+                  <span style={{
+                    background: 'rgba(0,0,0,0.18)',
+                    color: '#0a1a08',
+                    ...condFont,
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    padding: '3px 7px',
+                    borderRadius: '4px',
+                    lineHeight: 1
+                  }}>BETA</span>
+                </button>
+              ) : (
+                <button
+                  disabled
+                  aria-label="Tournament mode opens 11 June 2026"
+                  style={{
+                    width: '100%',
+                    padding: '14px 20px',
+                    background: '#3a3a44',
+                    color: colours.muted,
+                    border: 'none',
+                    borderRadius: '10px',
+                    ...displayFont,
+                    fontSize: 'clamp(20px, 5.4vw, 24px)',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    cursor: 'not-allowed',
+                    marginBottom: '18px',
+                    boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                    opacity: 0.75
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span aria-hidden="true">🔒</span>
+                    <span>TOURNAMENT MODE</span>
+                  </span>
+                  <span style={{
+                    ...condFont,
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    color: colours.gold,
+                    opacity: 0.95
+                  }}>
+                    OPENS 11 JUNE
+                  </span>
+                </button>
+              )}
+
               {/* Question chalkboard — wooden frame around dark slate */}
               <div style={{
                 background: 'linear-gradient(135deg, #6b4423 0%, #4a2e15 50%, #5c3a1d 100%)',
@@ -4634,91 +4698,6 @@ Deliver your verdict as JSON.`;
                   </div>
                 </div>
               </div>
-
-              {/* TOURNAMENT MODE — green when unlocked, locked/greyed for general public pre-launch.
-                  Phase 2, Deploy 5 / Stage 15: button now ALWAYS renders. Locked state
-                  shows a 🔒 emoji and "OPENS 11 JUNE" subtitle, fully unclickable. */}
-              {tournamentUnlocked ? (
-                <button
-                  onClick={() => setScreen('tournament-home')}
-                  className="kick3-button-hover kick3-pulse-gold"
-                  style={{
-                    width: '100%',
-                    padding: '18px 20px',
-                    background: '#5fb04a',
-                    color: '#0a1a08',
-                    border: 'none',
-                    borderRadius: '10px',
-                    ...displayFont,
-                    fontSize: 'clamp(20px, 5.4vw, 24px)',
-                    fontWeight: 800,
-                    letterSpacing: '0.08em',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '12px',
-                    cursor: 'pointer',
-                    marginBottom: '12px',
-                    boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
-                    position: 'relative'
-                  }}
-                  aria-label="Open tournament mode"
-                >
-                  <span>TOURNAMENT MODE</span>
-                  <span style={{
-                    background: 'rgba(0,0,0,0.18)',
-                    color: '#0a1a08',
-                    ...condFont,
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    letterSpacing: '0.1em',
-                    padding: '3px 7px',
-                    borderRadius: '4px',
-                    lineHeight: 1
-                  }}>BETA</span>
-                </button>
-              ) : (
-                <button
-                  disabled
-                  aria-label="Tournament mode opens 11 June 2026"
-                  style={{
-                    width: '100%',
-                    padding: '14px 20px',
-                    background: '#3a3a44',
-                    color: colours.muted,
-                    border: 'none',
-                    borderRadius: '10px',
-                    ...displayFont,
-                    fontSize: 'clamp(20px, 5.4vw, 24px)',
-                    fontWeight: 800,
-                    letterSpacing: '0.08em',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '4px',
-                    cursor: 'not-allowed',
-                    marginBottom: '12px',
-                    boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
-                    opacity: 0.75
-                  }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span aria-hidden="true">🔒</span>
-                    <span>TOURNAMENT MODE</span>
-                  </span>
-                  <span style={{
-                    ...condFont,
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    letterSpacing: '0.18em',
-                    color: colours.gold,
-                    opacity: 0.95
-                  }}>
-                    OPENS 11 JUNE
-                  </span>
-                </button>
-              )}
 
               {/* PLAY TODAY — yellow */}
               <button
@@ -4842,6 +4821,36 @@ Deliver your verdict as JSON.`;
                 ) : (
                   <span>2 PLAYER MODE</span>
                 )}
+              </button>
+
+              {/* Stage 22.7: MY DAILY QUESTION STATS — slim gold-outlined button
+                  beneath the two play modes. Visually quieter than the play
+                  buttons so users don't mistake it for a game mode. Routes to
+                  the existing stats screen. */}
+              <button
+                onClick={() => setScreen('stats')}
+                className="kick3-button-hover"
+                style={{
+                  width: '100%',
+                  padding: '13px 20px',
+                  background: 'transparent',
+                  color: colours.gold,
+                  border: `1.5px solid ${colours.gold}`,
+                  borderRadius: '10px',
+                  ...displayFont,
+                  fontSize: 'clamp(13px, 3.6vw, 15px)',
+                  fontWeight: 700,
+                  letterSpacing: '0.12em',
+                  cursor: 'pointer',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px'
+                }}
+              >
+                <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📊</span>
+                <span>MY DAILY QUESTION STATS</span>
               </button>
 
               {/* Countdown */}
@@ -5069,30 +5078,6 @@ Deliver your verdict as JSON.`;
                   >
                     LEADERBOARDS
                   </button>
-                  {/* STATS pill */}
-                  <button
-                    onClick={() => setScreen('stats')}
-                    aria-label="View stats"
-                    style={{
-                      background: 'rgba(20,20,30,0.85)',
-                      color: colours.gold,
-                      ...condFont,
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      letterSpacing: '0.3em',
-                      padding: '8px 14px',
-                      borderRadius: '4px',
-                      border: `1px solid ${colours.gold}`,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📊</span>
-                    <span>STATS</span>
-                  </button>
                   {/* TROPHIES pill */}
                   <button
                     onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
@@ -5247,6 +5232,89 @@ Deliver your verdict as JSON.`;
                   )
                 )}
 
+                {/* Stage 22.7: TOURNAMENT MODE moved above chalkboard for prominence. */}
+                {tournamentUnlocked ? (
+                  <button
+                    onClick={() => setScreen('tournament-home')}
+                    className="kick3-desktop-btn-tournament kick3-pulse-gold"
+                    style={{
+                      width: '100%',
+                      padding: '22px 24px',
+                      background: '#5fb04a',
+                      color: '#0a1a08',
+                      border: 'none',
+                      borderRadius: '12px',
+                      ...displayFont,
+                      fontSize: 'clamp(24px, 2.4vw, 30px)',
+                      fontWeight: 800,
+                      letterSpacing: '0.08em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '14px',
+                      cursor: 'pointer',
+                      marginBottom: '20px',
+                      boxShadow: '0 5px 0 rgba(0,0,0,0.25)',
+                      position: 'relative'
+                    }}
+                    aria-label="Open tournament mode"
+                  >
+                    <span>TOURNAMENT MODE</span>
+                    <span style={{
+                      background: 'rgba(0,0,0,0.18)',
+                      color: '#0a1a08',
+                      ...condFont,
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      padding: '4px 8px',
+                      borderRadius: '5px',
+                      lineHeight: 1
+                    }}>BETA</span>
+                  </button>
+                ) : (
+                  <button
+                    disabled
+                    aria-label="Tournament mode opens 11 June 2026"
+                    style={{
+                      width: '100%',
+                      padding: '18px 24px',
+                      background: '#3a3a44',
+                      color: colours.muted,
+                      border: 'none',
+                      borderRadius: '12px',
+                      ...displayFont,
+                      fontSize: 'clamp(24px, 2.4vw, 30px)',
+                      fontWeight: 800,
+                      letterSpacing: '0.08em',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      cursor: 'not-allowed',
+                      marginBottom: '20px',
+                      boxShadow: '0 5px 0 rgba(0,0,0,0.25)',
+                      opacity: 0.75
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span aria-hidden="true">🔒</span>
+                      <span>TOURNAMENT MODE</span>
+                    </span>
+                    <span style={{
+                      ...condFont,
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      letterSpacing: '0.2em',
+                      color: colours.gold,
+                      opacity: 0.95
+                    }}>
+                      OPENS 11 JUNE
+                    </span>
+                  </button>
+                )}
+
                 {/* Question chalkboard — wooden frame around slate */}
                 <div style={{
                   background: 'linear-gradient(135deg, #6b4423 0%, #4a2e15 50%, #5c3a1d 100%)',
@@ -5316,89 +5384,7 @@ Deliver your verdict as JSON.`;
                   </div>
                 </div>
 
-                {/* TOURNAMENT MODE — green when unlocked, locked/greyed for general public pre-launch.
-                    Phase 2, Deploy 5 / Stage 15: button now ALWAYS renders. */}
-                {tournamentUnlocked ? (
-                  <button
-                    onClick={() => setScreen('tournament-home')}
-                    className="kick3-desktop-btn-tournament kick3-pulse-gold"
-                    style={{
-                      width: '100%',
-                      padding: '22px 24px',
-                      background: '#5fb04a',
-                      color: '#0a1a08',
-                      border: 'none',
-                      borderRadius: '12px',
-                      ...displayFont,
-                      fontSize: 'clamp(24px, 2.4vw, 30px)',
-                      fontWeight: 800,
-                      letterSpacing: '0.08em',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '14px',
-                      cursor: 'pointer',
-                      marginBottom: '14px',
-                      boxShadow: '0 5px 0 rgba(0,0,0,0.25)',
-                      position: 'relative'
-                    }}
-                    aria-label="Open tournament mode"
-                  >
-                    <span>TOURNAMENT MODE</span>
-                    <span style={{
-                      background: 'rgba(0,0,0,0.18)',
-                      color: '#0a1a08',
-                      ...condFont,
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      letterSpacing: '0.1em',
-                      padding: '4px 8px',
-                      borderRadius: '5px',
-                      lineHeight: 1
-                    }}>BETA</span>
-                  </button>
-                ) : (
-                  <button
-                    disabled
-                    aria-label="Tournament mode opens 11 June 2026"
-                    style={{
-                      width: '100%',
-                      padding: '18px 24px',
-                      background: '#3a3a44',
-                      color: colours.muted,
-                      border: 'none',
-                      borderRadius: '12px',
-                      ...displayFont,
-                      fontSize: 'clamp(24px, 2.4vw, 30px)',
-                      fontWeight: 800,
-                      letterSpacing: '0.08em',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      cursor: 'not-allowed',
-                      marginBottom: '14px',
-                      boxShadow: '0 5px 0 rgba(0,0,0,0.25)',
-                      opacity: 0.75
-                    }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span aria-hidden="true">🔒</span>
-                      <span>TOURNAMENT MODE</span>
-                    </span>
-                    <span style={{
-                      ...condFont,
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      letterSpacing: '0.2em',
-                      color: colours.gold,
-                      opacity: 0.95
-                    }}>
-                      OPENS 11 JUNE
-                    </span>
-                  </button>
-                )}
+                {/* TOURNAMENT MODE moved above chalkboard in Stage 22.7 */}
 
                 {/* PLAY TODAY — yellow */}
                 <button
@@ -5522,6 +5508,34 @@ Deliver your verdict as JSON.`;
                   ) : (
                     <span>2 PLAYER MODE</span>
                   )}
+                </button>
+
+                {/* Stage 22.7: MY DAILY QUESTION STATS — desktop variant.
+                    Slim gold outline, smaller than the play buttons. */}
+                <button
+                  onClick={() => setScreen('stats')}
+                  className="kick3-button-hover"
+                  style={{
+                    width: '100%',
+                    padding: '15px 24px',
+                    background: 'transparent',
+                    color: colours.gold,
+                    border: `1.5px solid ${colours.gold}`,
+                    borderRadius: '12px',
+                    ...displayFont,
+                    fontSize: 'clamp(14px, 1.3vw, 17px)',
+                    fontWeight: 700,
+                    letterSpacing: '0.14em',
+                    cursor: 'pointer',
+                    marginBottom: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px'
+                  }}
+                >
+                  <span style={{ fontSize: '16px', letterSpacing: 0 }} aria-hidden="true">📊</span>
+                  <span>MY DAILY QUESTION STATS</span>
                 </button>
 
                 {/* Countdown */}
@@ -8207,8 +8221,8 @@ Deliver your verdict as JSON.`;
                 <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px' }}>
                   ALL-TIME RECORD
                 </div>
-                <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 8vw, 48px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
-                  MY STATS
+                <h1 style={{ ...displayFont, fontSize: 'clamp(28px, 7vw, 40px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.03em', lineHeight: 1 }}>
+                  MY DAILY QUESTION STATS
                 </h1>
               </div>
 
