@@ -4563,13 +4563,13 @@ Deliver your verdict as JSON.`;
                     flex: 1,
                     background: '#5fb04a',
                     color: '#0a1a08',
-                    ...condFont,
-                    fontSize: '11px',
+                    ...displayFont,
+                    fontSize: '12px',
                     fontWeight: 700,
-                    letterSpacing: '0.2em',
+                    letterSpacing: '0.14em',
                     padding: '8px 10px',
                     borderRadius: '5px',
-                    border: '1px solid #5fb04a',
+                    border: '1.5px solid #ffffff',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -4589,13 +4589,13 @@ Deliver your verdict as JSON.`;
                     flex: 1,
                     background: '#5fb04a',
                     color: '#0a1a08',
-                    ...condFont,
-                    fontSize: '11px',
+                    ...displayFont,
+                    fontSize: '12px',
                     fontWeight: 700,
-                    letterSpacing: '0.2em',
+                    letterSpacing: '0.14em',
                     padding: '8px 10px',
                     borderRadius: '5px',
-                    border: '1px solid #5fb04a',
+                    border: '1.5px solid #ffffff',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -4849,7 +4849,7 @@ Deliver your verdict as JSON.`;
                 )}
               </button>
 
-              {/* Stage 22.11: MY DAILY QUESTION STATS — light blue fill + outline, black text, emoji back. */}
+              {/* Stage 22.13: MY DAILY QUESTION STATS — blue fill, white text (cream). */}
               <button
                 onClick={() => setScreen('stats')}
                 className="kick3-button-hover"
@@ -4857,7 +4857,7 @@ Deliver your verdict as JSON.`;
                   width: '100%',
                   padding: '13px 20px',
                   background: '#4a90d4',
-                  color: '#000000',
+                  color: colours.cream,
                   border: '1.5px solid #4a90d4',
                   borderRadius: '10px',
                   ...displayFont,
@@ -4876,7 +4876,7 @@ Deliver your verdict as JSON.`;
                 <span>MY DAILY QUESTION STATS</span>
               </button>
 
-              {/* Stage 22.12: HOW TO PLAY — darker blue, hover animation, matched displayFont. */}
+              {/* Stage 22.13: HOW TO PLAY — blue fill, white text (cream). */}
               <button
                 onClick={() => setScreen('howto')}
                 className="kick3-button-hover"
@@ -4885,7 +4885,7 @@ Deliver your verdict as JSON.`;
                   marginTop: '24px',
                   padding: '14px 20px',
                   background: '#4a90d4',
-                  color: '#000000',
+                  color: colours.cream,
                   border: '1.5px solid #4a90d4',
                   borderRadius: '8px',
                   ...displayFont,
@@ -5246,13 +5246,13 @@ Deliver your verdict as JSON.`;
                       flex: 1,
                       background: '#5fb04a',
                       color: '#0a1a08',
-                      ...condFont,
-                      fontSize: '13px',
+                      ...displayFont,
+                      fontSize: '14px',
                       fontWeight: 700,
-                      letterSpacing: '0.25em',
+                      letterSpacing: '0.16em',
                       padding: '10px 14px',
                       borderRadius: '6px',
-                      border: '1px solid #5fb04a',
+                      border: '1.5px solid #ffffff',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -5272,13 +5272,13 @@ Deliver your verdict as JSON.`;
                       flex: 1,
                       background: '#5fb04a',
                       color: '#0a1a08',
-                      ...condFont,
-                      fontSize: '13px',
+                      ...displayFont,
+                      fontSize: '14px',
                       fontWeight: 700,
-                      letterSpacing: '0.25em',
+                      letterSpacing: '0.16em',
                       padding: '10px 14px',
                       borderRadius: '6px',
-                      border: '1px solid #5fb04a',
+                      border: '1.5px solid #ffffff',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -5531,7 +5531,7 @@ Deliver your verdict as JSON.`;
                   )}
                 </button>
 
-                {/* Stage 22.11 (desktop): MY DAILY QUESTION STATS — blue fill + outline, emoji back. */}
+                {/* Stage 22.13 (desktop): MY DAILY QUESTION STATS — blue fill, white text (cream). */}
                 <button
                   onClick={() => setScreen('stats')}
                   className="kick3-button-hover"
@@ -5539,7 +5539,7 @@ Deliver your verdict as JSON.`;
                     width: '100%',
                     padding: '15px 24px',
                     background: '#4a90d4',
-                    color: '#000000',
+                    color: colours.cream,
                     border: '1.5px solid #4a90d4',
                     borderRadius: '12px',
                     ...displayFont,
@@ -5558,7 +5558,7 @@ Deliver your verdict as JSON.`;
                   <span>MY DAILY QUESTION STATS</span>
                 </button>
 
-                {/* Stage 22.12 (desktop): HOW TO PLAY — darker blue, hover, matched displayFont. */}
+                {/* Stage 22.13 (desktop): HOW TO PLAY — blue fill, white text (cream). */}
                 <button
                   onClick={() => setScreen('howto')}
                   className="kick3-button-hover"
@@ -5567,7 +5567,7 @@ Deliver your verdict as JSON.`;
                     marginTop: '28px',
                     padding: '16px 22px',
                     background: '#4a90d4',
-                    color: '#000000',
+                    color: colours.cream,
                     border: '1.5px solid #4a90d4',
                     borderRadius: '10px',
                     ...displayFont,
