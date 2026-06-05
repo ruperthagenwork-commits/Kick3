@@ -4328,90 +4328,8 @@ Deliver your verdict as JSON.`;
                   alt="Pete the Pundit asleep in his study"
                 />
               </picture>
-              {/* Stage 22 top status row — single horizontal row spanning the
-                  top of the Pete illustration with FOUR evenly-spaced pills:
-                  DAY · LEADERBOARDS · STATS · TROPHIES.
-                  - DAY is a label (not tappable)
-                  - LEADERBOARDS routes to 'leaderboard' screen
-                  - STATS routes to 'stats' screen
-                  - TROPHIES routes to tournament-record screen
-                  Letter-spacing tightened from 0.3em to 0.18em and font-size
-                  dropped to 10px so all four fit comfortably on a 360px phone.
-                  whiteSpace: nowrap on each pill prevents two-line wrap. */}
-              <div style={{
-                position: 'absolute',
-                top: '14px',
-                left: '12px',
-                right: '12px',
-                display: 'flex',
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '6px',
-                zIndex: 2
-              }}>
-                {/* DAY pill — non-tappable label */}
-                <div style={{
-                  background: 'rgba(20,20,30,0.85)',
-                  color: colours.gold,
-                  ...condFont,
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  letterSpacing: '0.18em',
-                  padding: '6px 8px',
-                  borderRadius: '4px',
-                  border: `1px solid ${colours.gold}`,
-                  whiteSpace: 'nowrap'
-                }}>
-                  DAY {TODAYS_QUESTION.number}
-                </div>
-                {/* LEADERBOARDS pill — Stage 22. Tap routes to leaderboard.
-                    Signed-out tap prompts sign-in (handled in the leaderboard
-                    route itself). Always visible. */}
-                <button
-                  onClick={() => setScreen('leaderboard')}
-                  aria-label="View leaderboard"
-                  style={{
-                    background: 'rgba(20,20,30,0.85)',
-                    color: colours.gold,
-                    ...condFont,
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    letterSpacing: '0.18em',
-                    padding: '6px 8px',
-                    borderRadius: '4px',
-                    border: `1px solid ${colours.gold}`,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  LEADERBOARDS
-                </button>
-                {/* TROPHIES pill */}
-                <button
-                  onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
-                  aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
-                  style={{
-                    background: 'rgba(20,20,30,0.85)',
-                    color: colours.gold,
-                    ...condFont,
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    letterSpacing: '0.18em',
-                    padding: '6px 8px',
-                    borderRadius: '4px',
-                    border: `1px solid ${colours.gold}`,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  <span style={{ fontSize: '12px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
-                  <span>{homeTrophyCount}</span>
-                </button>
-              </div>
+              {/* Stage 22.10: top status row removed. DAY moved into chalkboard.
+                  LEADERBOARDS + TROPHIES moved beneath the TOURNAMENT MODE button. */}
             </div>
 
             {/* Navy UI panel below illustration */}
@@ -4629,6 +4547,67 @@ Deliver your verdict as JSON.`;
                 </button>
               )}
 
+              {/* Stage 22.10: split pills beneath the tournament button.
+                  Two thin pills side-by-side: 📊 LEADERBOARDS on left,
+                  🏆 N TROPHIES on right. Inherits the muted top-row style. */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'row',
+                gap: '8px',
+                marginBottom: '20px'
+              }}>
+                <button
+                  onClick={() => setScreen('leaderboard')}
+                  aria-label="View leaderboard"
+                  style={{
+                    flex: 1,
+                    background: 'rgba(20,20,30,0.85)',
+                    color: colours.gold,
+                    ...condFont,
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    letterSpacing: '0.2em',
+                    padding: '8px 10px',
+                    borderRadius: '5px',
+                    border: `1px solid ${colours.gold}`,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">📊</span>
+                  <span>LEADERBOARDS</span>
+                </button>
+                <button
+                  onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
+                  aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
+                  style={{
+                    flex: 1,
+                    background: 'rgba(20,20,30,0.85)',
+                    color: colours.gold,
+                    ...condFont,
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    letterSpacing: '0.2em',
+                    padding: '8px 10px',
+                    borderRadius: '5px',
+                    border: `1px solid ${colours.gold}`,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
+                  <span>TROPHIES {homeTrophyCount}</span>
+                </button>
+              </div>
+
               {/* Stage 22.9: PICTURE FRAME enclosing all daily-question content.
                   Thin wooden border + gold inner accent line, transparent interior
                   (page background shows through). Contains: chalkboard question,
@@ -4669,7 +4648,7 @@ Deliver your verdict as JSON.`;
                     marginBottom: '4px',
                     position: 'relative'
                   }}>
-                    TODAY&apos;S QUESTION
+                    DAY {TODAYS_QUESTION.number}: TODAY&apos;S QUESTION
                   </div>
                   <div style={{
                     width: '36px',
@@ -4708,6 +4687,42 @@ Deliver your verdict as JSON.`;
                 {/* Spacer between chalkboard slate and the play buttons.
                     Same picture frame contains both. */}
                 <div style={{ height: '14px' }} />
+
+              {/* Pete's italic intro quote — moved up in Stage 22.10 */}
+              <p style={{
+                ...condFont,
+                fontStyle: 'italic',
+                fontSize: '13px',
+                color: colours.muted,
+                textAlign: 'center',
+                margin: '0 0 12px 0',
+                padding: '0 8px',
+                lineHeight: '1.5',
+                opacity: 0.85
+              }}>
+                &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
+              </p>
+
+              {/* Countdown — moved up in Stage 22.10 to sit beneath Pete quote */}
+              <div style={{
+                ...condFont,
+                fontSize: '11px',
+                letterSpacing: '0.06em',
+                color: colours.cream,
+                fontWeight: 700,
+                textAlign: 'center',
+                marginBottom: '18px'
+              }}>
+                NEXT QUESTION IN{' '}
+                <span style={{
+                  color: colours.gold,
+                  fontWeight: 800,
+                  fontVariantNumeric: 'tabular-nums',
+                  marginLeft: '4px'
+                }}>
+                  {timeUntilNext}
+                </span>
+              </div>
 
               {/* PLAY TODAY — yellow */}
               <button
@@ -4833,19 +4848,17 @@ Deliver your verdict as JSON.`;
                 )}
               </button>
 
-              {/* Stage 22.7: MY DAILY QUESTION STATS — slim gold-outlined button
-                  beneath the two play modes. Visually quieter than the play
-                  buttons so users don't mistake it for a game mode. Routes to
-                  the existing stats screen. */}
+              {/* Stage 22.10: MY DAILY QUESTION STATS — restyled as white pill
+                  with black text. Emoji removed (now lives on LEADERBOARDS pill). */}
               <button
                 onClick={() => setScreen('stats')}
                 className="kick3-button-hover"
                 style={{
                   width: '100%',
                   padding: '13px 20px',
-                  background: 'transparent',
-                  color: colours.gold,
-                  border: `1.5px solid ${colours.gold}`,
+                  background: '#ffffff',
+                  color: '#000000',
+                  border: '1.5px solid #ffffff',
                   borderRadius: '10px',
                   ...displayFont,
                   fontSize: 'clamp(13px, 3.6vw, 15px)',
@@ -4855,60 +4868,22 @@ Deliver your verdict as JSON.`;
                   marginBottom: '20px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '10px'
+                  justifyContent: 'center'
                 }}
               >
-                <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📊</span>
                 <span>MY DAILY QUESTION STATS</span>
               </button>
 
-              {/* Countdown */}
-              <div style={{
-                ...condFont,
-                fontSize: '11px',
-                letterSpacing: '0.06em',
-                color: colours.cream,
-                fontWeight: 700,
-                textAlign: 'center',
-                marginBottom: '18px'
-              }}>
-                NEXT QUESTION IN{' '}
-                <span style={{
-                  color: colours.gold,
-                  fontWeight: 800,
-                  fontVariantNumeric: 'tabular-nums',
-                  marginLeft: '4px'
-                }}>
-                  {timeUntilNext}
-                </span>
-              </div>
-
-              {/* Pete's italic intro quote */}
-              <p style={{
-                ...condFont,
-                fontStyle: 'italic',
-                fontSize: '13px',
-                color: colours.muted,
-                textAlign: 'center',
-                margin: 0,
-                padding: '0 8px',
-                lineHeight: '1.5',
-                opacity: 0.85
-              }}>
-                &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
-              </p>
-
-              {/* HOW TO PLAY — secondary button, visible in bottom third of home */}
+              {/* Stage 22.10: HOW TO PLAY — white pill with light blue border. */}
               <button
                 onClick={() => setScreen('howto')}
                 style={{
                   width: '100%',
                   marginTop: '24px',
                   padding: '14px 20px',
-                  background: 'transparent',
-                  color: colours.gold,
-                  border: `1.5px solid ${colours.gold}`,
+                  background: '#ffffff',
+                  color: '#000000',
+                  border: '1.5px solid #8ec8e8',
                   borderRadius: '8px',
                   ...condFont,
                   fontSize: '13px',
@@ -5039,81 +5014,8 @@ Deliver your verdict as JSON.`;
                     alt="Pete the Pundit asleep in his study"
                   />
                 </picture>
-                {/* Stage 22 top status row — desktop variant of the same
-                    four-pill row used on phone. Larger font, more breathing
-                    room. Same routing logic. */}
-                <div style={{
-                  position: 'absolute',
-                  top: '18px',
-                  left: '18px',
-                  right: '18px',
-                  display: 'flex',
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '12px',
-                  zIndex: 2
-                }}>
-                  {/* DAY pill — non-tappable label */}
-                  <div style={{
-                    background: 'rgba(20,20,30,0.85)',
-                    color: colours.gold,
-                    ...condFont,
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    letterSpacing: '0.3em',
-                    padding: '8px 14px',
-                    borderRadius: '4px',
-                    border: `1px solid ${colours.gold}`,
-                    whiteSpace: 'nowrap'
-                  }}>
-                    DAY {TODAYS_QUESTION.number}
-                  </div>
-                  {/* LEADERBOARDS pill */}
-                  <button
-                    onClick={() => setScreen('leaderboard')}
-                    aria-label="View leaderboard"
-                    style={{
-                      background: 'rgba(20,20,30,0.85)',
-                      color: colours.gold,
-                      ...condFont,
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      letterSpacing: '0.3em',
-                      padding: '8px 14px',
-                      borderRadius: '4px',
-                      border: `1px solid ${colours.gold}`,
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    LEADERBOARDS
-                  </button>
-                  {/* TROPHIES pill */}
-                  <button
-                    onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
-                    aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
-                    style={{
-                      background: 'rgba(20,20,30,0.85)',
-                      color: colours.gold,
-                      ...condFont,
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      letterSpacing: '0.3em',
-                      padding: '8px 14px',
-                      borderRadius: '4px',
-                      border: `1px solid ${colours.gold}`,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
-                    <span>{homeTrophyCount}</span>
-                  </button>
-                </div>
+                {/* Stage 22.10: top status row removed (desktop). DAY moved into
+                    chalkboard. LEADERBOARDS + TROPHIES moved beneath TOURNAMENT. */}
               </div>
 
               {/* Navy UI panel below */}
@@ -5326,6 +5228,65 @@ Deliver your verdict as JSON.`;
                   </button>
                 )}
 
+                {/* Stage 22.10 (desktop): split pills beneath the tournament button. */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  gap: '12px',
+                  marginBottom: '24px'
+                }}>
+                  <button
+                    onClick={() => setScreen('leaderboard')}
+                    aria-label="View leaderboard"
+                    style={{
+                      flex: 1,
+                      background: 'rgba(20,20,30,0.85)',
+                      color: colours.gold,
+                      ...condFont,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      letterSpacing: '0.25em',
+                      padding: '10px 14px',
+                      borderRadius: '6px',
+                      border: `1px solid ${colours.gold}`,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">📊</span>
+                    <span>LEADERBOARDS</span>
+                  </button>
+                  <button
+                    onClick={() => { setRecordReturnScreen('home'); setScreen('tournament-record'); }}
+                    aria-label={`Tournament trophies: ${homeTrophyCount}. View record.`}
+                    style={{
+                      flex: 1,
+                      background: 'rgba(20,20,30,0.85)',
+                      color: colours.gold,
+                      ...condFont,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      letterSpacing: '0.25em',
+                      padding: '10px 14px',
+                      borderRadius: '6px',
+                      border: `1px solid ${colours.gold}`,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span style={{ fontSize: '15px', letterSpacing: 0 }} aria-hidden="true">🏆</span>
+                    <span>TROPHIES {homeTrophyCount}</span>
+                  </button>
+                </div>
+
                 {/* Stage 22.9: PICTURE FRAME enclosing all daily-question content
                     on desktop. Same approach as phone — thin wooden border + gold
                     inner accent line, transparent interior. */}
@@ -5364,7 +5325,7 @@ Deliver your verdict as JSON.`;
                       marginBottom: '6px',
                       position: 'relative'
                     }}>
-                      TODAY&apos;S QUESTION
+                      DAY {TODAYS_QUESTION.number}: TODAY&apos;S QUESTION
                     </div>
                     <div style={{
                       width: '44px',
@@ -5402,6 +5363,42 @@ Deliver your verdict as JSON.`;
 
                   {/* Spacer between chalkboard slate and the play buttons. */}
                   <div style={{ height: '18px' }} />
+
+                {/* Pete's italic intro quote — moved up in Stage 22.10 */}
+                <p style={{
+                  ...condFont,
+                  fontStyle: 'italic',
+                  fontSize: '15px',
+                  color: colours.muted,
+                  textAlign: 'center',
+                  margin: '0 0 14px 0',
+                  padding: '0 10px',
+                  lineHeight: '1.5',
+                  opacity: 0.85
+                }}>
+                  &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
+                </p>
+
+                {/* Countdown — moved up in Stage 22.10 to sit beneath Pete quote */}
+                <div style={{
+                  ...condFont,
+                  fontSize: '13px',
+                  letterSpacing: '0.06em',
+                  color: colours.cream,
+                  fontWeight: 700,
+                  textAlign: 'center',
+                  marginBottom: '20px'
+                }}>
+                  NEXT QUESTION IN{' '}
+                  <span style={{
+                    color: colours.gold,
+                    fontWeight: 800,
+                    fontVariantNumeric: 'tabular-nums',
+                    marginLeft: '4px'
+                  }}>
+                    {timeUntilNext}
+                  </span>
+                </div>
 
                 {/* TOURNAMENT MODE moved above chalkboard in Stage 22.7 */}
 
@@ -5529,17 +5526,16 @@ Deliver your verdict as JSON.`;
                   )}
                 </button>
 
-                {/* Stage 22.7: MY DAILY QUESTION STATS — desktop variant.
-                    Slim gold outline, smaller than the play buttons. */}
+                {/* Stage 22.10 (desktop): MY DAILY QUESTION STATS — white pill, no emoji. */}
                 <button
                   onClick={() => setScreen('stats')}
                   className="kick3-button-hover"
                   style={{
                     width: '100%',
                     padding: '15px 24px',
-                    background: 'transparent',
-                    color: colours.gold,
-                    border: `1.5px solid ${colours.gold}`,
+                    background: '#ffffff',
+                    color: '#000000',
+                    border: '1.5px solid #ffffff',
                     borderRadius: '12px',
                     ...displayFont,
                     fontSize: 'clamp(14px, 1.3vw, 17px)',
@@ -5549,60 +5545,22 @@ Deliver your verdict as JSON.`;
                     marginBottom: '24px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '12px'
+                    justifyContent: 'center'
                   }}
                 >
-                  <span style={{ fontSize: '16px', letterSpacing: 0 }} aria-hidden="true">📊</span>
                   <span>MY DAILY QUESTION STATS</span>
                 </button>
 
-                {/* Countdown */}
-                <div style={{
-                  ...condFont,
-                  fontSize: '13px',
-                  letterSpacing: '0.06em',
-                  color: colours.cream,
-                  fontWeight: 700,
-                  textAlign: 'center',
-                  marginBottom: '20px'
-                }}>
-                  NEXT QUESTION IN{' '}
-                  <span style={{
-                    color: colours.gold,
-                    fontWeight: 800,
-                    fontVariantNumeric: 'tabular-nums',
-                    marginLeft: '4px'
-                  }}>
-                    {timeUntilNext}
-                  </span>
-                </div>
-
-                {/* Pete's italic intro quote */}
-                <p style={{
-                  ...condFont,
-                  fontStyle: 'italic',
-                  fontSize: '15px',
-                  color: colours.muted,
-                  textAlign: 'center',
-                  margin: 0,
-                  padding: '0 10px',
-                  lineHeight: '1.5',
-                  opacity: 0.85
-                }}>
-                  &ldquo;{TODAYS_QUESTION.ronIntro}&rdquo;
-                </p>
-
-                {/* HOW TO PLAY — secondary button, visible in bottom third of home */}
+                {/* Stage 22.10 (desktop): HOW TO PLAY — white pill with light blue border. */}
                 <button
                   onClick={() => setScreen('howto')}
                   style={{
                     width: '100%',
                     marginTop: '28px',
                     padding: '16px 22px',
-                    background: 'transparent',
-                    color: colours.gold,
-                    border: `1.5px solid ${colours.gold}`,
+                    background: '#ffffff',
+                    color: '#000000',
+                    border: '1.5px solid #8ec8e8',
                     borderRadius: '10px',
                     ...condFont,
                     fontSize: '14px',
