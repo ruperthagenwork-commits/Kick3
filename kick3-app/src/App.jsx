@@ -2215,6 +2215,22 @@ export default function Kick3() {
   const [deleteConfirmStage, setDeleteConfirmStage] = useState(0);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
 
+  // Leaderboard state (Stage 22.4 — data layer for leaderboard screen).
+  // leaderboardRows: array of { handle, trophy_count, tournaments_attempted, distinct_days_played }
+  //   from the leaderboard_view, top 50 ordered by (trophy_count desc, attempts desc).
+  // leaderboardUserRank: { rank, row } | null — the signed-in user's position,
+  //   even if outside top 50. null if user has no trophies.
+  // leaderboardLastFetched: timestamp of last successful fetch (used for
+  //   the "Updated Xs ago" display).
+  // leaderboardLoading: true during the very first fetch (so the placeholder
+  //   doesn't flash). Subsequent polling refreshes are silent.
+  // leaderboardError: human-readable error string, or '' if no error.
+  const [leaderboardRows, setLeaderboardRows] = useState([]);
+  const [leaderboardUserRank, setLeaderboardUserRank] = useState(null);
+  const [leaderboardLastFetched, setLeaderboardLastFetched] = useState(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState('');
+
   // Check Supabase session once on mount; subscribe to auth state changes.
   // Session is persisted in localStorage by Supabase, so a previously signed-in
   // user is restored automatically on page reload.
@@ -2813,6 +2829,129 @@ export default function Kick3() {
     return { tier: 'NONE', label: '', color: null, textColor: null, daysToNext: 7 - d };
   };
   // ============ END DISTINCT DAYS PLAYED ============
+
+  // ============ LEADERBOARD FETCH (Stage 22.4 — data layer) ============
+  // Reads from the leaderboard_view created in Stage A.
+  // View is granted SELECT to authenticated users only — signed-out queries
+  // will fail with a permission error, which is correct (leaderboard requires
+  // sign-in per the locked design rule).
+  //
+  // Two main helpers:
+  //   - fetchLeaderboardTop50() → array of rows, ordered by view definition
+  //     (trophy_count desc, tournaments_attempted desc).
+  //   - fetchUserRank(handle) → { rank: N, row } | null. The view is already
+  //     ordered, but Supabase doesn't expose row_number(), so we count rows
+  //     above the user instead. Cheap at our scale.
+  //
+  // Both return promises. Errors are caught and surfaced via leaderboardError.
+
+  const fetchLeaderboardTop50 = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('leaderboard_view')
+        .select('handle, trophy_count, tournaments_attempted, distinct_days_played')
+        .limit(50);
+      if (error) {
+        if (typeof console !== 'undefined') {
+          console.warn('[kick3] leaderboard top50 fetch failed:', error);
+        }
+        return { rows: [], error };
+      }
+      return { rows: data || [], error: null };
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] leaderboard top50 fetch threw:', err);
+      }
+      return { rows: [], error: err };
+    }
+  };
+
+  // Find a specific handle's rank. Strategy: count rows in the view that
+  // rank ABOVE the given handle (i.e. higher trophy_count, or same trophies
+  // with more attempts). Add 1 = the rank. No row_number() needed.
+  // Returns { rank, row } if found, or null if the handle isn't in the view
+  // (e.g. user with 0 trophies — they're filtered out by the view itself).
+  const fetchUserRank = async (handle) => {
+    if (!handle) return null;
+    try {
+      // Step 1: get the user's own row from the view.
+      const { data: ownData, error: ownErr } = await supabase
+        .from('leaderboard_view')
+        .select('handle, trophy_count, tournaments_attempted, distinct_days_played')
+        .eq('handle', handle)
+        .maybeSingle();
+      if (ownErr || !ownData) {
+        // User isn't in the view yet — probably has zero trophies.
+        return null;
+      }
+      // Step 2: count rows that beat the user's row. The view's ORDER BY is
+      // (trophy_count desc, tournaments_attempted desc), so "beat" means:
+      //   trophy_count > userTrophies
+      //   OR (trophy_count == userTrophies AND attempts > userAttempts)
+      // Two queries; results summed = rows above the user.
+      const userTrophies = ownData.trophy_count;
+      const userAttempts = ownData.tournaments_attempted;
+
+      // (a) Rows with strictly more trophies.
+      const { count: higherTrophyCount, error: higherErr } = await supabase
+        .from('leaderboard_view')
+        .select('*', { count: 'exact', head: true })
+        .gt('trophy_count', userTrophies);
+      if (higherErr) return null;
+
+      // (b) Rows with same trophies AND more attempts.
+      const { count: sameTrophyMoreAttempts, error: sameErr } = await supabase
+        .from('leaderboard_view')
+        .select('*', { count: 'exact', head: true })
+        .eq('trophy_count', userTrophies)
+        .gt('tournaments_attempted', userAttempts);
+      if (sameErr) return null;
+
+      const rank = (higherTrophyCount || 0) + (sameTrophyMoreAttempts || 0) + 1;
+      return { rank, row: ownData };
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] user rank fetch threw:', err);
+      }
+      return null;
+    }
+  };
+
+  // Combined leaderboard refresh — called by the screen's polling effect AND
+  // by the manual REFRESH button. Wraps both fetches and updates all state.
+  // Silent on success (no flicker). Sets error on failure.
+  const refreshLeaderboard = async (isFirstFetch = false) => {
+    if (!authUser) return;
+    if (isFirstFetch) setLeaderboardLoading(true);
+    try {
+      const { rows, error: top50Err } = await fetchLeaderboardTop50();
+      if (top50Err) {
+        setLeaderboardError('Couldn\u2019t load the leaderboard. Try again.');
+        if (isFirstFetch) setLeaderboardLoading(false);
+        return;
+      }
+      setLeaderboardRows(rows);
+      setLeaderboardError('');
+      setLeaderboardLastFetched(Date.now());
+
+      // Find the signed-in user's rank. Need their handle from authProfile.
+      const myHandle = authProfile && authProfile.handle;
+      if (myHandle) {
+        const userRank = await fetchUserRank(myHandle);
+        setLeaderboardUserRank(userRank);
+      } else {
+        setLeaderboardUserRank(null);
+      }
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.warn('[kick3] refreshLeaderboard threw:', err);
+      }
+      setLeaderboardError('Network error. Try again.');
+    } finally {
+      if (isFirstFetch) setLeaderboardLoading(false);
+    }
+  };
+  // ============ END LEADERBOARD FETCH ============
   // ============ END CLOUD SYNC ============
 
   // ============ PROFILE SCREEN (Phase 2, Deploy 5 / Stage 20) ============
@@ -3168,6 +3307,24 @@ export default function Kick3() {
     loadProfileCloudState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, authUser]);
+
+  // Stage 22.4: leaderboard fetch + 30-second polling.
+  // Fires when entering the leaderboard screen (signed in only).
+  // On mount: immediate fetch. Then every 30s while screen is open.
+  // Cleanup on unmount cancels the interval (no leaked timers).
+  // No-op when signed out — the screen's own gate handles the prompt.
+  useEffect(() => {
+    if (screen !== 'leaderboard') return;
+    if (!authUser) return;
+    // Initial fetch with the loading flag set.
+    refreshLeaderboard(true);
+    // Then poll every 30s. Subsequent fetches don't set loading (silent).
+    const intervalId = setInterval(() => {
+      refreshLeaderboard(false);
+    }, 30000);
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, authUser, authProfile]);
 
   // ============ DAILY PLAY LIMIT (3 solo + 3 1v1 per day) ============
   // Counters reset automatically when TODAYS_QUESTION.number advances.
@@ -7638,20 +7795,140 @@ Deliver your verdict as JSON.`;
                 11 June &mdash; 19 July 2026
               </h1>
             </div>
+
+            {/* Stage 22.4 diagnostic block — replaces the placeholder with a
+                bare display of fetched data. Stage 22.5 turns this into a
+                proper leaderboard table. For now it proves the fetch works. */}
+
+            {/* Refresh + last-fetched timestamp */}
             <div style={{
-              padding: '40px 20px', background: colours.surface,
-              borderRadius: '12px', textAlign: 'center',
-              border: `1px dashed ${colours.muted}`
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: '14px', padding: '10px 14px',
+              background: colours.surface, borderRadius: '6px'
+            }}>
+              <div style={{ ...condFont, fontSize: '11px', color: colours.muted }}>
+                {leaderboardLoading
+                  ? 'Loading\u2026'
+                  : leaderboardLastFetched
+                    ? `Updated ${Math.floor((Date.now() - leaderboardLastFetched) / 1000)}s ago`
+                    : 'Not yet fetched'}
+              </div>
+              <button
+                onClick={() => refreshLeaderboard(false)}
+                style={{
+                  background: 'transparent', color: colours.gold,
+                  border: `1px solid ${colours.gold}`, borderRadius: '5px',
+                  ...condFont, fontSize: '11px', fontWeight: 600,
+                  letterSpacing: '0.2em', padding: '6px 12px',
+                  cursor: 'pointer'
+                }}
+              >
+                REFRESH
+              </button>
+            </div>
+
+            {/* Error display if fetch failed */}
+            {leaderboardError && (
+              <div style={{
+                background: 'rgba(232,52,74,0.10)',
+                border: '1px solid rgba(232,52,74,0.40)',
+                padding: '11px 14px', borderRadius: '6px',
+                marginBottom: '14px',
+                ...condFont, fontSize: '13px', color: colours.accent,
+                lineHeight: 1.4, fontWeight: 600
+              }}>
+                {leaderboardError}
+              </div>
+            )}
+
+            {/* Top 50 — bare list for 22.4 diagnostic, real table in 22.5 */}
+            <div style={{
+              padding: '14px 16px', background: colours.surface,
+              borderRadius: '8px', marginBottom: '14px'
             }}>
               <div style={{
-                ...condFont, fontSize: '13px', color: colours.muted,
-                fontStyle: 'italic', lineHeight: 1.6
+                ...condFont, fontSize: '10px', letterSpacing: '0.3em',
+                color: colours.gold, fontWeight: 700, marginBottom: '10px'
               }}>
-                Leaderboard coming soon.<br/>
-                Win tournament trophies to climb the ranks.<br/>
-                <br/>
-                Loyalty badges and live rankings activate before launch on 11 June.
+                TOP 50 ({leaderboardRows.length} {leaderboardRows.length === 1 ? 'PLAYER' : 'PLAYERS'})
               </div>
+              {leaderboardRows.length === 0 && !leaderboardLoading && (
+                <div style={{ ...condFont, fontSize: '12px', color: colours.muted, fontStyle: 'italic' }}>
+                  No trophies won yet. Be the first.
+                </div>
+              )}
+              {leaderboardRows.map((row, i) => (
+                <div key={row.handle} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '8px 0',
+                  borderBottom: i < leaderboardRows.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                  ...condFont, fontSize: '13px', color: colours.cream
+                }}>
+                  <span style={{ minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: colours.muted, marginRight: '10px' }}>#{i + 1}</span>
+                    {row.handle}
+                    <span style={{ color: colours.muted, fontSize: '11px', marginLeft: '8px' }}>
+                      ({row.distinct_days_played}d)
+                    </span>
+                  </span>
+                  <span style={{ color: colours.gold, fontWeight: 700, marginLeft: '12px' }}>
+                    🏆 {row.trophy_count}
+                  </span>
+                  <span style={{ color: colours.muted, fontSize: '11px', marginLeft: '8px', minWidth: '40px', textAlign: 'right' }}>
+                    {row.tournaments_attempted}a
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Your-rank panel — only when user has data */}
+            {leaderboardUserRank && (
+              <div style={{
+                padding: '14px 16px', background: 'rgba(212,175,55,0.06)',
+                border: '1px solid rgba(212,175,55,0.30)', borderRadius: '8px',
+                marginBottom: '14px'
+              }}>
+                <div style={{
+                  ...condFont, fontSize: '10px', letterSpacing: '0.3em',
+                  color: colours.gold, fontWeight: 700, marginBottom: '8px'
+                }}>
+                  YOUR RANK
+                </div>
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  ...condFont, fontSize: '14px', color: colours.cream
+                }}>
+                  <span>
+                    <span style={{ color: colours.gold, marginRight: '10px', fontWeight: 700 }}>
+                      #{leaderboardUserRank.rank}
+                    </span>
+                    {leaderboardUserRank.row.handle}
+                  </span>
+                  <span style={{ color: colours.gold, fontWeight: 700 }}>
+                    🏆 {leaderboardUserRank.row.trophy_count}
+                  </span>
+                </div>
+              </div>
+            )}
+            {!leaderboardUserRank && !leaderboardLoading && authProfile && (
+              <div style={{
+                padding: '12px 14px', background: colours.surface,
+                borderRadius: '8px', marginBottom: '14px',
+                ...condFont, fontSize: '12px', color: colours.muted,
+                fontStyle: 'italic', textAlign: 'center'
+              }}>
+                Win a tournament trophy to appear on the leaderboard.
+              </div>
+            )}
+
+            {/* Note for testing */}
+            <div style={{
+              padding: '10px 14px', background: 'rgba(20,20,30,0.4)',
+              borderRadius: '6px',
+              ...condFont, fontSize: '10px', color: colours.muted,
+              fontStyle: 'italic', textAlign: 'center', letterSpacing: '0.05em'
+            }}>
+              Stage 22.4 diagnostic view. Polished table coming in Stage 22.5.
             </div>
           </div>
         </div>
