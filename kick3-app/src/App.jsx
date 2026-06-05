@@ -4629,14 +4629,21 @@ Deliver your verdict as JSON.`;
                 </button>
               )}
 
-              {/* Question chalkboard — wooden frame around dark slate */}
+              {/* Stage 22.9: PICTURE FRAME enclosing all daily-question content.
+                  Thin wooden border + gold inner accent line, transparent interior
+                  (page background shows through). Contains: chalkboard question,
+                  three play/stats buttons, countdown, Pete's quote, HOW TO PLAY. */}
               <div style={{
-                background: 'linear-gradient(135deg, #6b4423 0%, #4a2e15 50%, #5c3a1d 100%)',
-                padding: '10px',
-                borderRadius: '6px',
-                marginBottom: '22px',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1)'
+                border: '5px solid #5c3a1d',
+                outline: '1px solid rgba(212,175,55,0.55)',
+                outlineOffset: '-9px',
+                background: 'transparent',
+                borderRadius: '8px',
+                padding: '18px 12px 16px 12px',
+                marginBottom: '20px',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.06)'
               }}>
+                {/* Inner chalkboard slate */}
                 <div style={{
                   background: '#1a1d23',
                   borderRadius: '3px',
@@ -4698,9 +4705,8 @@ Deliver your verdict as JSON.`;
                   </div>
                 </div>
 
-                {/* Stage 22.8: keep wooden frame open. Buttons sit inside the
-                    same chalkboard frame to visually group everything that
-                    relates to the daily question. */}
+                {/* Spacer between chalkboard slate and the play buttons.
+                    Same picture frame contains both. */}
                 <div style={{ height: '14px' }} />
 
               {/* PLAY TODAY — yellow */}
@@ -4856,7 +4862,6 @@ Deliver your verdict as JSON.`;
                 <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📊</span>
                 <span>MY DAILY QUESTION STATS</span>
               </button>
-              </div>{/* /Stage 22.8 daily-question chalkboard frame */}
 
               {/* Countdown */}
               <div style={{
@@ -4919,6 +4924,7 @@ Deliver your verdict as JSON.`;
                 <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">📖</span>
                 <span>HOW TO PLAY</span>
               </button>
+              </div>{/* /Stage 22.9 daily-question picture frame */}
 
               {/* Contact footer */}
               <div style={{
@@ -5320,14 +5326,20 @@ Deliver your verdict as JSON.`;
                   </button>
                 )}
 
-                {/* Question chalkboard — wooden frame around slate */}
+                {/* Stage 22.9: PICTURE FRAME enclosing all daily-question content
+                    on desktop. Same approach as phone — thin wooden border + gold
+                    inner accent line, transparent interior. */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #6b4423 0%, #4a2e15 50%, #5c3a1d 100%)',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  marginBottom: '26px',
-                  boxShadow: '0 3px 8px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1)'
+                  border: '7px solid #5c3a1d',
+                  outline: '1px solid rgba(212,175,55,0.55)',
+                  outlineOffset: '-12px',
+                  background: 'transparent',
+                  borderRadius: '10px',
+                  padding: '22px 16px 20px 16px',
+                  marginBottom: '24px',
+                  boxShadow: '0 3px 8px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.06)'
                 }}>
+                  {/* Inner chalkboard slate */}
                   <div style={{
                     background: '#1a1d23',
                     borderRadius: '4px',
@@ -5388,7 +5400,7 @@ Deliver your verdict as JSON.`;
                     </div>
                   </div>
 
-                  {/* Stage 22.8: wooden frame stays open. Buttons sit inside. */}
+                  {/* Spacer between chalkboard slate and the play buttons. */}
                   <div style={{ height: '18px' }} />
 
                 {/* TOURNAMENT MODE moved above chalkboard in Stage 22.7 */}
@@ -5544,7 +5556,6 @@ Deliver your verdict as JSON.`;
                   <span style={{ fontSize: '16px', letterSpacing: 0 }} aria-hidden="true">📊</span>
                   <span>MY DAILY QUESTION STATS</span>
                 </button>
-                </div>{/* /Stage 22.8 daily-question chalkboard frame */}
 
                 {/* Countdown */}
                 <div style={{
@@ -5607,6 +5618,7 @@ Deliver your verdict as JSON.`;
                   <span style={{ fontSize: '16px', letterSpacing: 0 }} aria-hidden="true">📖</span>
                   <span>HOW TO PLAY</span>
                 </button>
+                </div>{/* /Stage 22.9 daily-question picture frame */}
 
                 {/* Contact footer */}
                 <div style={{
