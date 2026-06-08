@@ -7276,7 +7276,7 @@ Deliver your verdict as JSON.`;
                   <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Save your tournament trophies forever</div>
                   <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Keep your daily score history</div>
                   <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Keep your record across phone, laptop, tablet</div>
-                  <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Compete on leaderboards (coming soon)</div>
+                  <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Compete on leaderboards (launches with Tournament Mode, 11 June)</div>
                 </div>
               </div>
             )}
@@ -8414,14 +8414,16 @@ Deliver your verdict as JSON.`;
     const tournamentStatus = getTournamentStatus(new Date());
     const debugMode = getTournamentDebugMode();
     const tournamentState = readTournamentState();
-    const playedToday = debugMode === 'unlock'
-      ? false
-      : debugMode === 'locked'
-        ? true
-        : hasPlayedTournamentToday(tournamentState);
-    // debug=unlock and debug=locked both simulate "tournament is live today" — they
-    // would be useless if insideWindow gated them out. Outside debug, insideWindow
-    // strictly enforces the real 11 Jun – 19 Jul window.
+    // Stage 22.20: debug=tournament-unlock now only bypasses the DATE check
+    // (insideWindow), not the daily attempt cap. This lets us test the 3-attempt
+    // lockout end-to-end during pre-launch. debug=tournament-locked still forces
+    // the locked-out countdown view.
+    const playedToday = debugMode === 'locked'
+      ? true
+      : hasPlayedTournamentToday(tournamentState);
+    // insideWindow stays permissive on debug — both unlock and locked simulate
+    // "tournament is live today" so the screen renders rather than showing the
+    // "not live" view. The actual play gating uses (insideWindow && !playedToday).
     const insideWindow = !!tournamentStatus || debugMode === 'unlock' || debugMode === 'locked';
     const canPlay = insideWindow && !playedToday;
 
