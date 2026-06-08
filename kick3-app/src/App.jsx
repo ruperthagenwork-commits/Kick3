@@ -8719,11 +8719,11 @@ Deliver your verdict as JSON.`;
                       </div>
                       <div>
                         <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '3px' }}>OVERALL RATING</div>
-                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>The number on each card (1&ndash;10) is the player&rsquo;s Overall rating across the six football attributes. Higher = more rounded. Only shown on your six cards, not your opponent&rsquo;s.</div>
+                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>The number on each card (1&ndash;10) is the player&rsquo;s Overall rating &mdash; the average of six attributes: One-Off, Season-Long, Style, Character, Chaos, and Legacy. Higher = more rounded. Only shown on your six cards, not your opponent&rsquo;s.</div>
                       </div>
                       <div>
                         <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '3px' }}>ROUND 3 IS DIFFERENT</div>
-                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>R1 and R2 are scored on attributes. R3 is judged on your written argument. Pete picks his own three, you pick yours, and the AI VAR decides. Both sides draft from a smaller pool of true greats.</div>
+                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>R1 and R2 are scored on attributes. R3 is judged on your written argument. Pete picks his own three, you pick yours, and the VAR decides. Both sides draft from a smaller pool of true greats.</div>
                       </div>
                     </div>
                   </div>
@@ -8957,11 +8957,11 @@ Deliver your verdict as JSON.`;
                         </div>
                         <div>
                           <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.22em', color: colours.gold, fontWeight: 700, marginBottom: '4px' }}>OVERALL RATING</div>
-                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>The number on each card (1&ndash;10) is the player&rsquo;s Overall rating across the six football attributes. Higher = more rounded. Only shown on your six cards, not your opponent&rsquo;s.</div>
+                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>The number on each card (1&ndash;10) is the player&rsquo;s Overall rating &mdash; the average of six attributes: One-Off, Season-Long, Style, Character, Chaos, and Legacy. Higher = more rounded. Only shown on your six cards, not your opponent&rsquo;s.</div>
                         </div>
                         <div>
                           <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.22em', color: colours.gold, fontWeight: 700, marginBottom: '4px' }}>ROUND 3 IS DIFFERENT</div>
-                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>R1 and R2 are scored on attributes. R3 is judged on your written argument. Pete picks his own three, you pick yours, and the AI VAR decides. Both sides draft from a smaller pool of true greats.</div>
+                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>R1 and R2 are scored on attributes. R3 is judged on your written argument. Pete picks his own three, you pick yours, and the VAR decides. Both sides draft from a smaller pool of true greats.</div>
                         </div>
                       </div>
                     </div>
