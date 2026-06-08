@@ -2182,6 +2182,11 @@ export default function Kick3() {
   // - New trophy badge on the main home screen sets this to 'home' before routing in
   const [recordReturnScreen, setRecordReturnScreen] = useState('tournament-home');
 
+  // Stage 22.21: HOW IT WORKS expandable section on tournament-home.
+  // Closed by default — players can tap to expand inline. No persistence needed;
+  // resets to closed every visit, which is fine for a short reference panel.
+  const [tournamentHowToOpen, setTournamentHowToOpen] = useState(false);
+
   // ============ AUTH STATE (Phase 2, Deploy 5 / Stage 17) ============
   // Optional sign-in: the game works fully without it. authUser is the
   // Supabase user object (or null when signed out). authProfile is the row
@@ -8663,6 +8668,68 @@ Deliver your verdict as JSON.`;
                 {contextLine}
               </div>
 
+              {/* Stage 22.21: HOW IT WORKS — collapsible. Closed by default. */}
+              <div style={{ marginBottom: '20px' }}>
+                <button
+                  onClick={() => setTournamentHowToOpen(!tournamentHowToOpen)}
+                  style={{
+                    width: '100%',
+                    background: 'transparent',
+                    color: colours.cream,
+                    border: `1px solid ${colours.gold}`,
+                    borderRadius: '6px',
+                    padding: '10px 14px',
+                    ...condFont,
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    letterSpacing: '0.18em',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <span>HOW IT WORKS &amp; RATINGS</span>
+                  <span style={{ fontSize: '14px', color: colours.gold }}>{tournamentHowToOpen ? '–' : '+'}</span>
+                </button>
+                {tournamentHowToOpen && (
+                  <div style={{
+                    border: `1px solid ${colours.gold}`,
+                    borderTop: 'none',
+                    borderRadius: '0 0 6px 6px',
+                    padding: '16px 16px 18px',
+                    marginTop: '-2px',
+                    background: 'rgba(0,0,0,0.18)'
+                  }}>
+                    <p style={{ ...condFont, fontStyle: 'italic', color: colours.cream, fontSize: '13px', lineHeight: 1.45, marginTop: 0, marginBottom: '14px', opacity: 0.9 }}>
+                      &ldquo;Three rounds. Three opponents. Beat me in the final and you walk away with a trophy.&rdquo; — Pete
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '3px' }}>THREE ROUNDS</div>
+                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>Pete&rsquo;s Pub Mate, then Pete&rsquo;s Producer, then Pete himself. Each one harder than the last.</div>
+                      </div>
+                      <div>
+                        <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '3px' }}>THE TROPHY</div>
+                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>Win all three rounds to take a trophy. Lose any round and the attempt&rsquo;s over.</div>
+                      </div>
+                      <div>
+                        <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '3px' }}>3 ATTEMPTS, 1 TROPHY</div>
+                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>Up to three goes per day. Maximum one trophy per day. Resets at UK midnight.</div>
+                      </div>
+                      <div>
+                        <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '3px' }}>OVERALL RATING</div>
+                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>The number on each card (1&ndash;10) is the player&rsquo;s Overall rating across the six football attributes. Higher = more rounded. Only shown on your six cards, not your opponent&rsquo;s.</div>
+                      </div>
+                      <div>
+                        <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '3px' }}>ROUND 3 IS DIFFERENT</div>
+                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>R1 and R2 are scored on attributes. R3 is judged on your written argument. Pete picks his own three, you pick yours, and the AI VAR decides. Both sides draft from a smaller pool of true greats.</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* PLAY NOW — green */}
               <button
                 onClick={canPlay ? startTournament : undefined}
@@ -8837,6 +8904,68 @@ Deliver your verdict as JSON.`;
                   marginRight: 'auto'
                 }}>
                   {contextLine}
+                </div>
+
+                {/* Stage 22.21 (desktop): HOW IT WORKS — collapsible. */}
+                <div style={{ maxWidth: '600px', marginLeft: 'auto', marginRight: 'auto', marginBottom: '24px' }}>
+                  <button
+                    onClick={() => setTournamentHowToOpen(!tournamentHowToOpen)}
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      color: colours.cream,
+                      border: `1px solid ${colours.gold}`,
+                      borderRadius: '7px',
+                      padding: '12px 18px',
+                      ...condFont,
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      letterSpacing: '0.2em',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <span>HOW IT WORKS &amp; RATINGS</span>
+                    <span style={{ fontSize: '16px', color: colours.gold }}>{tournamentHowToOpen ? '–' : '+'}</span>
+                  </button>
+                  {tournamentHowToOpen && (
+                    <div style={{
+                      border: `1px solid ${colours.gold}`,
+                      borderTop: 'none',
+                      borderRadius: '0 0 7px 7px',
+                      padding: '20px 22px 22px',
+                      marginTop: '-2px',
+                      background: 'rgba(0,0,0,0.18)'
+                    }}>
+                      <p style={{ ...condFont, fontStyle: 'italic', color: colours.cream, fontSize: '14px', lineHeight: 1.45, marginTop: 0, marginBottom: '16px', opacity: 0.9 }}>
+                        &ldquo;Three rounds. Three opponents. Beat me in the final and you walk away with a trophy.&rdquo; — Pete
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        <div>
+                          <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.22em', color: colours.gold, fontWeight: 700, marginBottom: '4px' }}>THREE ROUNDS</div>
+                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>Pete&rsquo;s Pub Mate, then Pete&rsquo;s Producer, then Pete himself. Each one harder than the last.</div>
+                        </div>
+                        <div>
+                          <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.22em', color: colours.gold, fontWeight: 700, marginBottom: '4px' }}>THE TROPHY</div>
+                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>Win all three rounds to take a trophy. Lose any round and the attempt&rsquo;s over.</div>
+                        </div>
+                        <div>
+                          <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.22em', color: colours.gold, fontWeight: 700, marginBottom: '4px' }}>3 ATTEMPTS, 1 TROPHY</div>
+                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>Up to three goes per day. Maximum one trophy per day. Resets at UK midnight.</div>
+                        </div>
+                        <div>
+                          <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.22em', color: colours.gold, fontWeight: 700, marginBottom: '4px' }}>OVERALL RATING</div>
+                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>The number on each card (1&ndash;10) is the player&rsquo;s Overall rating across the six football attributes. Higher = more rounded. Only shown on your six cards, not your opponent&rsquo;s.</div>
+                        </div>
+                        <div>
+                          <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.22em', color: colours.gold, fontWeight: 700, marginBottom: '4px' }}>ROUND 3 IS DIFFERENT</div>
+                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>R1 and R2 are scored on attributes. R3 is judged on your written argument. Pete picks his own three, you pick yours, and the AI VAR decides. Both sides draft from a smaller pool of true greats.</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* PLAY NOW — green */}
