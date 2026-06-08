@@ -7258,7 +7258,7 @@ Deliver your verdict as JSON.`;
 
             <div style={{ marginTop: '28px' }}>
               <p style={bodyText}>
-                Kick 3 is a daily football game built by Rupert Hagen in Farnham, UK. This notice explains what data the app collects, why, and what you can do about it. Written in plain English, no legal sleight of hand.
+                Kick 3 is a daily football game. This notice explains what data the app collects, why, and what you can do about it. Written in plain English, no legal sleight of hand.
               </p>
 
               <div style={sectionHeader}>WHAT WE COLLECT</div>
