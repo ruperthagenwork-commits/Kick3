@@ -2182,6 +2182,11 @@ export default function Kick3() {
   // - New trophy badge on the main home screen sets this to 'home' before routing in
   const [recordReturnScreen, setRecordReturnScreen] = useState('tournament-home');
 
+  // Stage 22.21: HOW IT WORKS expandable section on tournament-home.
+  // Closed by default — players can tap to expand inline. No persistence needed;
+  // resets to closed every visit, which is fine for a short reference panel.
+  const [tournamentHowToOpen, setTournamentHowToOpen] = useState(false);
+
   // ============ AUTH STATE (Phase 2, Deploy 5 / Stage 17) ============
   // Optional sign-in: the game works fully without it. authUser is the
   // Supabase user object (or null when signed out). authProfile is the row
@@ -4998,6 +5003,21 @@ Deliver your verdict as JSON.`;
                   <span style={{ fontSize: '13px', letterSpacing: 0 }} aria-hidden="true">✉️</span>
                   <span>CONTACT THE TEAM AT KICK 3 &rarr;</span>
                 </a>
+
+                {/* Stage 22.23: Privacy notice link */}
+                <div style={{ marginTop: '14px' }}>
+                  <button
+                    onClick={() => setScreen('privacy')}
+                    style={{
+                      background: 'transparent', border: 'none', padding: 0,
+                      ...condFont, fontSize: '10px', letterSpacing: '0.18em',
+                      color: colours.muted, fontWeight: 600, opacity: 0.6,
+                      cursor: 'pointer', textDecoration: 'underline'
+                    }}
+                  >
+                    PRIVACY
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -5680,6 +5700,21 @@ Deliver your verdict as JSON.`;
                     <span style={{ fontSize: '14px', letterSpacing: 0 }} aria-hidden="true">✉️</span>
                     <span>CONTACT THE TEAM AT KICK 3 &rarr;</span>
                   </a>
+
+                  {/* Stage 22.23: Privacy notice link */}
+                  <div style={{ marginTop: '14px' }}>
+                    <button
+                      onClick={() => setScreen('privacy')}
+                      style={{
+                        background: 'transparent', border: 'none', padding: 0,
+                        ...condFont, fontSize: '11px', letterSpacing: '0.18em',
+                        color: colours.muted, fontWeight: 600, opacity: 0.6,
+                        cursor: 'pointer', textDecoration: 'underline'
+                      }}
+                    >
+                      PRIVACY
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -7191,6 +7226,112 @@ Deliver your verdict as JSON.`;
     );
   }
 
+  // ---------- PRIVACY NOTICE (Stage 22.23) ----------
+  // Plain-English privacy notice. Accessible via small PRIVACY link in home footer.
+  // Effective date moves forward whenever this notice is materially updated.
+  if (screen === 'privacy') {
+    const sectionHeader = {
+      ...condFont, fontSize: '13px', letterSpacing: '0.22em',
+      color: colours.gold, fontWeight: 700, marginTop: '24px', marginBottom: '8px'
+    };
+    const bodyText = {
+      ...condFont, fontSize: '15px', color: colours.cream,
+      lineHeight: 1.55, marginBottom: '12px'
+    };
+    return (
+      <>
+        <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@0,400;0,600;1,500&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+        <div style={bgStyle}>
+          <div style={pitchOverlay} />
+          <div style={{ ...container, maxWidth: '680px' }}>
+            <div style={{ textAlign: 'center', paddingTop: '8px', marginBottom: '8px' }}>
+              <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.3em', color: colours.muted, marginBottom: '8px' }}>
+                KICK 3
+              </div>
+              <h1 style={{ ...displayFont, fontSize: 'clamp(34px, 7vw, 44px)', fontWeight: 700, color: colours.gold, margin: 0, letterSpacing: '0.04em', lineHeight: 1 }}>
+                PRIVACY
+              </h1>
+              <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.2em', color: colours.muted, marginTop: '12px' }}>
+                EFFECTIVE 9 JUNE 2026
+              </div>
+            </div>
+
+            <div style={{ marginTop: '28px' }}>
+              <p style={bodyText}>
+                Kick 3 is a daily football game. This notice explains what data the app collects, why, and what you can do about it. Written in plain English, no legal sleight of hand.
+              </p>
+
+              <div style={sectionHeader}>WHAT WE COLLECT</div>
+              <p style={bodyText}>
+                <strong>If you don&rsquo;t sign in:</strong> nothing personal. Your game state (trophies, scores, daily play counts) is stored on your own device using browser localStorage. We don&rsquo;t see it.
+              </p>
+              <p style={bodyText}>
+                <strong>If you sign in:</strong> we store your chosen handle (your public username), a password hash (handled by Supabase Auth &mdash; we never see the plaintext), your tournament trophy count, attempts, last played date, daily score history, and how many distinct days you&rsquo;ve played. That&rsquo;s it. No email required, no real name, no payment details.
+              </p>
+
+              <div style={sectionHeader}>WHY WE COLLECT IT</div>
+              <p style={bodyText}>
+                To save your progress across devices, show you your stats, and rank you on the World Cup leaderboard. Your handle is publicly visible on the leaderboard alongside your trophy count. Choose a handle accordingly.
+              </p>
+
+              <div style={sectionHeader}>WHERE IT&rsquo;S STORED</div>
+              <p style={bodyText}>
+                On <strong>Supabase</strong>, a managed Postgres service. Our project lives in their EU region. Supabase acts as our data processor. The site itself runs on <strong>Vercel</strong>. We use <strong>Vercel Analytics</strong> for basic visitor counts &mdash; it doesn&rsquo;t track individuals across sites.
+              </p>
+
+              <div style={sectionHeader}>COOKIES &amp; LOCAL STORAGE</div>
+              <p style={bodyText}>
+                Kick 3 uses browser localStorage to remember your game state, sign-in session, and play counts. Vercel and Supabase may set small functional cookies needed for the site to work and for sign-in to persist. We don&rsquo;t use advertising or tracking cookies.
+              </p>
+
+              <div style={sectionHeader}>YOUR RIGHTS</div>
+              <p style={bodyText}>
+                You can delete your account at any time from the PROFILE screen &mdash; that removes your handle and game data from our database. You can also email us to request deletion or to ask what we hold. Under UK GDPR you have the right to access, correct, and delete your personal data, and to complain to the ICO if you think we&rsquo;ve handled it badly.
+              </p>
+
+              <div style={sectionHeader}>CHILDREN</div>
+              <p style={bodyText}>
+                Kick 3 isn&rsquo;t designed for children under 13. If you&rsquo;re under 13, please don&rsquo;t sign in. If you&rsquo;re a parent and think your child has, email us and we&rsquo;ll delete the account.
+              </p>
+
+              <div style={sectionHeader}>CONTACT</div>
+              <p style={bodyText}>
+                Questions, requests, or anything else: <a href="mailto:contactkick3@gmail.com" style={{ color: colours.gold, textDecoration: 'underline' }}>contactkick3@gmail.com</a>.
+              </p>
+
+              <div style={sectionHeader}>CHANGES</div>
+              <p style={bodyText}>
+                If this notice changes, we&rsquo;ll update the effective date at the top. Material changes will be flagged to signed-in users.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setScreen('home')}
+              style={{
+                width: '100%',
+                marginTop: '32px',
+                padding: '16px',
+                background: colours.gold,
+                color: '#000',
+                border: 'none',
+                borderRadius: '8px',
+                ...displayFont,
+                fontSize: '18px',
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                cursor: 'pointer',
+                boxShadow: '0 4px 0 rgba(0,0,0,0.25)'
+              }}
+            >
+              ← BACK TO HOME
+            </button>
+          </div>
+        </div>
+        <Analytics />
+      </>
+    );
+  }
+
   // ---------- AUTH SCREEN (sign-up / sign-in) ----------
   // Phase 2, Deploy 5 / Stage 18. Single screen handles both new and returning
   // users. authMode toggles between 'signup' and 'signin' — controlled by a
@@ -7276,7 +7417,7 @@ Deliver your verdict as JSON.`;
                   <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Save your tournament trophies forever</div>
                   <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Keep your daily score history</div>
                   <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Keep your record across phone, laptop, tablet</div>
-                  <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Compete on leaderboards (coming soon)</div>
+                  <div><span style={{ color: '#5fb04a', marginRight: '8px', fontWeight: 700 }}>✓</span>Compete on leaderboards (launches with Tournament Mode, 11 June)</div>
                 </div>
               </div>
             )}
@@ -8414,14 +8555,16 @@ Deliver your verdict as JSON.`;
     const tournamentStatus = getTournamentStatus(new Date());
     const debugMode = getTournamentDebugMode();
     const tournamentState = readTournamentState();
-    const playedToday = debugMode === 'unlock'
-      ? false
-      : debugMode === 'locked'
-        ? true
-        : hasPlayedTournamentToday(tournamentState);
-    // debug=unlock and debug=locked both simulate "tournament is live today" — they
-    // would be useless if insideWindow gated them out. Outside debug, insideWindow
-    // strictly enforces the real 11 Jun – 19 Jul window.
+    // Stage 22.20: debug=tournament-unlock now only bypasses the DATE check
+    // (insideWindow), not the daily attempt cap. This lets us test the 3-attempt
+    // lockout end-to-end during pre-launch. debug=tournament-locked still forces
+    // the locked-out countdown view.
+    const playedToday = debugMode === 'locked'
+      ? true
+      : hasPlayedTournamentToday(tournamentState);
+    // insideWindow stays permissive on debug — both unlock and locked simulate
+    // "tournament is live today" so the screen renders rather than showing the
+    // "not live" view. The actual play gating uses (insideWindow && !playedToday).
     const insideWindow = !!tournamentStatus || debugMode === 'unlock' || debugMode === 'locked';
     const canPlay = insideWindow && !playedToday;
 
@@ -8661,6 +8804,68 @@ Deliver your verdict as JSON.`;
                 {contextLine}
               </div>
 
+              {/* Stage 22.21: HOW IT WORKS — collapsible. Closed by default. */}
+              <div style={{ marginBottom: '20px' }}>
+                <button
+                  onClick={() => setTournamentHowToOpen(!tournamentHowToOpen)}
+                  style={{
+                    width: '100%',
+                    background: 'transparent',
+                    color: colours.cream,
+                    border: `1px solid ${colours.gold}`,
+                    borderRadius: '6px',
+                    padding: '10px 14px',
+                    ...condFont,
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    letterSpacing: '0.18em',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <span>HOW IT WORKS &amp; RATINGS</span>
+                  <span style={{ fontSize: '14px', color: colours.gold }}>{tournamentHowToOpen ? '–' : '+'}</span>
+                </button>
+                {tournamentHowToOpen && (
+                  <div style={{
+                    border: `1px solid ${colours.gold}`,
+                    borderTop: 'none',
+                    borderRadius: '0 0 6px 6px',
+                    padding: '16px 16px 18px',
+                    marginTop: '-2px',
+                    background: 'rgba(0,0,0,0.18)'
+                  }}>
+                    <p style={{ ...condFont, fontStyle: 'italic', color: colours.cream, fontSize: '13px', lineHeight: 1.45, marginTop: 0, marginBottom: '14px', opacity: 0.9 }}>
+                      &ldquo;Three rounds. Three opponents. Beat me in the final and you walk away with a trophy.&rdquo; — Pete
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '3px' }}>THREE ROUNDS</div>
+                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>Pete&rsquo;s Pub Mate, then Pete&rsquo;s Producer, then Pete himself. Each one harder than the last.</div>
+                      </div>
+                      <div>
+                        <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '3px' }}>THE TROPHY</div>
+                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>Win all three rounds to take a trophy. Lose any round and the attempt&rsquo;s over.</div>
+                      </div>
+                      <div>
+                        <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '3px' }}>3 ATTEMPTS, 1 TROPHY</div>
+                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>Up to three goes per day. Maximum one trophy per day. Resets at UK midnight.</div>
+                      </div>
+                      <div>
+                        <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '3px' }}>OVERALL RATING</div>
+                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>The number on each card (1&ndash;10) is the player&rsquo;s Overall rating &mdash; the average of six attributes: One-Off, Season-Long, Style, Character, Chaos, and Legacy. Higher = more rounded. Only shown on your six cards, not your opponent&rsquo;s.</div>
+                      </div>
+                      <div>
+                        <div style={{ ...condFont, fontSize: '11px', letterSpacing: '0.2em', color: colours.gold, fontWeight: 700, marginBottom: '3px' }}>ROUND 3 IS DIFFERENT</div>
+                        <div style={{ ...condFont, fontSize: '13px', color: colours.cream, lineHeight: 1.4 }}>R1 and R2 are scored on attributes. R3 is judged on your written argument. Pete picks his own three, you pick yours, and the VAR decides. Both sides draft from a smaller pool of true greats.</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* PLAY NOW — green */}
               <button
                 onClick={canPlay ? startTournament : undefined}
@@ -8835,6 +9040,68 @@ Deliver your verdict as JSON.`;
                   marginRight: 'auto'
                 }}>
                   {contextLine}
+                </div>
+
+                {/* Stage 22.21 (desktop): HOW IT WORKS — collapsible. */}
+                <div style={{ maxWidth: '600px', marginLeft: 'auto', marginRight: 'auto', marginBottom: '24px' }}>
+                  <button
+                    onClick={() => setTournamentHowToOpen(!tournamentHowToOpen)}
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      color: colours.cream,
+                      border: `1px solid ${colours.gold}`,
+                      borderRadius: '7px',
+                      padding: '12px 18px',
+                      ...condFont,
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      letterSpacing: '0.2em',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <span>HOW IT WORKS &amp; RATINGS</span>
+                    <span style={{ fontSize: '16px', color: colours.gold }}>{tournamentHowToOpen ? '–' : '+'}</span>
+                  </button>
+                  {tournamentHowToOpen && (
+                    <div style={{
+                      border: `1px solid ${colours.gold}`,
+                      borderTop: 'none',
+                      borderRadius: '0 0 7px 7px',
+                      padding: '20px 22px 22px',
+                      marginTop: '-2px',
+                      background: 'rgba(0,0,0,0.18)'
+                    }}>
+                      <p style={{ ...condFont, fontStyle: 'italic', color: colours.cream, fontSize: '14px', lineHeight: 1.45, marginTop: 0, marginBottom: '16px', opacity: 0.9 }}>
+                        &ldquo;Three rounds. Three opponents. Beat me in the final and you walk away with a trophy.&rdquo; — Pete
+                      </p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        <div>
+                          <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.22em', color: colours.gold, fontWeight: 700, marginBottom: '4px' }}>THREE ROUNDS</div>
+                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>Pete&rsquo;s Pub Mate, then Pete&rsquo;s Producer, then Pete himself. Each one harder than the last.</div>
+                        </div>
+                        <div>
+                          <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.22em', color: colours.gold, fontWeight: 700, marginBottom: '4px' }}>THE TROPHY</div>
+                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>Win all three rounds to take a trophy. Lose any round and the attempt&rsquo;s over.</div>
+                        </div>
+                        <div>
+                          <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.22em', color: colours.gold, fontWeight: 700, marginBottom: '4px' }}>3 ATTEMPTS, 1 TROPHY</div>
+                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>Up to three goes per day. Maximum one trophy per day. Resets at UK midnight.</div>
+                        </div>
+                        <div>
+                          <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.22em', color: colours.gold, fontWeight: 700, marginBottom: '4px' }}>OVERALL RATING</div>
+                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>The number on each card (1&ndash;10) is the player&rsquo;s Overall rating &mdash; the average of six attributes: One-Off, Season-Long, Style, Character, Chaos, and Legacy. Higher = more rounded. Only shown on your six cards, not your opponent&rsquo;s.</div>
+                        </div>
+                        <div>
+                          <div style={{ ...condFont, fontSize: '12px', letterSpacing: '0.22em', color: colours.gold, fontWeight: 700, marginBottom: '4px' }}>ROUND 3 IS DIFFERENT</div>
+                          <div style={{ ...condFont, fontSize: '14px', color: colours.cream, lineHeight: 1.45 }}>R1 and R2 are scored on attributes. R3 is judged on your written argument. Pete picks his own three, you pick yours, and the VAR decides. Both sides draft from a smaller pool of true greats.</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* PLAY NOW — green */}
