@@ -986,7 +986,9 @@ const todayDateString = (date = new Date()) => {
 const getTournamentStatus = (date) => {
   const start = parseTournamentDate(TOURNAMENT_CONFIG.startDate);
   const end   = parseTournamentDate(TOURNAMENT_CONFIG.endDate);
-  const dayAnchor = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0));
+  // Stage 22.25: anchor on the user's LOCAL date, not UTC. UK midnight should
+  // unlock the window for UK users; UTC was an hour late in BST.
+  const dayAnchor = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0));
   if (dayAnchor < start || dayAnchor > end) return null;
   const offset = daysBetween(start, dayAnchor);
   const trioNumber = Math.floor(offset / TOURNAMENT_CONFIG.daysPerTrio) + 1;
@@ -1617,7 +1619,8 @@ const resolveOpponentPicks = (opponent) => {
 const pickTournamentAttribute = (roundNumber, date = new Date()) => {
   const attrs = ['One-Off', 'Season-Long', 'Style', 'Character', 'Chaos'];
   const start = parseTournamentDate(TOURNAMENT_CONFIG.startDate);
-  const dayAnchor = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0));
+  // Stage 22.25: anchor on local date — keeps attribute selection in sync with UK day.
+  const dayAnchor = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0));
   const offset = Math.max(0, daysBetween(start, dayAnchor));
   const trioIndex = Math.floor(offset / TOURNAMENT_CONFIG.daysPerTrio);
   // Different attribute per round but stable per trio.
@@ -4497,17 +4500,6 @@ Deliver your verdict as JSON.`;
                   aria-label="Open tournament mode"
                 >
                   <span>TOURNAMENT MODE</span>
-                  <span style={{
-                    background: 'rgba(0,0,0,0.18)',
-                    color: '#0a1a08',
-                    ...condFont,
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    letterSpacing: '0.1em',
-                    padding: '3px 7px',
-                    borderRadius: '4px',
-                    lineHeight: 1
-                  }}>BETA</span>
                 </button>
               ) : (
                 <button
@@ -5196,17 +5188,6 @@ Deliver your verdict as JSON.`;
                     aria-label="Open tournament mode"
                   >
                     <span>TOURNAMENT MODE</span>
-                    <span style={{
-                      background: 'rgba(0,0,0,0.18)',
-                      color: '#0a1a08',
-                      ...condFont,
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      letterSpacing: '0.1em',
-                      padding: '4px 8px',
-                      borderRadius: '5px',
-                      lineHeight: 1
-                    }}>BETA</span>
                   </button>
                 ) : (
                   <button
