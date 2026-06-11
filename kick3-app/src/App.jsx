@@ -2239,6 +2239,33 @@ export default function Kick3() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState('');
 
+  // Stage 22.26: session-age control.
+  // Auto-sign-out after 24 hours to prevent stale-session sync failures.
+  // Background: Supabase JWTs are short-lived and refresh automatically, but
+  // edge cases (long gaps between visits, refresh-token issues) can leave the
+  // React state thinking a user is signed in while the actual auth token is
+  // dead. That leads to silent RLS denials on writes (trophies don't sync).
+  // Forcing a fresh sign-in every 24h removes the failure mode entirely.
+  const SESSION_TIMESTAMP_KEY = 'kick3_session_started_at';
+  const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  const recordSessionStart = () => {
+    try { localStorage.setItem(SESSION_TIMESTAMP_KEY, String(Date.now())); } catch {}
+  };
+  const clearSessionStart = () => {
+    try { localStorage.removeItem(SESSION_TIMESTAMP_KEY); } catch {}
+  };
+  const isSessionExpired = () => {
+    try {
+      const ts = localStorage.getItem(SESSION_TIMESTAMP_KEY);
+      if (!ts) return true; // No timestamp = treat as expired (forces refresh of legacy sessions).
+      const age = Date.now() - parseInt(ts, 10);
+      return !Number.isFinite(age) || age > SESSION_MAX_AGE_MS;
+    } catch {
+      return true; // If localStorage is broken, fail safe by signing out.
+    }
+  };
+
   // Check Supabase session once on mount; subscribe to auth state changes.
   // Session is persisted in localStorage by Supabase, so a previously signed-in
   // user is restored automatically on page reload.
@@ -2250,6 +2277,15 @@ export default function Kick3() {
         const { data: { session } } = await supabase.auth.getSession();
         if (cancelled) return;
         if (session?.user) {
+          // Stage 22.26: enforce 24-hour session limit. Sign out silently if expired.
+          // No user-facing message — they just see the signed-out home screen.
+          if (isSessionExpired()) {
+            try { await supabase.auth.signOut(); } catch {}
+            clearSessionStart();
+            setAuthUser(null);
+            setAuthProfile(null);
+            return;
+          }
           setAuthUser(session.user);
           // Fetch matching profile row (handle, etc.). Safe if missing.
           const profile = await fetchProfileForUser(session.user.id);
@@ -2445,6 +2481,8 @@ export default function Kick3() {
       setAuthUser(newUser);
       const newProfile = await fetchProfileForUser(newUser.id);
       if (newProfile) setAuthProfile(newProfile);
+      // Stage 22.26: record sign-in timestamp for the 24-hour session-age check.
+      recordSessionStart();
       // Stage 21.1: fresh plays on account creation.
       resetDailyPlayCounts();
       setAuthSuccess(`Welcome, ${handle}.`);
@@ -2590,6 +2628,8 @@ export default function Kick3() {
       setAuthUser(signedInUser);
       const signedInProfile = await fetchProfileForUser(signedInUser.id);
       if (signedInProfile) setAuthProfile(signedInProfile);
+      // Stage 22.26: record sign-in timestamp for the 24-hour session-age check.
+      recordSessionStart();
       // Stage 21.1: fresh plays on sign-in.
       resetDailyPlayCounts();
       setAuthSuccess(`Welcome back, ${handle}.`);
@@ -2654,6 +2694,8 @@ export default function Kick3() {
   const submitSignOut = async () => {
     // Stage 21.1: reset daily play counts on sign-out for fresh-start feel.
     resetDailyPlayCounts();
+    // Stage 22.26: clear session timestamp so the next sign-in starts fresh.
+    clearSessionStart();
     try {
       await supabase.auth.signOut();
     } catch (err) {
